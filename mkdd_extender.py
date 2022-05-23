@@ -4,15 +4,48 @@ MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 48 extra cou
 """
 import argparse
 import contextlib
+import itertools
 import logging
 import os
 import shutil
+import sys
 import tempfile
 
 import rarc
 from tools import gcm
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
+"""
+List of all the known languages in the three regions.
+"""
+
+COURSES = (
+    'Luigi',
+    'Peach',
+    'BabyLuigi',
+    'Desert',
+    'Nokonoko',
+    'Mario',
+    'Daisy',
+    'Waluigi',
+    'Snow',
+    'Patapata',
+    'Yoshi',
+    'Donkey',
+    'Wario',
+    'Diddy',
+    'Koopa',
+    'Rainbow',
+)
+"""
+Internal names of the courses, in order of appearance.
+"""
+
+PREFIXES = tuple(f'{c}{i + 1:02}' for c, i in itertools.product(('A', 'B', 'C'), range(16)))
+"""
+A list of the "prefixes" that are used when naming the track archives. First letter states the page,
+and the next two digits indicate the track index in the page (from `01` to `16`).
+"""
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(module)-15s %(message)s',
                     level=logging.INFO,
@@ -44,6 +77,188 @@ def build_file_list(dirpath: str) -> 'tuple[str]':
 
     with current_directory(dirpath):
         return _build_file_list('')
+
+
+def extract_and_flatten_archive(src_filepath: str, dst_dirpath: str):
+    # Extracts a ZIP archive into the given directory. If the archive contains a single directory,
+    # it will be unwrapped. If the archive contains a nested archive, it will be extracted too.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        shutil.unpack_archive(src_filepath, tmp_dir)
+
+        paths = tuple(os.path.join(tmp_dir, p) for p in os.listdir(tmp_dir))
+
+        while len(paths) == 1:
+            # If there is only one entry, and it's another archive, apply action recursively.
+            path = paths[0]
+            if path.endswith('.zip') and os.path.isfile(path):
+                extract_and_flatten_archive(path, dst_dirpath)
+                return
+
+            # If there is only one entry, and it's a directory, make it current.
+            if os.path.isdir(path):
+                paths = tuple(os.path.join(path, p) for p in os.listdir(path))
+                continue
+
+            break
+
+        if paths:
+            os.makedirs(dst_dirpath, exist_ok=True)
+            for path in paths:
+                shutil.move(path, dst_dirpath)
+
+
+def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
+    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+
+    stream_dirpath = os.path.join(files_dirpath, 'AudioRes', 'Stream')
+    course_dirpath = os.path.join(files_dirpath, 'Course')
+    coursename_dirpath = os.path.join(files_dirpath, 'CourseName')
+    staffghosts_dirpath = os.path.join(files_dirpath, 'StaffGhosts')
+
+    with tempfile.TemporaryDirectory() as tracks_tmp_dir:
+        # Extract all ZIP archives to their respective directories.
+        zip_filepaths = tuple(
+            os.path.join(tracks_dirpath, p) for p in sorted(os.listdir(tracks_dirpath))
+            if p.endswith('.zip'))
+        prefix_to_zip_filename = {}
+        extracted = 0
+        log.info(f'Extracting ZIP archives...')
+        for prefix in PREFIXES:
+            for zip_filepath in zip_filepaths:
+                zip_filename = os.path.basename(zip_filepath)
+                if zip_filename.startswith(prefix):
+                    track_dirpath = os.path.join(tracks_tmp_dir, prefix)
+                    log.info(f'Extracting "{zip_filepath}" into "{track_dirpath}"...')
+                    extract_and_flatten_archive(zip_filepath, track_dirpath)
+                    prefix_to_zip_filename[prefix] = zip_filename
+                    extracted += 1
+                    break
+            else:
+                # For now, missing an archive will be considered an error. Perhaps a program
+                # argument (e.g. `--on-missing`) can be added, so that the user can choose between:
+                # - Print error and exit script. Default?
+                # - Fall back to the stock course in the slot that he missing track would occupy.
+                # - Disable slot by making the label and preview images transparent or black, and
+                #   replacing the course with the smallest, viable track that doesn't make the game
+                #   crash if the player ends up selecting the track.
+                log.error(f'No track assigned to {prefix}. This is fatal.')
+                sys.exit(1)
+        if extracted > 0:
+            log.info(f'{extracted} archives extracted.')
+        else:
+            log.warning(f'No archive has been extracted.')
+
+        # Copy files into the GCM temporariy dirctory.
+        log.info(f'Melding extracted directories...')
+        melded = 0
+        for prefix in PREFIXES:
+            track_dirpath = os.path.join(tracks_tmp_dir, prefix)
+            page_index = ord(prefix[0]) - ord('A')
+            track_index = int(prefix[1:3]) - 1
+            assert 0 <= page_index <= 2
+            assert 0 <= track_index <= 15
+
+            zip_filename = prefix_to_zip_filename[prefix]
+
+            log.info(f'Melding "{nodename}" ("{track_dirpath}")...')
+            melded += 1
+
+            def with_page_index_suffix(path: str) -> str:
+                stem, ext = os.path.splitext(path)
+                stem = stem[:-len(str(page_index))] + str(page_index)
+                return stem + ext
+
+            page_course_dirpath = with_page_index_suffix(course_dirpath)
+            page_coursename_dirpath = with_page_index_suffix(coursename_dirpath)
+            page_staffghosts_dirpath = with_page_index_suffix(staffghosts_dirpath)
+
+            # Start off with a copy of the original directories. Relevant files will be replaced
+            # next.
+            if not os.path.isdir(page_course_dirpath):
+                shutil.copytree(course_dirpath, page_course_dirpath)
+            if not os.path.isdir(page_coursename_dirpath):
+                shutil.copytree(coursename_dirpath, page_coursename_dirpath)
+            if not os.path.isdir(page_staffghosts_dirpath):
+                shutil.copytree(staffghosts_dirpath, page_staffghosts_dirpath)
+
+            # Copy course files.
+            track_filepath = os.path.join(track_dirpath, 'track.arc')
+            if not os.path.isfile(track_filepath):
+                log.error(f'Unable to locate `track.arc` file in "{zip_filename}". This is fatal.')
+                sys.exit(1)
+            track_mp_filepath = os.path.join(track_dirpath, 'track_mp.arc')
+            if not os.path.isfile(track_mp_filepath):
+                log.warning(f'Unable to locate `track_mp.arc` file in "{zip_filename}". '
+                            '`track.arc` will be used.')
+                track_mp_filepath = track_filepath
+            if track_index == 0:
+                track_50cc_filepath = os.path.join(track_dirpath, 'track_50cc.arc')
+                if not os.path.isfile(track_50cc_filepath):
+                    log.warning(f'Unable to locate `track_50cc.arc` file in "{zip_filename}". '
+                                '`track.arc` will be used.')
+                    track_50cc_filepath = track_filepath
+                track_mp_50cc_filepath = os.path.join(track_dirpath, 'track_mp_50cc.arc')
+                if not os.path.isfile(track_mp_50cc_filepath):
+                    log.warning(f'Unable to locate `track_mp_50cc.arc` file in "{zip_filename}". '
+                                '`track_mp.arc` will be used.')
+                    track_mp_50cc_filepath = track_mp_filepath
+            if track_index == 0:
+                page_track_filepath = os.path.join(page_course_dirpath,
+                                                   f'{COURSES[track_index]}2.arc')
+                page_track_mp_filepath = os.path.join(page_course_dirpath,
+                                                      f'{COURSES[track_index]}2L.arc')
+                page_track_50cc_filepath = os.path.join(page_course_dirpath,
+                                                        f'{COURSES[track_index]}.arc')
+                page_track_mp_50cc_filepath = os.path.join(page_course_dirpath,
+                                                           f'{COURSES[track_index]}L.arc')
+                shutil.copy2(track_filepath, page_track_filepath)
+                shutil.copy2(track_mp_filepath, page_track_mp_filepath)
+                shutil.copy2(track_50cc_filepath, page_track_50cc_filepath)
+                shutil.copy2(track_mp_50cc_filepath, page_track_mp_50cc_filepath)
+            else:
+                page_track_filepath = os.path.join(page_course_dirpath,
+                                                   f'{COURSES[track_index]}.arc')
+                page_track_mp_filepath = os.path.join(page_course_dirpath,
+                                                      f'{COURSES[track_index]}L.arc')
+                shutil.copy2(track_filepath, page_track_filepath)
+                shutil.copy2(track_mp_filepath, page_track_mp_filepath)
+
+            # Copy GHT file.
+            ght_filepath = os.path.join(track_dirpath, 'staffghost.ght')
+            if os.path.isfile(ght_filepath):
+                page_ght_filepath = os.path.join(page_staffghosts_dirpath,
+                                                 f'{COURSES[track_index]}.ght')
+                shutil.copy2(ght_filepath, page_ght_filepath)
+            else:
+                log.warning(f'Unable to locate `staffghost.ght` file in "{zip_filename}".')
+
+            # Copy audio files. Unlike with the previous files, audio files are stored in the stock
+            # directory. The names of the audio files strategically start with a "X_" prefix to
+            # ensure they are inserted after the stock audio files.
+            lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_normal.ast')
+            if not os.path.isfile(lap_music_normal_filepath):
+                # If there is only the fast version (single-lap course?), it will be used for both,
+                # and no warning is needed.
+                lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
+            if os.path.isfile(lap_music_normal_filepath):
+                dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
+                shutil.copy2(lap_music_normal_filepath, dst_ast_filepath)
+
+                lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
+                if os.path.isfile(lap_music_fast_filepath):
+                    dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
+                    shutil.copy2(lap_music_fast_filepath, dst_ast_filepath)
+                else:
+                    log.warning(f'Unable to locate `lap_music_fast.ast` in "{zip_filename}". '
+                                '`lap_music_normal.ast` will be used.')
+            else:
+                log.warning(f'Unable to locate `lap_music_normal.ast` in "{zip_filename}". Luigi '
+                            'Circuit\'s sound track will be used.')
+
+        if melded > 0:
+            log.info(f'{melded} directories melded.')
+        else:
+            log.warning(f'No directory has been melded.')
 
 
 def main():
@@ -91,7 +306,7 @@ def main():
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
 
-        # Do work here...
+        meld_courses(args.tracks, gcm_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')
