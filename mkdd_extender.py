@@ -7,7 +7,9 @@ import contextlib
 import itertools
 import logging
 import os
+import platform
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -47,11 +49,19 @@ A list of the "prefixes" that are used when naming the track archives. First let
 and the next two digits indicate the track index in the page (from `01` to `16`).
 """
 
+linux = platform.system() == 'Linux'
+windows = platform.system() == 'Windows'
+macos = platform.system() == 'Darwin'
+
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(module)-15s %(message)s',
                     level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
 log = logging.getLogger('mkdd-extender')
+
+script_path = os.path.realpath(__file__)
+script_dir = os.path.dirname(script_path)
+tools_dir = os.path.join(script_dir, 'tools')
 
 
 @contextlib.contextmanager
@@ -62,6 +72,20 @@ def current_directory(dirpath):
         yield
     finally:
         os.chdir(cwd)
+
+
+def run(command: list, verbose: bool = False, cwd: str = None) -> int:
+    with subprocess.Popen(command,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          cwd=cwd,
+                          text=True) as process:
+        output, errors = process.communicate()
+        if output and (verbose or (process.returncode and not errors)):
+            log.info(output)
+        if errors:
+            log.error(errors)
+        return process.returncode
 
 
 def build_file_list(dirpath: str) -> 'tuple[str]':
@@ -105,6 +129,43 @@ def extract_and_flatten_archive(src_filepath: str, dst_dirpath: str):
             os.makedirs(dst_dirpath, exist_ok=True)
             for path in paths:
                 shutil.move(path, dst_dirpath)
+
+
+def convert_bti_to_png(src_filepath: str, dst_filepath: str):
+    assert src_filepath.endswith('.bti')
+
+    os.makedirs(os.path.dirname(dst_filepath), exist_ok=True)
+
+    wimgt_name = 'wimgt.exe' if windows else 'wimgt-mac' if macos else 'wimgt'
+    wimgt_path = os.path.join(tools_dir, 'wimgt', wimgt_name)
+    command = (wimgt_path, 'decode', src_filepath, '-o', '-d', dst_filepath)
+
+    if 0 != run(command):
+        raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
+
+
+def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
+    assert src_filepath.endswith('.png')
+
+    os.makedirs(os.path.dirname(dst_filepath), exist_ok=True)
+
+    wimgt_name = 'wimgt.exe' if windows else 'wimgt-mac' if macos else 'wimgt'
+    wimgt_path = os.path.join(tools_dir, 'wimgt', wimgt_name)
+    command = (wimgt_path, 'encode', src_filepath, '--n-mipmaps=0', '-o', '-d', dst_filepath, '-x',
+               f'BTI.{image_format}')
+
+    if 0 != run(command):
+        raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
+
+    # Wrap S/T fields will be zeroed. It's been advised to do this:
+    #
+    #   > After converting with wimgt, hex edit the bytes at 0x06 and 0x07 to both be “00”. This
+    #   > will ensure that the images are not messed up on Nintendont.
+    #
+    # Dolphin does not show any difference with or without these bytes set.
+    with open(dst_filepath, 'r+b') as f:
+        f.seek(0x06)
+        f.write(bytes((0x00, 0x00)))
 
 
 def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
