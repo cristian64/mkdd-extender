@@ -4,14 +4,18 @@ MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 48 extra cou
 """
 import argparse
 import contextlib
+import hashlib
 import itertools
 import logging
 import os
 import platform
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+
+from PIL import Image
 
 import rarc
 from tools import gcm
@@ -62,6 +66,7 @@ log = logging.getLogger('mkdd-extender')
 script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
 tools_dir = os.path.join(script_dir, 'tools')
+data_dir = os.path.join(script_dir, 'data')
 
 
 @contextlib.contextmanager
@@ -86,6 +91,10 @@ def run(command: list, verbose: bool = False, cwd: str = None) -> int:
         if errors:
             log.error(errors)
         return process.returncode
+
+
+def md5sum(filepath: str) -> str:
+    return hashlib.md5(open(filepath, 'rb').read()).hexdigest()
 
 
 def build_file_list(dirpath: str) -> 'tuple[str]':
@@ -166,6 +175,136 @@ def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
     with open(dst_filepath, 'r+b') as f:
         f.seek(0x06)
         f.write(bytes((0x00, 0x00)))
+
+
+def crop_image_sides(image: Image.Image) -> Image.Image:
+    bbox = list(image.getbbox())
+    bbox[1] = 0
+    bbox[3] = image.height
+    return image.crop(bbox)
+
+
+def split_image(image: Image.Image) -> 'list[Image.Image]':
+    image = crop_image_sides(image)
+
+    width = image.width
+    height = image.height
+
+    for w in range(width):
+        for h in range(height):
+            r, g, b, a = image.getpixel((w, h))
+            if (r, g, b, a) != (0, 0, 0, 0):
+                break
+        else:
+            left_image = image.crop((0, 0, w, height))
+            right_images = split_image(image.crop((w + 1, 0, width, height)))
+            return [left_image] + right_images
+
+    return [image]
+
+
+def add_controls_to_title_image(src_filepath: str, dst_filepath: str, language: str):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        title_filename = os.path.basename(src_filepath)
+        tmp_filepath = os.path.join(tmp_dir, title_filename[:-len('.bti')] + '.png')
+
+        convert_bti_to_png(src_filepath, tmp_filepath)
+
+        controls_filepath = os.path.join(data_dir, 'controls', 'controls.png')
+        controls_image = Image.open(controls_filepath)
+        slash_filepath = os.path.join(data_dir, 'controls', 'slash.png')
+        slash_image = Image.open(slash_filepath)
+        slash_image = slash_image.convert('RGBA')
+
+        title_image = Image.open(tmp_filepath)
+        title_image = title_image.convert('RGBA')
+
+        canvas_width = title_image.width
+        canvas_height = title_image.height
+
+        words = split_image(title_image)
+        if language == 'Spanish':
+            words = words[0::2]  # Drop "UN" and "UNA" in Spanish, as otherwise it's too crowded.
+        words.append(slash_image)
+        words.append(controls_image)
+
+        effective_width = sum(img.width for img in words)
+
+        available_width = canvas_width - effective_width
+
+        MAX_SPACING = 10
+        spaces = len(words) - 1
+        spacing = min(MAX_SPACING, available_width // spaces)
+        spacing_width = spacing * spaces
+
+        margin_width = max(0, available_width - spacing_width)
+        offset = max(0, margin_width // 2)
+
+        ops = []
+        for word in words:
+            ops.append((word, (offset, 0)))
+            offset += spacing + word.width
+
+        image = Image.new('RGBA', (canvas_width, canvas_height))
+        for word, box in reversed(ops):
+            image.paste(word, box, word)
+        image.save(tmp_filepath)
+
+        convert_png_to_bti(tmp_filepath, dst_filepath, 'RGB5A3')
+
+
+def patch_title_lines(gcm_tmp_dir: str):
+    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+    scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
+
+    log.info(f'Patching title lines...')
+
+    for language in LANGUAGES:
+        language_dirpath = os.path.join(scenedata_dirpath, language)
+        if not os.path.isdir(language_dirpath):
+            continue
+
+        titleline_dirpath = os.path.join(language_dirpath, 'titleline')
+        timg_dir = os.path.join(titleline_dirpath, 'timg')
+        scrn_dir = os.path.join(titleline_dirpath, 'scrn')
+
+        for title_filename in ('selectcourse.bti', 'selectcup.bti'):
+            title_filepath = os.path.join(timg_dir, title_filename)
+            log.info(f'Modifying {title_filepath}...')
+            add_controls_to_title_image(title_filepath, title_filepath, language)
+
+        # Gradient colors are specified in the BLO file, which we want to avoid in the controls
+        # icons. Also, avoid the game blurrying the images.
+        menu_title_line_blo_filepath = os.path.join(scrn_dir, 'menu_title_line.blo')
+
+        log.info(f'Patching BLO file ("{menu_title_line_blo_filepath}")...')
+
+        with open(menu_title_line_blo_filepath, 'r+b') as f:
+            # For some reason, the game was setting the dimensions to 654x38, but the actual
+            # resolution of the BTI files is 512x32. This was making the text blurry unnecessarily,
+            # and we can use the extra space gain for the controls icon.
+            f.seek(0x22C8)
+            width, height = struct.unpack('>ff', f.read(4 * 2))
+            if (width, height) == (654.0, 38.0):
+                f.seek(0x22C8)
+                f.write(struct.pack('>ff', 512.0, 32.0))
+            else:
+                log.warning(f'Unexpected dimensions in BLO file. Titles\' dimensions will not be '
+                            'updated.')
+
+            # Each corner has its own color, although only the two at the top (the first
+            # two) were yellow.
+            f.seek(0x2310)
+            top_left, top_right, bottom_left, bottom_right = struct.unpack('>LLLL', f.read(4 * 4))
+            if (top_left, top_right, bottom_left, bottom_right) == (0xFFFF00FF, 0xFFFF00FF,
+                                                                    0xFFFFFFFF, 0xFFFFFFFF):
+                f.seek(0x2310)
+                f.write(struct.pack('>LLLL', 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF))
+            else:
+                log.warning(f'Unexpected colors in BLO file. Titles\' color gradient will not be '
+                            'desaturated.')
+
+    log.info('Title lines patched.')
 
 
 def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
@@ -367,6 +506,7 @@ def main():
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
 
+        patch_title_lines(gcm_tmp_dir)
         meld_courses(args.tracks, gcm_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
