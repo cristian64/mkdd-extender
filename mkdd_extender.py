@@ -253,6 +253,74 @@ def add_controls_to_title_image(src_filepath: str, dst_filepath: str, language: 
         convert_png_to_bti(tmp_filepath, dst_filepath, 'RGB5A3')
 
 
+def patch_bnr_file(gcm_tmp_dir: str):
+    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+    bnr_filepath = os.path.join(files_dirpath, 'opening.bnr')
+
+    checksum = md5sum(bnr_filepath)
+    if checksum == '1b187557206eb4ea072a4882f37a4966':
+        region = 'E'
+    elif checksum == '953470f151856f512fc08ef36cc872e6':
+        region = 'P'
+    elif checksum == 'a5315f8bdd9bc56331bac1a6af5e195c':
+        region = 'J'
+    else:
+        region = None
+
+    # Replace the image data with the pre-generated raw data. The raw data was generated with the
+    # `bnrparser.py` tool (part of pyisotools), after converting the `banner.png` file and isolating
+    # the image data (bytes between 0x0020 and 0x1820).
+
+    log.info(f'Replacing banner image in BNR file ("{bnr_filepath}")...')
+
+    raw_filepath = os.path.join(data_dir, 'banner', 'banner.raw')
+    IMAGE_OFFSET = 0x0020
+    IMAGE_LENGTH = 0x1800
+
+    with open(bnr_filepath, 'r+b') as f:
+        f.seek(IMAGE_OFFSET)
+        f.write(open(raw_filepath, 'rb').read())
+        assert f.tell() == IMAGE_OFFSET + IMAGE_LENGTH
+
+    log.info('Banner image replaced.')
+
+    if region is None:
+        log.warning('Unrecognized BNR file. Game title will not be modified.')
+        return
+
+    log.info(f'Tweaking game title in BNR file ("{bnr_filepath}")...')
+
+    # If the BNR file is an original, "Extended!!" will be appended to the game title (or titles, in
+    # the PAL version).
+
+    with open(bnr_filepath, 'rb') as f:
+        data = bytearray(f.read())
+
+    TITLE_OFFSET = 0x1860
+    NEXT_TITLE_OFFSET_STEP = 0x0140
+
+    title_offsets = []
+    for title_offset in range(TITLE_OFFSET, len(data), NEXT_TITLE_OFFSET_STEP):
+        title_offsets.append(title_offset)
+
+    if region != 'J':
+        EXCLAMATION_MARKS = b'!!'
+        LABEL = b' Extended!!'
+    else:
+        EXCLAMATION_MARKS = bytes((0x81, 0x49, 0x81, 0x49))
+        LABEL = b'\x20\x83G\x83N\x83X\x83e\x83\x93\x83h' + bytes((0x81, 0x49, 0x81, 0x49))
+
+    for title_offset in title_offsets:
+        title_end_idx = data.find(EXCLAMATION_MARKS, title_offset) + len(EXCLAMATION_MARKS)
+        for i, c in enumerate(LABEL):
+            data[title_end_idx + i] = c
+
+    with open(bnr_filepath, 'wb') as f:
+        f.write(data)
+
+    log.info(f'Game title tweaked.')
+
+
 def patch_title_lines(gcm_tmp_dir: str):
     files_dirpath = os.path.join(gcm_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
@@ -506,6 +574,7 @@ def main():
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
 
+        patch_bnr_file(gcm_tmp_dir)
         patch_title_lines(gcm_tmp_dir)
         meld_courses(args.tracks, gcm_tmp_dir)
 
