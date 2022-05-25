@@ -140,6 +140,47 @@ def extract_and_flatten_archive(src_filepath: str, dst_dirpath: str):
                 shutil.move(path, dst_dirpath)
 
 
+def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
+    assert course_filepath.endswith('.arc')
+    assert 0 <= track_index <= 15
+
+    MUSIC_IDS = (36, 34, 33, 50, 40, 37, 35, 42, 51, 41, 38, 45, 43, 44, 47, 49)
+    assert len(MUSIC_IDS) == 16 == len(set(MUSIC_IDS))
+
+    music_id = MUSIC_IDS[track_index]
+
+    BOL_MAGIC = b'0015'
+    MUSIC_ID_OFFSET = 0x19  # https://wiki.tockdom.com/wiki/BOL_(File_Format)
+
+    with open(course_filepath, 'rb') as f:
+        data = f.read()
+
+    # If the start of the BOL file can be located [once] in the archive, the BOL file can be edited
+    # directly without having to extract the archive first, which would be slower.
+    bol_offset = data.find(BOL_MAGIC)
+    if bol_offset > 0 and data.find(BOL_MAGIC, bol_offset + len(BOL_MAGIC)) < 0:
+        with open(course_filepath, 'r+b') as f:
+            f.seek(bol_offset + MUSIC_ID_OFFSET)
+            f.write(bytes([music_id]))
+        return
+
+    # Otherwise, extract the RARC file, locate the BOL file in the directory, patch the BOL file,
+    # and re-pack the RARC archive.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        rarc.extract(course_filepath, tmp_dir)
+
+        course_dirpath = os.path.join(tmp_dir, os.listdir(tmp_dir)[0])
+        bol_filepath = os.path.join(
+            course_dirpath,
+            tuple(p for p in os.listdir(course_dirpath) if p.endswith('.bol'))[0])
+
+        with open(bol_filepath, 'r+b') as f:
+            f.seek(MUSIC_ID_OFFSET)
+            f.write(bytes([music_id]))
+
+        rarc.pack(course_dirpath, course_filepath)
+
+
 def convert_bti_to_png(src_filepath: str, dst_filepath: str):
     assert src_filepath.endswith('.bti')
 
@@ -483,6 +524,11 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
                 shutil.copy2(track_mp_filepath, page_track_mp_filepath)
                 shutil.copy2(track_50cc_filepath, page_track_50cc_filepath)
                 shutil.copy2(track_mp_50cc_filepath, page_track_mp_50cc_filepath)
+
+                patch_music_id_in_bol_file(page_track_filepath, track_index)
+                patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
+                patch_music_id_in_bol_file(page_track_50cc_filepath, track_index)
+                patch_music_id_in_bol_file(page_track_mp_50cc_filepath, track_index)
             else:
                 page_track_filepath = os.path.join(page_course_dirpath,
                                                    f'{COURSES[track_index]}.arc')
@@ -490,6 +536,9 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
                                                       f'{COURSES[track_index]}L.arc')
                 shutil.copy2(track_filepath, page_track_filepath)
                 shutil.copy2(track_mp_filepath, page_track_mp_filepath)
+
+                patch_music_id_in_bol_file(page_track_filepath, track_index)
+                patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
 
             # Copy GHT file.
             ght_filepath = os.path.join(track_dirpath, 'staffghost.ght')
