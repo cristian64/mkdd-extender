@@ -3,6 +3,7 @@
 MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 48 extra courses.
 """
 import argparse
+import configparser
 import contextlib
 import hashlib
 import itertools
@@ -15,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 import rarc
 from tools import gcm
@@ -292,6 +293,57 @@ def add_controls_to_title_image(src_filepath: str, dst_filepath: str, language: 
         image.save(tmp_filepath)
 
         convert_png_to_bti(tmp_filepath, dst_filepath, 'RGB5A3')
+
+
+def generate_bti_image(text: str, width: int, height: int, image_format: str,
+                       background: 'tuple[int, int, int, int]', filepath: str):
+    assert filepath.endswith('.bti')
+
+    filtered_text = ''
+    for c in text:
+        if c.lower() in ' abcdefghijklmnopqrstuvwxyz0123456789$!?@':
+            filtered_text += c
+
+    filtered_text = ' '.join(filtered_text.split())
+
+    if not filtered_text:
+        filtered_text = '?'
+
+    image = Image.new('RGBA', (width, height), background)
+    draw = ImageDraw.Draw(image)
+
+    font_filepath = os.path.join(data_dir, 'fonts', 'SuperMario256.ttf')
+
+    padded_text = f'{filtered_text}-'  # So it's not close to the edge
+
+    for size in range(2, 100):
+        font = ImageFont.truetype(font_filepath, size)
+        w, h = font.getsize(padded_text)
+        if w >= width or h >= height:
+            font = ImageFont.truetype(font_filepath, size - 1)
+            break
+
+    w, h = font.getsize(filtered_text)
+    x, y = (width - w) // 2, (height - h) // 2
+
+    for offset, alpha in ((1, 255), (2, 250), (3, 245)):
+        draw.text((x - offset, y - 0), filtered_text, font=font, fill=(0, 0, 0, alpha))
+        draw.text((x + offset, y - 0), filtered_text, font=font, fill=(0, 0, 0, alpha))
+        draw.text((x - 0, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha))
+        draw.text((x + 0, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha))
+        draw.text((x - offset, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
+        draw.text((x - offset, y + offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
+        draw.text((x + offset, y + offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
+        draw.text((x + offset, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
+
+    draw.text((x, y), filtered_text, font=font, fill=(255, 255, 255, 255))
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_filepath = os.path.join(tmp_dir,
+                                    f'{os.path.splitext(os.path.basename(filepath))[0]}.png')
+        image.save(tmp_filepath)
+
+        convert_png_to_bti(tmp_filepath, filepath, image_format)
 
 
 def patch_bnr_file(gcm_tmp_dir: str):
@@ -571,6 +623,65 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
             else:
                 log.warning(f'Unable to locate `lap_music_normal.ast` in "{zip_filename}". Luigi '
                             'Circuit\'s sound track will be used.')
+
+            try:
+                trackinfo_filepath = os.path.join(track_dirpath, 'trackinfo.ini')
+                trackinfo = configparser.ConfigParser()
+                trackinfo.read(trackinfo_filepath)
+                trackname = trackinfo['Config']['trackname']
+                main_language = trackinfo['Config']['main_language']
+            except Exception:
+                log.warning(f'Unable to locate `trackinfo.ini` in "{zip_filename}".')
+                trackinfo = None
+                trackname = prefix
+                main_language = None
+
+            def find_or_generate_image_path(language: str, filename: str, width: int, height: int,
+                                            image_format: str,
+                                            background: 'tuple[int, int, int, int]') -> str:
+                course_images_dirpath = os.path.join(track_dirpath, 'course_images')
+
+                filepath = os.path.join(course_images_dirpath, language, filename)
+                if os.path.isfile(filepath):
+                    return filepath
+
+                if main_language:
+                    filepath = os.path.join(course_images_dirpath, main_language, filename)
+                    if os.path.isfile(filepath):
+                        # No need to generate warning in this case. This is acceptable.
+                        return filepath
+
+                for l in LANGUAGES:
+                    filepath = os.path.join(course_images_dirpath, l, filename)
+                    if os.path.isfile(filepath):
+                        log.warning(f'Unable to locate `{filename}` in "{zip_filename}" for '
+                                    f'current language ({language}). Image for {l} will be used.')
+                        return filepath
+
+                log.warning(f'Unable to locate `{filename}` in "{zip_filename}" for {language}. '
+                            'An auto-generated image will be provided.')
+
+                filepath = os.path.join(course_images_dirpath, language, filename)
+                generate_bti_image(trackname, width, height, image_format, background, filepath)
+                return filepath
+
+            # Copy course logo.
+            expected_languages = os.listdir(page_coursename_dirpath)
+            expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
+            if not expected_languages:
+                log.error(f'Unable to locate language directories in "{zip_filename}" for course '
+                          'logo. This is fatal.')
+                sys.exit(1)
+            for language in expected_languages:
+                logo_filepath = find_or_generate_image_path(language, 'track_big_logo.bti', 208,
+                                                            104, 'RGB5A3', (0, 0, 0, 0))
+
+                page_coursename_language_dirpath = os.path.join(page_coursename_dirpath, language)
+                os.makedirs(page_coursename_language_dirpath, exist_ok=True)
+
+                page_coursename_filepath = os.path.join(page_coursename_language_dirpath,
+                                                        f'{COURSES[track_index]}_name.bti')
+                shutil.copy2(logo_filepath, page_coursename_filepath)
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
