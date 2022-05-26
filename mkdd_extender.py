@@ -18,6 +18,7 @@ import tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
+import gecko_code
 import rarc
 from tools import gcm
 
@@ -749,6 +750,42 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
             log.warning(f'No directory has been melded.')
 
 
+def patch_dol_file(gcm_tmp_dir: str):
+    sys_dirpath = os.path.join(gcm_tmp_dir, 'sys')
+    dol_path = os.path.join(sys_dirpath, 'main.dol')
+
+    assert os.path.isfile(dol_path)
+
+    checksum = md5sum(dol_path)
+    if checksum not in ('edb478baec557381d10137035a72bdcc', '3a8e73b977368d1e53293d36f634e3c7',
+                        '81f1b05c6650d65326f757bb25bad604'):
+        log.error(f'Checksum failed: DOL file ("{dol_path}") is not original. This is fatal.')
+        sys.exit(1)
+
+    with open(dol_path, 'rb') as f:
+        data = f.read()
+        game_id_offset = data.find(b'DOL-GM4')
+        assert game_id_offset >= 0
+        game_id_offset += len('DOL-')
+        game_id = data[game_id_offset:game_id_offset + len('GM4x')] + b'01'
+        game_id = game_id.decode('ascii')
+        assert game_id in ('GM4E01', 'GM4P01', 'GM4J01')
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
+        log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
+
+        gecko_code.write_code(game_id, tmp_gecko_code_filepath)
+
+        log.info(f'Injecting Gecko code into "{dol_path}"...')
+
+        geckoloader_filepath = os.path.join(tools_dir, 'GeckoLoader', 'GeckoLoader.py')
+        command = (sys.executable, geckoloader_filepath, dol_path, tmp_gecko_code_filepath,
+                   '--dest', dol_path, '--hooktype', 'GX')
+        if 0 != run(command):
+            raise RuntimeError(f'Error occurred while injecting Gecko code into DOL file.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the original ISO/GCM file.')
@@ -797,6 +834,7 @@ def main():
         patch_bnr_file(gcm_tmp_dir)
         patch_title_lines(gcm_tmp_dir)
         meld_courses(args.tracks, gcm_tmp_dir)
+        patch_dol_file(gcm_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')
