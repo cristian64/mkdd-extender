@@ -732,8 +732,13 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
                                                     'timg')
                 lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
 
-                preview_filepath = find_or_generate_image_path(language, 'track_image.bti', 256,
-                                                               184, 'CMPR', (0, 0, 0, 255))
+                # preview_filepath = find_or_generate_image_path(language, 'track_image.bti', 256,
+                #                                                184, 'CMPR', (0, 0, 0, 255))
+                # TODO(CA): RARC file gets too big. For now, generate smaller placeholders.
+                course_images_dirpath = os.path.join(track_dirpath, 'course_images')
+                preview_filepath = os.path.join(course_images_dirpath, language, 'track_image.bti')
+                generate_bti_image(trackname, 256 // 2, 184 // 2, 'CMPR', (0, 0, 0, 255),
+                                   preview_filepath)
                 page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
                 shutil.copy2(preview_filepath, page_preview_filepath)
 
