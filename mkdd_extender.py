@@ -48,6 +48,37 @@ COURSES = (
 Internal names of the courses, in order of appearance.
 """
 
+COURSE_TO_PREVIEW_IMAGE_NAME = {
+    'BabyLuigi': 'baby_park',
+    'Koopa': 'bowser_castle',
+    'Daisy': 'daisy_ship',
+    'Diddy': 'dino_dino_jungle',
+    'Donkey': 'dk_mountain',
+    'Desert': 'kara_kara_desert',
+    'Nokonoko': 'kinoko_bridge',
+    'Patapata': 'konoko_city',
+    'Luigi': 'luigi_circuit',
+    'Mario': 'mario_circuit',
+    'Peach': 'peach_beach',
+    'Rainbow': 'rainbow_road',
+    'Snow': 'sherbet_land',
+    'Waluigi': 'waluigi_stadium',
+    'Wario': 'wario_colosseum',
+    'Yoshi': 'yoshi_circuit',
+}
+"""
+A dictionary to map the internal course name to the [partial] name of the preview images in the
+`SceneData/<language>/courseselect.arc` archive, which is `cop_<partial_name>.bti`.
+"""
+
+COURSE_TO_LABEL_IMAGE_NAME = {**dict(COURSE_TO_PREVIEW_IMAGE_NAME), **{'Patapata': 'kinoko_city'}}
+"""
+A dictionary to map the internal course name to the [partial] name of the label images in the
+`SceneData/<language>/courseselect.arc` archive, which is `coname_<partial_name>.bti`.
+
+This is identical to `COURSE_TO_PREVIEW_IMAGE_NAME`, except for the `Patapata` entry, which differs.
+"""
+
 PREFIXES = tuple(f'{c}{i + 1:02}' for c, i in itertools.product(('A', 'B', 'C'), range(16)))
 """
 A list of the "prefixes" that are used when naming the track archives. First letter states the page,
@@ -475,6 +506,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
     course_dirpath = os.path.join(files_dirpath, 'Course')
     coursename_dirpath = os.path.join(files_dirpath, 'CourseName')
     staffghosts_dirpath = os.path.join(files_dirpath, 'StaffGhosts')
+    scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
     with tempfile.TemporaryDirectory() as tracks_tmp_dir:
         # Extract all ZIP archives to their respective directories.
@@ -682,6 +714,34 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
                 page_coursename_filepath = os.path.join(page_coursename_language_dirpath,
                                                         f'{COURSES[track_index]}_name.bti')
                 shutil.copy2(logo_filepath, page_coursename_filepath)
+
+            # Copy preview image and label image.
+            expected_languages = os.listdir(scenedata_dirpath)
+            expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
+            if not expected_languages:
+                log.error(f'Unable to locate `SceneData/language` directories in "{zip_filename}". '
+                          'This is fatal.')
+                sys.exit(1)
+            preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
+            label_filename = f'coname_{COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]}.bti'
+            page_preview_filename = with_page_index_suffix(preview_filename)
+            page_label_filename = with_page_index_suffix(label_filename)
+            for language in expected_languages:
+                courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
+                                                    'timg')
+                lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
+
+                preview_filepath = find_or_generate_image_path(language, 'track_image.bti', 256,
+                                                               184, 'CMPR', (0, 0, 0, 255))
+                page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
+                shutil.copy2(preview_filepath, page_preview_filepath)
+
+                label_filepath = find_or_generate_image_path(language, 'track_name.bti', 256, 32,
+                                                             'IA4', (0, 0, 0, 0))
+                page_label_filepath = os.path.join(courseselect_dirpath, page_label_filename)
+                shutil.copy2(label_filepath, page_label_filepath)
+                page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
+                shutil.copy2(label_filepath, page_label_filepath)
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
