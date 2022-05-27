@@ -215,6 +215,48 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
         rarc.pack(course_dirpath, course_filepath)
 
 
+def repack_course_arc_file(archive_filepath: str, new_dirname: str):
+    """
+    Extracts a RARC archive, renames its root directory and its files, and re-packs it.
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        rarc.extract(archive_filepath, tmp_dir)
+
+        dirnames = os.listdir(tmp_dir)
+        if len(dirnames) != 1:
+            log.error(f'Unable to rename entries in "{archive_filepath}". Unexpected number of '
+                      'root entries in directory. This is fatal.')
+            sys.exit(1)
+
+        dirname = dirnames[0]
+        dirpath = os.path.join(tmp_dir, dirname)
+        new_dirpath = os.path.join(tmp_dir, new_dirname)
+        os.rename(dirpath, new_dirpath)
+
+        course_name = new_dirname
+        if course_name.endswith('l'):
+            course_name = course_name[:-1]
+        if course_name.endswith('2'):
+            course_name = course_name[:-1]
+
+        # Files that contain "_" in their names need to be renamed as well to the course name.
+        for filename in os.listdir(new_dirpath):
+            if '_' in filename:
+                filepath = os.path.join(new_dirpath, filename)
+                if os.path.isfile(filepath):
+                    parts = filename.split('_', maxsplit=1)
+                    if len(parts) > 2:
+                        log.error(
+                            f'Unable to rename entries in "{archive_filepath}". Unrecognized '
+                            f'filename with multiple "_" characters ("{filename}"). This is fatal.')
+                        sys.exit(1)
+                    new_filename = f'{course_name}_{parts[1]}'
+                    new_filepath = os.path.join(new_dirpath, new_filename)
+                    os.rename(filepath, new_filepath)
+
+        rarc.pack(new_dirpath, archive_filepath)
+
+
 def convert_bti_to_png(src_filepath: str, dst_filepath: str):
     assert src_filepath.endswith('.bti')
 
@@ -617,6 +659,11 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                 patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_50cc_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_mp_50cc_filepath, track_index)
+
+                repack_course_arc_file(page_track_filepath, f'{COURSES[track_index].lower()}2')
+                repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}2l')
+                repack_course_arc_file(page_track_50cc_filepath, f'{COURSES[track_index].lower()}')
+                repack_course_arc_file(page_track_mp_50cc_filepath, f'{COURSES[track_index].lower()}l')
             else:
                 page_track_filepath = os.path.join(page_course_dirpath,
                                                    f'{COURSES[track_index]}.arc')
@@ -627,6 +674,9 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
 
                 patch_music_id_in_bol_file(page_track_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
+
+                repack_course_arc_file(page_track_filepath, f'{COURSES[track_index].lower()}')
+                repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}l')
 
             # Copy GHT file.
             ght_filepath = os.path.join(track_dirpath, 'staffghost.ght')
