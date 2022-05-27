@@ -7,6 +7,7 @@ import configparser
 import contextlib
 import hashlib
 import itertools
+import json
 import logging
 import os
 import platform
@@ -500,7 +501,9 @@ def patch_title_lines(gcm_tmp_dir: str):
     log.info('Title lines patched.')
 
 
-def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
+def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
+    minimap_data = {}
+
     files_dirpath = os.path.join(gcm_tmp_dir, 'files')
 
     stream_dirpath = os.path.join(files_dirpath, 'AudioRes', 'Stream')
@@ -749,13 +752,32 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str):
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
                 shutil.copy2(label_filepath, page_label_filepath)
 
+            # Gather minimap values.
+            minimap_filepath = os.path.join(track_dirpath, 'minimap.json')
+            try:
+                with open(minimap_filepath, 'r', encoding='ascii') as f:
+                    minimap_json = json.loads(f.read())
+                minimap_data[(page_index, track_index)] = (
+                    float(minimap_json['Top Left Corner X']),
+                    float(minimap_json['Top Left Corner Z']),
+                    float(minimap_json['Bottom Right Corner X']),
+                    float(minimap_json['Bottom Right Corner Z']),
+                    int(minimap_json['Orientation']),
+                )
+            except Exception as e:
+                log.error(f'Unable to parse minimap data in "{zip_filename}": {str(e)}. This is '
+                          'fatal.')
+                sys.exit(1)
+
         if melded > 0:
             log.info(f'{melded} directories melded.')
         else:
             log.warning(f'No directory has been melded.')
 
+    return minimap_data
 
-def patch_dol_file(gcm_tmp_dir: str):
+
+def patch_dol_file(minimap_data: dict, gcm_tmp_dir: str):
     sys_dirpath = os.path.join(gcm_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
 
@@ -780,7 +802,7 @@ def patch_dol_file(gcm_tmp_dir: str):
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
         log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
 
-        gecko_code.write_code(game_id, tmp_gecko_code_filepath)
+        gecko_code.write_code(game_id, minimap_data, tmp_gecko_code_filepath)
 
         log.info(f'Injecting Gecko code into "{dol_path}"...')
 
@@ -838,8 +860,8 @@ def main():
 
         patch_bnr_file(gcm_tmp_dir)
         patch_title_lines(gcm_tmp_dir)
-        meld_courses(args.tracks, gcm_tmp_dir)
-        patch_dol_file(gcm_tmp_dir)
+        minimap_data = meld_courses(args.tracks, gcm_tmp_dir)
+        patch_dol_file(minimap_data, gcm_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')

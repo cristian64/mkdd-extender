@@ -4,6 +4,7 @@ Mario Kart: Double Dash!!.
 """
 
 import os
+import struct
 
 BUTTONS_STATE_ADDRESSES = {
     'GM4E01': 0x003A4D6C,
@@ -61,6 +62,114 @@ It is known that `calcAnm()` is the caller. Add then a breakpoint before the cal
 `setTexture()` (e.g. in the `fcmpu` instruction), and change courses again to hit it. The value of
 the `r2` register (+ the offset seen in the assembly), should tell which is the address of the
 "variable" that we are after.
+"""
+
+COURSES = (
+    'Luigi',
+    'Peach',
+    'BabyLuigi',
+    'Desert',
+    'Nokonoko',
+    'Mario',
+    'Daisy',
+    'Waluigi',
+    'Snow',
+    'Patapata',
+    'Yoshi',
+    'Donkey',
+    'Wario',
+    'Diddy',
+    'Koopa',
+    'Rainbow',
+)
+"""
+Internal names of the courses, in order of appearance.
+"""
+
+COURSE_TO_MINIMAP_ADDRESSES = {
+    'GM4E01': {
+        'BabyLuigi': (0x003CDDEC, 0x003CDDF0, 0x003CDDF4, 0x003CDDF8, 0x00141E14),
+        'Peach': (0x003CDE0C, 0x003CDE10, 0x003CDE14, 0x003CDE18, 0x00141EE0),
+        'Daisy': (0x003CDE34, 0x003CDE38, 0x003CDE3C, 0x003CDE40, 0x0014200c),
+        'Luigi': (0x003CDE5C, 0x003CDE60, 0x003CDE64, 0x003CDE68, 0x001420D8),
+        'Mario': (0x003CDE74, 0x003CDE78, 0x003CDE7C, 0x003CDE80, 0x001421A4),
+        'Yoshi': (0x003CDE90, 0x003CDE94, 0x003CDE98, 0x003CDE9C, 0x00142270),
+        'Nokonoko': (0x003CDEB0, 0x003CDEB4, 0x003CDEB8, 0x003CDEBC, 0x0014233c),
+        'Patapata': (0x003CDEC8, 0x003CDECC, 0x003CDED0, 0x003CDED4, 0x00142408),
+        'Waluigi': (0x003CDEE8, 0x003CDEEC, 0x003CDEF0, 0x003CDEF4, 0x001424D4),
+        'Wario': (0x003CDF0C, 0x003CDF10, 0x003CDF14, 0x003CDF18, 0x001425A0),
+        'Diddy': (0x003CDF28, 0x003CDF2C, 0x003CDF30, 0x003CDF34, 0x0014266C),
+        'Donkey': (0x003CDF40, 0x003CDF44, 0x003CDF48, 0x003CDF4C, 0x00142738),
+        'Koopa': (0x003CDF5C, 0x003CDF60, 0x003CDF64, 0x003CDF68, 0x00142804),
+        'Rainbow': (0x003CDF70, 0x003CDF74, 0x003CDF78, 0x003CDF7C, 0x001428D0),
+        'Desert': (0x003CDF84, 0x003CDF88, 0x003CDF8C, 0x003CDF90, 0x0014299C),
+        'Snow': (0x003CDFA4, 0x003CDFA8, 0x003CDFAC, 0x003CDFB0, 0x00142A68),
+    },
+    'GM4P01': {
+        'BabyLuigi': (0x003D7C2C, 0x003D7C30, 0x003D7C34, 0x003D7C38, 0x00141E44),
+        'Peach': (0x003D7C4C, 0x003D7C50, 0x003D7C54, 0x003D7C58, 0x00141F10),
+        'Daisy': (0x003D7C74, 0x003D7C78, 0x003D7C7C, 0x003D7C80, 0x0014203C),
+        'Luigi': (0x003D7C9C, 0x003D7CA0, 0x003D7CA4, 0x003D7CA8, 0x00142108),
+        'Mario': (0x003D7CB4, 0x003D7CB8, 0x003D7CBC, 0x003D7CC0, 0x001421D4),
+        'Yoshi': (0x003D7CD0, 0x003D7CD4, 0x003D7CD8, 0x003D7CDC, 0x001422A0),
+        'Nokonoko': (0x003D7CF0, 0x003D7CF4, 0x003D7CF8, 0x003D7CFC, 0x0014236C),
+        'Patapata': (0x003D7D08, 0x003D7D0C, 0x003D7D10, 0x003D7D14, 0x00142438),
+        'Waluigi': (0x003D7D28, 0x003D7D2C, 0x003D7D30, 0x003D7D34, 0x00142504),
+        'Wario': (0x003D7D4C, 0x003D7D50, 0x003D7D54, 0x003D7D58, 0x001425D0),
+        'Diddy': (0x003D7D68, 0x003D7D6C, 0x003D7D70, 0x003D7D74, 0x0014269C),
+        'Donkey': (0x003D7D80, 0x003D7D84, 0x003D7D88, 0x003D7D8C, 0x00142768),
+        'Koopa': (0x003D7D9C, 0x003D7DA0, 0x003D7DA4, 0x003D7DA8, 0x00142834),
+        'Rainbow': (0x003D7DB0, 0x003D7DB4, 0x003D7DB8, 0x003D7DBC, 0x00142900),
+        'Desert': (0x003D7DC4, 0x003D7DC8, 0x003D7DCC, 0x003D7DD0, 0x001429CC),
+        'Snow': (0x003D7DE4, 0x003D7DE8, 0x003D7DEC, 0x003D7DF0, 0x00142A98),
+    },
+    'GM4J01': {
+        'BabyLuigi': (0x003E840C, 0x003E8410, 0x003E8414, 0x003E8418, 0x00141E14),
+        'Peach': (0x003E842C, 0x003E8430, 0x003E8434, 0x003E8438, 0x00141EE0),
+        'Daisy': (0x003E8454, 0x003E8458, 0x003E845C, 0x003E8460, 0x0014200C),
+        'Luigi': (0x003E847C, 0x003E8480, 0x003E8484, 0x003E8488, 0x001420D8),
+        'Mario': (0x003E8494, 0x003E8498, 0x003E849C, 0x003E84A0, 0x001421A4),
+        'Yoshi': (0x003E84B0, 0x003E84B4, 0x003E84B8, 0x003E84BC, 0x00142270),
+        'Nokonoko': (0x003E84D0, 0x003E84D4, 0x003E84D8, 0x003E84DC, 0x0014233C),
+        'Patapata': (0x003E84E8, 0x003E84EC, 0x003E84F0, 0x003E84F4, 0x00142408),
+        'Waluigi': (0x003E8508, 0x003E850C, 0x003E8510, 0x003E8514, 0x001424D4),
+        'Wario': (0x003E852C, 0x003E8530, 0x003E8534, 0x003E8538, 0x001425A0),
+        'Diddy': (0x003E8548, 0x003E854C, 0x003E8550, 0x003E8554, 0x0014266C),
+        'Donkey': (0x003E8560, 0x003E8564, 0x003E8568, 0x003E856C, 0x00142738),
+        'Koopa': (0x003E857C, 0x003E8580, 0x003E8584, 0x003E8588, 0x00142804),
+        'Rainbow': (0x003E8590, 0x003E8594, 0x003E8598, 0x003E859C, 0x001428D0),
+        'Desert': (0x003E85A4, 0x003E85A8, 0x003E85AC, 0x003E85B0, 0x0014299C),
+        'Snow': (0x003E85C4, 0x003E85C8, 0x003E85CC, 0x003E85D0, 0x00142A68),
+    }
+}
+"""
+The addresses (for each region) where the minimap values are stored.
+
+Addresses have been borrowed from the MKDD Track Patcher:
+
+https://github.com/RenolY2/mkdd-track-patcher/blob/c0a8c7c97a9d9519888d7374c13cf31e010d82c4/src/resources/minimap_locations.json
+"""
+
+COURSE_TO_MINIMAP_VALUES = {
+    'BabyLuigi': (-16572.30078125, -8286.099609375, 16572.30078125, 8286.099609375, 3),
+    'Peach': (-22321.359375, -34855.83984375, 12534.3994140625, 34855.83984375, 2),
+    'Daisy': (-42000.0, -20000.0, 38000.0, 20000.0, 3),
+    'Luigi': (-18519.01953125, -37634.34765625, 16332.9404296875, 32069.701171875, 2),
+    'Mario': (-19360.0, -38720.0, 19360.0, 38720.0, 2),
+    'Yoshi': (-22050.0, -43050.0, 28350.0, 57750.0, 0),
+    'Nokonoko': (-32285.599609375, -16658.701171875, 45813.0, 22390.6015625, 3),
+    'Patapata': (-35800.0, -22500.0, 54200.0, 22500.0, 3),
+    'Waluigi': (-25000.0, -13000.0, 27000.0, 13000.0, 1),
+    'Wario': (-27000.0, -14500.0, 33000.0, 15500.0, 3),
+    'Diddy': (-53460.0, -26730.0, 35640.0, 17820.0, 3),
+    'Donkey': (-28636.720703125, -68430.875, 17479.201171875, 23800.958984375, 2),
+    'Koopa': (-32400.0, -39600.0, 7200.0, 39600.0, 0),
+    'Rainbow': (-28797.119140625, -54394.2890625, 25597.169921875, 54394.2890625, 0),
+    'Desert': (-34715.8984375, -63251.5, 28535.69921875, 63251.5, 0),
+    'Snow': (-15298.3203125, -42345.6796875, 29461.521484375, 47174.0, 0),
+}
+"""
+The stock minimap values for each course.
 """
 
 DIR_STRINGS = (
@@ -278,7 +387,11 @@ def get_line(encoded_address: int, value: int) -> str:
     return f'{encoded_address:08X} {value:08X}'
 
 
-def write_code(game_id: str, filepath: str):
+def float_to_hex(value: float) -> int:
+    return struct.unpack('>L', struct.pack('>f', value))[0]
+
+
+def write_code(game_id: str, minimap_data: dict, filepath: str):
 
     encoded_buttons_state_address = encode_address('if16', BUTTONS_STATE_ADDRESSES[game_id])
 
@@ -333,6 +446,31 @@ def write_code(game_id: str, filepath: str):
             file_string_address_line = get_line(encoded_file_string_address, last_char_value)
 
             lines_for_deactivator.append(file_string_address_line)
+
+    # Minimap data.
+    for page_index in range(3):
+        for track_index in range(16):
+            addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
+            values = minimap_data[(page_index, track_index)]
+
+            lines_for_activator[page_index].extend((
+                get_line(encode_address('write32', addresses[0]), float_to_hex(values[0])),
+                get_line(encode_address('write32', addresses[1]), float_to_hex(values[1])),
+                get_line(encode_address('write32', addresses[2]), float_to_hex(values[2])),
+                get_line(encode_address('write32', addresses[3]), float_to_hex(values[3])),
+                get_line(encode_address('write8', addresses[4] + 3), values[4]),
+            ))
+    for track_index in range(16):
+        addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
+        values = COURSE_TO_MINIMAP_VALUES[COURSES[track_index]]
+
+        lines_for_deactivator.extend((
+            get_line(encode_address('write32', addresses[0]), float_to_hex(values[0])),
+            get_line(encode_address('write32', addresses[1]), float_to_hex(values[1])),
+            get_line(encode_address('write32', addresses[2]), float_to_hex(values[2])),
+            get_line(encode_address('write32', addresses[3]), float_to_hex(values[3])),
+            get_line(encode_address('write8', addresses[4] + 3), values[4]),
+        ))
 
     # Redraw course selection screen code.
     redraw_courseselect_address = REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]
