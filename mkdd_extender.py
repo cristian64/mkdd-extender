@@ -724,11 +724,11 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                 trackname = prefix
                 main_language = None
 
+            course_images_dirpath = os.path.join(track_dirpath, 'course_images')
+
             def find_or_generate_image_path(language: str, filename: str, width: int, height: int,
                                             image_format: str,
                                             background: 'tuple[int, int, int, int]') -> str:
-                course_images_dirpath = os.path.join(track_dirpath, 'course_images')
-
                 filepath = os.path.join(course_images_dirpath, language, filename)
                 if os.path.isfile(filepath):
                     return filepath
@@ -771,13 +771,60 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                                                         f'{COURSES[track_index]}_name.bti')
                 shutil.copy2(logo_filepath, page_coursename_filepath)
 
-            # Copy preview image and label image.
+            # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
+            PREVIEW_IMAGE_SIZE = 256 // 2, 184 // 2
+
+            def resize_preview_image(filepath: str):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    png_tmp_filepath = os.path.join(
+                        tmp_dir,
+                        os.path.splitext(os.path.basename(filepath))[0] + '.png')
+
+                    # At this time, there are a number of images that `wimgt` cannot convert. If the
+                    # attempt fails, we won't be able to downscale the BTI image, and that cannot be
+                    # allowed, or else the size of the archive would grow too great. In those cases,
+                    # the BTI image will be deleted; an auto-geneated image will be provided later.
+                    failed = False
+                    try:
+                        convert_bti_to_png(filepath, png_tmp_filepath)
+                    except Exception:
+                        failed = True
+                    if not os.path.isfile(png_tmp_filepath):
+                        failed = True
+                    if failed:
+                        log.warning(f'Unable to downscale BTI image ("{filepath}"). This mage will '
+                                    'be discarded.')
+                        os.remove(filepath)
+                        return
+
+                    image = Image.open(png_tmp_filepath)
+                    image.convert('RGBA')
+
+                    image = image.resize(PREVIEW_IMAGE_SIZE,
+                                         resample=Image.HAMMING,
+                                         reducing_gap=3.0)
+                    image.save(png_tmp_filepath)
+
+                    convert_png_to_bti(png_tmp_filepath, filepath, 'CMPR')
+
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
                 log.error(f'Unable to locate `SceneData/language` directories in "{nodename}". '
                           'This is fatal.')
                 sys.exit(1)
+
+            # Downscale preview images in all available languages.
+            for language in expected_languages:
+                language_dirpath = os.path.join(course_images_dirpath, language)
+                if not os.path.isdir(language_dirpath):
+                    continue
+                for filename in os.listdir(language_dirpath):
+                    if filename == 'track_image.bti':
+                        filepath = os.path.join(language_dirpath, filename)
+                        resize_preview_image(filepath)
+
+            # Copy preview image and label image.
             preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
             label_filename = f'coname_{COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]}.bti'
             page_preview_filename = with_page_index_suffix(preview_filename)
@@ -787,13 +834,10 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                                                     'timg')
                 lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
 
-                # preview_filepath = find_or_generate_image_path(language, 'track_image.bti', 256,
-                #                                                184, 'CMPR', (0, 0, 0, 255))
-                # TODO(CA): RARC file gets too big. For now, generate smaller placeholders.
-                course_images_dirpath = os.path.join(track_dirpath, 'course_images')
-                preview_filepath = os.path.join(course_images_dirpath, language, 'track_image.bti')
-                generate_bti_image(trackname, 256 // 2, 184 // 2, 'CMPR', (0, 0, 0, 255),
-                                   preview_filepath)
+                preview_filepath = find_or_generate_image_path(language, 'track_image.bti',
+                                                               PREVIEW_IMAGE_SIZE[0],
+                                                               PREVIEW_IMAGE_SIZE[1], 'CMPR',
+                                                               (0, 0, 0, 255))
                 page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
                 shutil.copy2(preview_filepath, page_preview_filepath)
 
