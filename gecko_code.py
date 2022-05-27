@@ -423,11 +423,12 @@ def write_code(game_id: str, minimap_data: dict, filepath: str):
 
             lines_for_activator[page_index].append(dir_string_address_line)
 
-            last_char = dir_string[offset]
-            last_char_value = last_char.encode('ascii')[0]
-            dir_string_address_line = get_line(encoded_dir_string_address, last_char_value)
+            if page_index == 0:
+                last_char = dir_string[offset]
+                last_char_value = last_char.encode('ascii')[0]
+                dir_string_address_line = get_line(encoded_dir_string_address, last_char_value)
 
-            lines_for_deactivator.append(dir_string_address_line)
+                lines_for_deactivator.append(dir_string_address_line)
 
         # File strings.
         for file_string in FILE_STRINGS:
@@ -441,11 +442,12 @@ def write_code(game_id: str, minimap_data: dict, filepath: str):
 
             lines_for_activator[page_index].append(file_string_address_line)
 
-            last_char = file_string[offset]
-            last_char_value = last_char.encode('ascii')[0]
-            file_string_address_line = get_line(encoded_file_string_address, last_char_value)
+            if page_index == 0:
+                last_char = file_string[offset]
+                last_char_value = last_char.encode('ascii')[0]
+                file_string_address_line = get_line(encoded_file_string_address, last_char_value)
 
-            lines_for_deactivator.append(file_string_address_line)
+                lines_for_deactivator.append(file_string_address_line)
 
     # Minimap data.
     for page_index in range(3):
