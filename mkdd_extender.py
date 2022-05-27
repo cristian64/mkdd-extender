@@ -146,11 +146,14 @@ def build_file_list(dirpath: str) -> 'tuple[str]':
         return _build_file_list('')
 
 
-def extract_and_flatten_archive(src_filepath: str, dst_dirpath: str):
+def extract_and_flatten(src_path: str, dst_dirpath: str):
     # Extracts a ZIP archive into the given directory. If the archive contains a single directory,
     # it will be unwrapped. If the archive contains a nested archive, it will be extracted too.
     with tempfile.TemporaryDirectory() as tmp_dir:
-        shutil.unpack_archive(src_filepath, tmp_dir)
+        if os.path.isfile(src_path):
+            shutil.unpack_archive(src_path, tmp_dir)
+        else:
+            shutil.copytree(src_path, os.path.join(tmp_dir, os.path.basename(src_path)))
 
         paths = tuple(os.path.join(tmp_dir, p) for p in os.listdir(tmp_dir))
 
@@ -158,7 +161,7 @@ def extract_and_flatten_archive(src_filepath: str, dst_dirpath: str):
             # If there is only one entry, and it's another archive, apply action recursively.
             path = paths[0]
             if path.endswith('.zip') and os.path.isfile(path):
-                extract_and_flatten_archive(path, dst_dirpath)
+                extract_and_flatten(path, dst_dirpath)
                 return
 
             # If there is only one entry, and it's a directory, make it current.
@@ -556,20 +559,18 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
 
     with tempfile.TemporaryDirectory() as tracks_tmp_dir:
         # Extract all ZIP archives to their respective directories.
-        zip_filepaths = tuple(
-            os.path.join(tracks_dirpath, p) for p in sorted(os.listdir(tracks_dirpath))
-            if p.endswith('.zip'))
-        prefix_to_zip_filename = {}
+        paths = tuple(os.path.join(tracks_dirpath, p) for p in sorted(os.listdir(tracks_dirpath)))
+        prefix_to_nodename = {}
         extracted = 0
         log.info(f'Extracting ZIP archives...')
         for prefix in PREFIXES:
-            for zip_filepath in zip_filepaths:
-                zip_filename = os.path.basename(zip_filepath)
-                if zip_filename.startswith(prefix):
+            for path in paths:
+                filename = os.path.basename(path)
+                if filename.startswith(prefix):
                     track_dirpath = os.path.join(tracks_tmp_dir, prefix)
-                    log.info(f'Extracting "{zip_filepath}" into "{track_dirpath}"...')
-                    extract_and_flatten_archive(zip_filepath, track_dirpath)
-                    prefix_to_zip_filename[prefix] = zip_filename
+                    log.info(f'Extracting "{path}" into "{track_dirpath}"...')
+                    extract_and_flatten(path, track_dirpath)
+                    prefix_to_nodename[prefix] = filename
                     extracted += 1
                     break
             else:
@@ -597,7 +598,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
             assert 0 <= page_index <= 2
             assert 0 <= track_index <= 15
 
-            zip_filename = prefix_to_zip_filename[prefix]
+            nodename = prefix_to_nodename[prefix]
 
             log.info(f'Melding "{nodename}" ("{track_dirpath}")...')
             melded += 1
@@ -623,22 +624,22 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
             if not os.path.isfile(track_filepath):
-                log.error(f'Unable to locate `track.arc` file in "{zip_filename}". This is fatal.')
+                log.error(f'Unable to locate `track.arc` file in "{nodename}". This is fatal.')
                 sys.exit(1)
             track_mp_filepath = os.path.join(track_dirpath, 'track_mp.arc')
             if not os.path.isfile(track_mp_filepath):
-                log.warning(f'Unable to locate `track_mp.arc` file in "{zip_filename}". '
+                log.warning(f'Unable to locate `track_mp.arc` file in "{nodename}". '
                             '`track.arc` will be used.')
                 track_mp_filepath = track_filepath
             if track_index == 0:
                 track_50cc_filepath = os.path.join(track_dirpath, 'track_50cc.arc')
                 if not os.path.isfile(track_50cc_filepath):
-                    log.warning(f'Unable to locate `track_50cc.arc` file in "{zip_filename}". '
+                    log.warning(f'Unable to locate `track_50cc.arc` file in "{nodename}". '
                                 '`track.arc` will be used.')
                     track_50cc_filepath = track_filepath
                 track_mp_50cc_filepath = os.path.join(track_dirpath, 'track_mp_50cc.arc')
                 if not os.path.isfile(track_mp_50cc_filepath):
-                    log.warning(f'Unable to locate `track_mp_50cc.arc` file in "{zip_filename}". '
+                    log.warning(f'Unable to locate `track_mp_50cc.arc` file in "{nodename}". '
                                 '`track_mp.arc` will be used.')
                     track_mp_50cc_filepath = track_mp_filepath
             if track_index == 0:
@@ -663,7 +664,8 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                 repack_course_arc_file(page_track_filepath, f'{COURSES[track_index].lower()}2')
                 repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}2l')
                 repack_course_arc_file(page_track_50cc_filepath, f'{COURSES[track_index].lower()}')
-                repack_course_arc_file(page_track_mp_50cc_filepath, f'{COURSES[track_index].lower()}l')
+                repack_course_arc_file(page_track_mp_50cc_filepath,
+                                       f'{COURSES[track_index].lower()}l')
             else:
                 page_track_filepath = os.path.join(page_course_dirpath,
                                                    f'{COURSES[track_index]}.arc')
@@ -685,7 +687,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                                                  f'{COURSES[track_index]}.ght')
                 shutil.copy2(ght_filepath, page_ght_filepath)
             else:
-                log.warning(f'Unable to locate `staffghost.ght` file in "{zip_filename}".')
+                log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
 
             # Copy audio files. Unlike with the previous files, audio files are stored in the stock
             # directory. The names of the audio files strategically start with a "X_" prefix to
@@ -704,10 +706,10 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                     dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
                     shutil.copy2(lap_music_fast_filepath, dst_ast_filepath)
                 else:
-                    log.warning(f'Unable to locate `lap_music_fast.ast` in "{zip_filename}". '
+                    log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
                                 '`lap_music_normal.ast` will be used.')
             else:
-                log.warning(f'Unable to locate `lap_music_normal.ast` in "{zip_filename}". Luigi '
+                log.warning(f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
                             'Circuit\'s sound track will be used.')
 
             try:
@@ -717,7 +719,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                 trackname = trackinfo['Config']['trackname']
                 main_language = trackinfo['Config']['main_language']
             except Exception:
-                log.warning(f'Unable to locate `trackinfo.ini` in "{zip_filename}".')
+                log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}".')
                 trackinfo = None
                 trackname = prefix
                 main_language = None
@@ -740,11 +742,11 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                 for l in LANGUAGES:
                     filepath = os.path.join(course_images_dirpath, l, filename)
                     if os.path.isfile(filepath):
-                        log.warning(f'Unable to locate `{filename}` in "{zip_filename}" for '
+                        log.warning(f'Unable to locate `{filename}` in "{nodename}" for '
                                     f'current language ({language}). Image for {l} will be used.')
                         return filepath
 
-                log.warning(f'Unable to locate `{filename}` in "{zip_filename}" for {language}. '
+                log.warning(f'Unable to locate `{filename}` in "{nodename}" for {language}. '
                             'An auto-generated image will be provided.')
 
                 filepath = os.path.join(course_images_dirpath, language, filename)
@@ -755,7 +757,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
             expected_languages = os.listdir(page_coursename_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
-                log.error(f'Unable to locate language directories in "{zip_filename}" for course '
+                log.error(f'Unable to locate language directories in "{nodename}" for course '
                           'logo. This is fatal.')
                 sys.exit(1)
             for language in expected_languages:
@@ -773,7 +775,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
-                log.error(f'Unable to locate `SceneData/language` directories in "{zip_filename}". '
+                log.error(f'Unable to locate `SceneData/language` directories in "{nodename}". '
                           'This is fatal.')
                 sys.exit(1)
             preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
@@ -815,7 +817,7 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
                     int(minimap_json['Orientation']),
                 )
             except Exception as e:
-                log.error(f'Unable to parse minimap data in "{zip_filename}": {str(e)}. This is '
+                log.error(f'Unable to parse minimap data in "{nodename}": {str(e)}. This is '
                           'fatal.')
                 sys.exit(1)
 
