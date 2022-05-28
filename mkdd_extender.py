@@ -323,12 +323,12 @@ def split_image(image: Image.Image) -> 'list[Image.Image]':
     return [image]
 
 
-def add_controls_to_title_image(src_filepath: str, dst_filepath: str, language: str):
+def add_controls_to_title_image(filepath: str, language: str):
     with tempfile.TemporaryDirectory() as tmp_dir:
-        title_filename = os.path.basename(src_filepath)
+        title_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, title_filename[:-len('.bti')] + '.png')
 
-        convert_bti_to_png(src_filepath, tmp_filepath)
+        convert_bti_to_png(filepath, tmp_filepath)
 
         controls_filepath = os.path.join(data_dir, 'controls', 'controls.png')
         controls_image = Image.open(controls_filepath)
@@ -370,7 +370,7 @@ def add_controls_to_title_image(src_filepath: str, dst_filepath: str, language: 
             image.paste(word, box, word)
         image.save(tmp_filepath)
 
-        convert_png_to_bti(tmp_filepath, dst_filepath, 'RGB5A3')
+        convert_png_to_bti(tmp_filepath, filepath, 'RGB5A3')
 
 
 def generate_bti_image(text: str, width: int, height: int, image_format: str,
@@ -510,7 +510,7 @@ def patch_title_lines(gcm_tmp_dir: str):
         for title_filename in ('selectcourse.bti', 'selectcup.bti'):
             title_filepath = os.path.join(timg_dir, title_filename)
             log.info(f'Modifying {title_filepath}...')
-            add_controls_to_title_image(title_filepath, title_filepath, language)
+            add_controls_to_title_image(title_filepath, language)
 
         # Gradient colors are specified in the BLO file, which we want to avoid in the controls
         # icons. Also, avoid the game blurrying the images.
