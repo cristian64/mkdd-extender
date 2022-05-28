@@ -373,6 +373,60 @@ def add_controls_to_title_image(filepath: str, language: str):
         convert_png_to_bti(tmp_filepath, filepath, 'RGB5A3')
 
 
+def add_dpad_to_cup_name_image(filepath: str, page_index: int):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        cupname_filename = os.path.basename(filepath)
+        tmp_filepath = os.path.join(tmp_dir, cupname_filename[:-len('.bti')] + '.png')
+
+        convert_bti_to_png(filepath, tmp_filepath)
+
+        dpad_filepath = os.path.join(data_dir, 'controls', 'dpad.png')
+        dpad_image = Image.open(dpad_filepath)
+
+        # It is assumed that the D-pad image is set to the initial state (that is, pointing to the
+        # right). Only for the extra custom pages a rotation is needed.
+        if page_index == 0:
+            dpad_image = dpad_image.rotate(90)  # Up
+        elif page_index == 1:
+            dpad_image = dpad_image.rotate(-90)  # Down
+        elif page_index == 2:
+            dpad_image = dpad_image.rotate(180)  # Left
+
+        cupname_image = Image.open(tmp_filepath)
+        original_mode = cupname_image.mode  # Original mode is 'LA'.
+        cupname_image = cupname_image.convert('RGBA')
+
+        canvas_width = cupname_image.width - dpad_image.width
+        canvas_height = cupname_image.height
+
+        words = split_image(cupname_image)
+
+        effective_width = sum(img.width for img in words)
+        available_width = canvas_width - effective_width
+
+        MAX_SPACING = 3
+        spaces = len(words) - 1
+        spacing = min(MAX_SPACING, available_width // spaces) if spaces > 0 else 0
+        spacing_width = spacing * spaces
+
+        margin_width = max(0, available_width - spacing_width)
+        offset = max(0, margin_width // 2)
+
+        ops = []
+        for word in words:
+            ops.append((word, (offset + dpad_image.width, 0)))
+            offset += spacing + word.width
+
+        image = Image.new('RGBA', (canvas_width + dpad_image.width, canvas_height))
+        image.paste(dpad_image, (0, 0), dpad_image)
+        for word, box in reversed(ops):
+            image.paste(word, box, word)
+        image = image.convert(original_mode)
+        image.save(tmp_filepath)
+
+        convert_png_to_bti(tmp_filepath, filepath, 'IA4')
+
+
 def generate_bti_image(text: str, width: int, height: int, image_format: str,
                        background: 'tuple[int, int, int, int]', filepath: str):
     assert filepath.endswith('.bti')
@@ -544,6 +598,47 @@ def patch_title_lines(gcm_tmp_dir: str):
                             'desaturated.')
 
     log.info('Title lines patched.')
+
+
+def patch_cup_names(gcm_tmp_dir: str):
+    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+    scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
+
+    log.info(f'Patching cup names...')
+
+    for language in LANGUAGES:
+        language_dirpath = os.path.join(scenedata_dirpath, language)
+        if not os.path.isdir(language_dirpath):
+            continue
+
+        courseselect_dirpath = os.path.join(language_dirpath, 'courseselect')
+        timg_dir = os.path.join(courseselect_dirpath, 'timg')
+
+        cupname_filenames = ('cupname_flower_cup.bti', 'cupname_mushroom_cup.bti',
+                             'cupname_reverse2_cup.bti', 'cupname_special_cup.bti',
+                             'cupname_star_cup.bti')
+
+        for cupname_filename in cupname_filenames:
+            cupname_filepath = os.path.join(timg_dir, cupname_filename)
+            log.info(f'Modifying {cupname_filepath}...')
+
+            for page_index in range(3):
+
+                def with_page_index_suffix(path: str) -> str:
+                    stem, ext = os.path.splitext(path)
+                    stem = stem[:-len(str(page_index))] + str(page_index)
+                    return stem + ext
+
+                page_cupname_filepath = with_page_index_suffix(cupname_filepath)
+                shutil.copyfile(cupname_filepath, page_cupname_filepath)
+                add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
+                shutil.copyfile(page_cupname_filepath,
+                                page_cupname_filepath.replace('courseselect', 'lanplay'))
+
+            add_dpad_to_cup_name_image(cupname_filepath, -1)
+            shutil.copyfile(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
+
+    log.info('Cup names patched.')
 
 
 def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
@@ -956,6 +1051,7 @@ def main():
 
         patch_bnr_file(gcm_tmp_dir)
         patch_title_lines(gcm_tmp_dir)
+        patch_cup_names(gcm_tmp_dir)
         minimap_data = meld_courses(args.tracks, gcm_tmp_dir)
         patch_dol_file(minimap_data, gcm_tmp_dir)
 
