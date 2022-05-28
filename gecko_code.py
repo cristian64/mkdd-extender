@@ -212,6 +212,11 @@ FILE_STRINGS = (
     'CoName_DINO_DINO_JUNGLE.bti',
     'CoName_BOWSER_CASTLE.bti',
     'CoName_RAINBOW_ROAD.bti',
+    'CupName_MUSHROOM_CUP.bti',
+    'CupName_FLOWER_CUP.bti',
+    'CupName_STAR_CUP.bti',
+    'CupName_SPECIAL_CUP.bti',
+    'CupName_REVERSE2_CUP.bti',
 )
 
 
@@ -281,6 +286,11 @@ STRING_ADDRESSES = {
         'CoName_DINO_DINO_JUNGLE.bti': 0x0033224C,
         'CoName_BOWSER_CASTLE.bti': 0x00332284,
         'CoName_RAINBOW_ROAD.bti': 0x003322B8,
+        'CupName_MUSHROOM_CUP.bti': 0x00331EDC,
+        'CupName_FLOWER_CUP.bti': 0x00331EF8,
+        'CupName_STAR_CUP.bti': 0x00331F10,
+        'CupName_SPECIAL_CUP.bti': 0x00331F28,
+        'CupName_REVERSE2_CUP.bti': 0x00331F40,
     },
     'GM4P01': {
         '/Course/%s%s.arc': 0x00340B7C,
@@ -319,6 +329,11 @@ STRING_ADDRESSES = {
         'CoName_DINO_DINO_JUNGLE.bti': 0x0033C01C,
         'CoName_BOWSER_CASTLE.bti': 0x0033C054,
         'CoName_RAINBOW_ROAD.bti': 0x0033C088,
+        'CupName_MUSHROOM_CUP.bti': 0x0033BCAC,
+        'CupName_FLOWER_CUP.bti': 0x0033BCC8,
+        'CupName_STAR_CUP.bti': 0x0033BCE0,
+        'CupName_SPECIAL_CUP.bti': 0x0033BCF8,
+        'CupName_REVERSE2_CUP.bti': 0x0033BD10,
     },
     'GM4J01': {
         '/Course/%s%s.arc': 0x0035135C,
@@ -357,6 +372,11 @@ STRING_ADDRESSES = {
         'CoName_DINO_DINO_JUNGLE.bti': 0x0034C86C,
         'CoName_BOWSER_CASTLE.bti': 0x0034C8A4,
         'CoName_RAINBOW_ROAD.bti': 0x0034C8D8,
+        'CupName_MUSHROOM_CUP.bti': 0x0034C4FC,
+        'CupName_FLOWER_CUP.bti': 0x0034C518,
+        'CupName_STAR_CUP.bti': 0x0034C530,
+        'CupName_SPECIAL_CUP.bti': 0x0034C548,
+        'CupName_REVERSE2_CUP.bti': 0x0034C560,
     }
 }
 
