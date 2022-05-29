@@ -968,6 +968,79 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
     return minimap_data
 
 
+def gather_audio_file_indices(gcm_tmp_dir: str) -> tuple:
+    # The Gecko code generator needs the list of 32 integers with the file index of each audio track
+    # mapped to each track.
+
+    file_list = build_file_list(gcm_tmp_dir)
+
+    COURSE_STREAM_ORDER = {
+        'BabyLuigi': 'BABY',
+        'Peach': 'BEACH',
+        'Daisy': 'BEACH',  # Reused.
+        'Luigi': 'CIRCUIT',
+        'Mario': 'CIRCUIT',  # Reused.
+        'Yoshi': 'CIRCUIT',  # Reused.
+        'Nokonoko': 'HIWAY',
+        'Patapata': 'HIWAY',  # Reused.
+        'Waluigi': 'STADIUM',
+        'Wario': 'STADIUM',  # Reused.
+        'Diddy': 'JUNGLE',
+        'Donkey': 'JUNGLE',  # Reused.
+        'Koopa': 'CASTLE',
+        'Rainbow': 'RAINBOW',
+        'Desert': 'DESERT',
+        'Snow': 'SNOW',
+    }
+
+    SPEED_TYPES = ('COURSE', 'FINALLAP')
+
+    stock_audio_track_indices = []
+    for speed_type in SPEED_TYPES:
+        for _course, subname in COURSE_STREAM_ORDER.items():
+            filename = f'{speed_type}_{subname}'
+            for file_index, filepath in enumerate(file_list):
+                if filepath.endswith('.ast') and filename in filepath:
+                    stock_audio_track_indices.append(file_index)
+                    break
+            else:
+                log.error(f'Unable to locate audio track "{filename}" in file list. This is fatal.')
+                sys.exit(1)
+    stock_audio_track_indices = tuple(stock_audio_track_indices)
+
+    FALLBACK_AUDIO_COURSE = 'Luigi'
+    course_stream_order = tuple(COURSE_STREAM_ORDER.keys())
+    fallback_index = stock_audio_track_indices[course_stream_order.index(FALLBACK_AUDIO_COURSE)]
+    fallback_finallap_index = stock_audio_track_indices[
+        course_stream_order.index(FALLBACK_AUDIO_COURSE) + 16]
+
+    audio_track_data = (
+        [fallback_index] * 16 + [fallback_finallap_index] * 16,  # Page 0
+        [fallback_index] * 16 + [fallback_finallap_index] * 16,  # Page 1
+        [fallback_index] * 16 + [fallback_finallap_index] * 16,  # Page 2
+        stock_audio_track_indices,
+    )
+
+    for prefix in PREFIXES:
+        page_index = ord(prefix[0]) - ord('A')
+        track_index = int(prefix[1:3]) - 1
+        assert 0 <= page_index <= 2
+        assert 0 <= track_index <= 15
+
+        for i, speed_type in enumerate(SPEED_TYPES):
+            speed_type = f'X_{speed_type}'
+            filename = f'{speed_type}_{prefix}'
+            for file_index, filepath in enumerate(file_list):
+                if filepath.endswith('.ast') and filename in filepath:
+                    mapped_offset = course_stream_order.index(COURSES[track_index])
+                    audio_track_data[page_index][mapped_offset + i * 16] = file_index
+                    break
+            else:
+                pass  # Fallback audio file index will be used.
+
+    return tuple(tuple(l) for l in audio_track_data)
+
+
 def patch_dol_file(minimap_data: dict, gcm_tmp_dir: str):
     sys_dirpath = os.path.join(gcm_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
@@ -989,11 +1062,13 @@ def patch_dol_file(minimap_data: dict, gcm_tmp_dir: str):
         game_id = game_id.decode('ascii')
         assert game_id in ('GM4E01', 'GM4P01', 'GM4J01')
 
+    audio_track_data = gather_audio_file_indices(gcm_tmp_dir)
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
         log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
 
-        gecko_code.write_code(game_id, minimap_data, tmp_gecko_code_filepath)
+        gecko_code.write_code(game_id, minimap_data, audio_track_data, tmp_gecko_code_filepath)
 
         log.info(f'Injecting Gecko code into "{dol_path}"...')
 

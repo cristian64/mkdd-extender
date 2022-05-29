@@ -172,6 +172,63 @@ COURSE_TO_MINIMAP_VALUES = {
 The stock minimap values for each course.
 """
 
+COURSE_TO_STREAM_FILE_INDEX_ADDRESSES = {
+    'GM4E01': 0x0052EB04,
+    'GM4P01': 0x00538944,
+    'GM4J01': 0x0053FC5C,
+}
+"""
+This address points to a `int[50]` structure where the file index of each audio track is stored for
+each course. This is the array where the 50 values returned by the 50 calls to
+`DVDConvertPathToEntrynum()` from within `JAUSection::newStreamFileTable()` are stored.
+
+In the unedited game, the stock values for the first 32 integers are:
+
+    Offset  Value  Description
+    -------------------------------------------
+    0x00    14     Baby Park
+    0x04    15     Peach Beach
+    0x08    15     Daisy Cruiser
+    0x0C    17     Luigi Circuit
+    0x10    17     Mario Circuit
+    0x14    17     Yoshi Circuit
+    0x18    19     Mushroom Bridge
+    0x1C    19     Mushroom City
+    0x20    23     Waluigi Stadium
+    0x24    23     Wario Colosseum
+    0x28    20     Dino Dino Jungle
+    0x2C    20     DK Mountain
+    0x30    16     Bowser's Castle
+    0x34    21     Rainbow Road
+    0x38    18     Dry Dry Desert
+    0x3C    22     Sherbet Land
+    0x40    25     Baby Park (final lap)
+    0x44    26     Peach Beach (final lap)
+    0x48    26     Daisy Cruiser (final lap)
+    0x4C    28     Luigi Circuit (final lap)
+    0x50    28     Mario Circuit (final lap)
+    0x54    28     Yoshi Circuit (final lap)
+    0x58    30     Mushroom Bridge (final lap)
+    0x5C    30     Mushroom City (final lap)
+    0x60    34     Waluigi Stadium (final lap)
+    0x64    34     Wario Colosseum (final lap)
+    0x68    31     Dino Dino Jungle (final lap)
+    0x6C    31     DK Mountain (final lap)
+    0x70    27     Bowser's Castle (final lap)
+    0x74    32     Rainbow Road (final lap)
+    0x78    29     Dry Dry Desert (final lap)
+    0x7C    33     Sherbet Land (final lap)
+
+This list matches the order in the BSFT file (and in the BSFT section in the BAA file). The rest of
+the values in the interger array relate to other file indices such as the goal sound or the
+commemoration sound, but they are not relevant at this point.
+
+For the JAP and PAL versions, the address has been figured out by searching for
+"00 00 00 0E 00 00 00 0F 00 00 00 0F 00 00 00 11 00 00 00 11 00 00 00 11 00 00 00 13" with the
+Dolphin Memory Engine tool. For the PAL version, because the tree structure has two more files, an
+offset of +2 has been added to each integer before searching for it.
+"""
+
 DIR_STRINGS = (
     '/Course/%s%s.arc',
     '/Course/Luigi2%s.arc',
@@ -411,7 +468,7 @@ def float_to_hex(value: float) -> int:
     return struct.unpack('>L', struct.pack('>f', value))[0]
 
 
-def write_code(game_id: str, minimap_data: dict, filepath: str):
+def write_code(game_id: str, minimap_data: dict, audio_track_data: tuple, filepath: str):
 
     encoded_buttons_state_address = encode_address('if16', BUTTONS_STATE_ADDRESSES[game_id])
 
@@ -493,6 +550,16 @@ def write_code(game_id: str, minimap_data: dict, filepath: str):
             get_line(encode_address('write32', addresses[3]), float_to_hex(values[3])),
             get_line(encode_address('write8', addresses[4] + 3), values[4]),
         ))
+
+    # Audio track data.
+    for page_index in range(3):
+        for i, value in enumerate(audio_track_data[page_index]):
+            address = COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + i * 4
+            lines_for_activator[page_index].append(
+                get_line(encode_address('write32', address), value))
+    for i, value in enumerate(audio_track_data[3]):
+        address = COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + i * 4
+        lines_for_deactivator.append(get_line(encode_address('write32', address), value))
 
     # Redraw course selection screen code.
     redraw_courseselect_address = REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]
