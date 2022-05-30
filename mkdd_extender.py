@@ -21,7 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 import gecko_code
 import rarc
-from tools import gcm
+from tools import bti, gcm
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
@@ -269,8 +269,11 @@ def convert_bti_to_png(src_filepath: str, dst_filepath: str):
     wimgt_path = os.path.join(tools_dir, 'wimgt', wimgt_name)
     command = (wimgt_path, 'decode', src_filepath, '-o', '-d', dst_filepath)
 
-    if 0 != run(command):
-        raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
+    if 0 != run(command) or not os.path.isfile(dst_filepath):
+        # Fall back to the `bti` module if `wimgt` fails.
+        bti.BTI(open(src_filepath, 'rb')).render().save(dst_filepath)
+        if not os.path.isfile(dst_filepath):
+            raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
 
 
 def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
