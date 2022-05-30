@@ -3,6 +3,7 @@
 MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 48 extra courses.
 """
 import argparse
+import audioop
 import configparser
 import contextlib
 import hashlib
@@ -16,9 +17,11 @@ import struct
 import subprocess
 import sys
 import tempfile
+import wave
 
 from PIL import Image, ImageDraw, ImageFont
 
+import ast_converter
 import gecko_code
 import rarc
 from tools import bti, gcm
@@ -481,6 +484,63 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
         convert_png_to_bti(tmp_filepath, filepath, image_format)
 
 
+def conform_audio_file(filepath: str):
+    log.info(f'Conforming audio file ("{filepath}")...')
+    ast_info = ast_converter.get_ast_info(filepath)
+
+    bit_depth = ast_info['bit_depth']
+    channel_count = ast_info['channel_count']
+    sample_rate = ast_info['sample_rate']
+
+    if channel_count not in (1, 2, 4):
+        log.error(f'Unsupported channel count ({channel_count}) in "{filepath}". '
+                  'Expected 1, 2, or 4 channels.')
+        sys.exit(1)
+
+    if channel_count == 1:
+        return
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        wav_filepath = os.path.join(tmp_dir,
+                                    os.path.splitext(os.path.basename(filepath))[0] + '.wav')
+        ast_converter.convert_to_wav(filepath, wav_filepath)
+
+        with wave.open(wav_filepath, 'rb') as f:
+            real_sample_count = f.getnframes()
+            data = f.readframes(real_sample_count)
+
+        if channel_count == 4:
+            data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+            channel_count = 2
+        if channel_count == 2:
+            data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+            channel_count = 1
+
+        # NOTE: Audio could be resampled to 32000 Hz as well. Loop start and loop end would be
+        # multiplied by the sample rate ratio (input sample rate / 32 kHz), so that the loop does
+        # not break. Rounding errors might make the loop vary by a few samples, but that should
+        # never be noticeable (a minimal crack, at most). If loop end was matching sample count,
+        # then it should still match. For now, not doing this, as it only saves 90 MiB with the
+        # current custom track packs, and converting to mono already puts us under the limit with a
+        # safe cushion.
+
+        with wave.open(wav_filepath, 'wb') as f:
+            f.setsampwidth(bit_depth // 8)
+            f.setnchannels(channel_count)
+            f.setframerate(sample_rate)
+            f.setnframes(real_sample_count)
+            f.writeframesraw(data)
+
+        ast_converter.convert_to_ast(wav_filepath,
+                                     filepath,
+                                     looped=ast_info['looped'],
+                                     sample_count=ast_info['sample_count'],
+                                     loop_start=ast_info['loop_start'],
+                                     loop_end=ast_info['loop_end'],
+                                     volume=ast_info['volume'],
+                                     last_block_size=ast_info['last_block_size'])
+
+
 def patch_bnr_file(gcm_tmp_dir: str):
     files_dirpath = os.path.join(gcm_tmp_dir, 'files')
     bnr_filepath = os.path.join(files_dirpath, 'opening.bnr')
@@ -685,6 +745,16 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
             log.info(f'{extracted} archives extracted.')
         else:
             log.warning(f'No archive has been extracted.')
+
+        # Reduce size of the audio files by converting to mono.
+        REDUCE_AUDIO_SIZE = True
+        if REDUCE_AUDIO_SIZE:
+            for rootdir, dirnames, filenames in os.walk(tracks_tmp_dir):
+                dirnames.sort()
+                for filename in sorted(filenames):
+                    if filename.endswith('.ast'):
+                        filepath = os.path.join(rootdir, filename)
+                        conform_audio_file(filepath)
 
         # Copy files into the GCM temporariy dirctory.
         log.info(f'Melding extracted directories...')
