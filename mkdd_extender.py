@@ -484,8 +484,7 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
         convert_png_to_bti(tmp_filepath, filepath, image_format)
 
 
-def conform_audio_file(filepath: str):
-    log.info(f'Conforming audio file ("{filepath}")...')
+def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate: int):
     ast_info = ast_converter.get_ast_info(filepath)
 
     bit_depth = ast_info['bit_depth']
@@ -497,8 +496,13 @@ def conform_audio_file(filepath: str):
                   'Expected 1, 2, or 4 channels.')
         sys.exit(1)
 
-    if channel_count == 1 and sample_rate == 32000:
+    needs_mixing = mix_to_mono and channel_count != 1
+    needs_downsampling = downsample_sample_rate and sample_rate != downsample_sample_rate
+
+    if not needs_mixing and not needs_downsampling:
         return
+
+    log.info(f'Conforming audio file ("{filepath}")...')
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         wav_filepath = os.path.join(tmp_dir,
@@ -509,19 +513,20 @@ def conform_audio_file(filepath: str):
             real_sample_count = f.getnframes()
             data = f.readframes(real_sample_count)
 
-        if channel_count == 4:
-            data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
-            channel_count = 2
-        if channel_count == 2:
-            data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
-            channel_count = 1
+        if needs_mixing:
+            if channel_count == 4:
+                data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+                channel_count = 2
+            if channel_count == 2:
+                data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+                channel_count = 1
 
         sample_rate_ratio = 1
-        if sample_rate > 32000:
-            data, _state = audioop.ratecv(data, bit_depth // 8, channel_count, sample_rate, 32000,
-                                          None)
-            sample_rate_ratio = 32000 / sample_rate
-            sample_rate = 32000
+        if needs_downsampling:
+            data, _state = audioop.ratecv(data, bit_depth // 8, channel_count, sample_rate,
+                                          downsample_sample_rate, None)
+            sample_rate_ratio = downsample_sample_rate / sample_rate
+            sample_rate = downsample_sample_rate
 
         with wave.open(wav_filepath, 'wb') as f:
             f.setsampwidth(bit_depth // 8)
@@ -714,7 +719,9 @@ def patch_cup_names(gcm_tmp_dir: str):
     log.info('Cup names patched.')
 
 
-def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
+def meld_courses(args: argparse.Namespace, gcm_tmp_dir: str) -> dict:
+    tracks_dirpath = args.tracks
+
     minimap_data = {}
 
     files_dirpath = os.path.join(gcm_tmp_dir, 'files')
@@ -757,14 +764,13 @@ def meld_courses(tracks_dirpath: str, gcm_tmp_dir: str) -> dict:
             log.warning(f'No archive has been extracted.')
 
         # Reduce size of the audio files by converting to mono.
-        REDUCE_AUDIO_SIZE = True
-        if REDUCE_AUDIO_SIZE:
+        if args.mix_to_mono or args.sample_rate:
             for rootdir, dirnames, filenames in os.walk(tracks_tmp_dir):
                 dirnames.sort()
                 for filename in sorted(filenames):
                     if filename.endswith('.ast'):
                         filepath = os.path.join(rootdir, filename)
-                        conform_audio_file(filepath)
+                        conform_audio_file(filepath, args.mix_to_mono, args.sample_rate)
 
         # Copy files into the GCM temporariy dirctory.
         log.info(f'Melding extracted directories...')
@@ -1172,6 +1178,19 @@ def main():
     parser.add_argument('output',
                         type=str,
                         help='Filepath where the modified ISO/GCM file will be written.')
+
+    audio_group = parser.add_argument_group('Audio options')
+    audio_group.add_argument('--mix-to-mono',
+                             action='store_true',
+                             help='If enabled, custom audio tracks will be mixed into mono audio. '
+                             'This reduces the size of the ISO image considerably.')
+    audio_group.add_argument('--sample-rate',
+                             type=int,
+                             help='If set (in Hz), custom audio tracks that have a greater sample '
+                             'rate than the provided value will be downsampled. This can be used '
+                             'to reduce the size of the ISO image notably. Stock courses use 32000 '
+                             'Hz.')
+
     args = parser.parse_args()
 
     gcm_tmp_dir = tempfile.mkdtemp()
@@ -1210,7 +1229,7 @@ def main():
         patch_bnr_file(gcm_tmp_dir)
         patch_title_lines(gcm_tmp_dir)
         patch_cup_names(gcm_tmp_dir)
-        minimap_data = meld_courses(args.tracks, gcm_tmp_dir)
+        minimap_data = meld_courses(args, gcm_tmp_dir)
         patch_dol_file(minimap_data, gcm_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
