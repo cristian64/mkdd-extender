@@ -497,7 +497,7 @@ def conform_audio_file(filepath: str):
                   'Expected 1, 2, or 4 channels.')
         sys.exit(1)
 
-    if channel_count == 1:
+    if channel_count == 1 and sample_rate == 32000:
         return
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -516,29 +516,39 @@ def conform_audio_file(filepath: str):
             data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
             channel_count = 1
 
-        # NOTE: Audio could be resampled to 32000 Hz as well. Loop start and loop end would be
-        # multiplied by the sample rate ratio (input sample rate / 32 kHz), so that the loop does
-        # not break. Rounding errors might make the loop vary by a few samples, but that should
-        # never be noticeable (a minimal crack, at most). If loop end was matching sample count,
-        # then it should still match. For now, not doing this, as it only saves 90 MiB with the
-        # current custom track packs, and converting to mono already puts us under the limit with a
-        # safe cushion.
+        sample_rate_ratio = 1
+        if sample_rate > 32000:
+            data, _state = audioop.ratecv(data, bit_depth // 8, channel_count, sample_rate, 32000,
+                                          None)
+            sample_rate_ratio = 32000 / sample_rate
+            sample_rate = 32000
 
         with wave.open(wav_filepath, 'wb') as f:
             f.setsampwidth(bit_depth // 8)
             f.setnchannels(channel_count)
             f.setframerate(sample_rate)
-            f.setnframes(real_sample_count)
-            f.writeframesraw(data)
+            f.writeframes(data)
+            new_real_sample_count = f.getnframes()
+
+        sample_count = ast_info['sample_count']
+        loop_start = ast_info['loop_start']
+        loop_end = ast_info['loop_end']
+
+        sample_count = min(new_real_sample_count, round(sample_rate_ratio * sample_count))
+        loop_start = min(new_real_sample_count, round(sample_rate_ratio * loop_start))
+        loop_end = min(new_real_sample_count, round(sample_rate_ratio * loop_end))
+
+        # If the audio has been resampled, let the last block size be auto-determined.
+        last_block_size = ast_info['last_block_size'] if sample_rate_ratio == 1 else None
 
         ast_converter.convert_to_ast(wav_filepath,
                                      filepath,
                                      looped=ast_info['looped'],
-                                     sample_count=ast_info['sample_count'],
-                                     loop_start=ast_info['loop_start'],
-                                     loop_end=ast_info['loop_end'],
+                                     sample_count=sample_count,
+                                     loop_start=loop_start,
+                                     loop_end=loop_end,
                                      volume=ast_info['volume'],
-                                     last_block_size=ast_info['last_block_size'])
+                                     last_block_size=last_block_size)
 
 
 def patch_bnr_file(gcm_tmp_dir: str):
