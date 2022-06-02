@@ -94,9 +94,34 @@ linux = platform.system() == 'Linux'
 windows = platform.system() == 'Windows'
 macos = platform.system() == 'Darwin'
 
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(module)-15s %(message)s',
-                    level=logging.INFO,
-                    datefmt='%Y-%m-%d %H:%M:%S')
+
+class _CustomFormatter(logging.Formatter):
+    yellow = '\x1b[0;33m' if not windows else ''
+    bold_red = '\x1b[1;91m' if not windows else ''
+    bold_fucsia = '\x1b[1;95m' if not windows else ''
+    reset = '\x1b[0m' if not windows else ''
+
+    def __init__(self):
+        super().__init__()
+
+        fmt = '%(asctime)s %(levelname)-8s %(module)-15s %(message)s'
+        self.__formatters = {
+            logging.DEBUG: logging.Formatter(fmt),
+            logging.INFO: logging.Formatter(fmt),
+            logging.WARNING: logging.Formatter(self.yellow + fmt + self.reset),
+            logging.ERROR: logging.Formatter(self.bold_red + fmt + self.reset),
+            logging.CRITICAL: logging.Formatter(self.bold_fucsia + fmt + self.reset),
+        }
+
+    def format(self, record):
+        return self.__formatters[record.levelno].format(record)
+
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(_CustomFormatter())
+
+logging.basicConfig(datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO, handlers=(console_handler, ))
 
 log = logging.getLogger('mkdd-extender')
 
