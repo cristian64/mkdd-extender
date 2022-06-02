@@ -5,6 +5,7 @@ Mario Kart: Double Dash!!.
 
 import os
 import struct
+import textwrap
 
 BUTTONS_STATE_ADDRESSES = {
     'GM4E01': 0x003A4D6C,
@@ -460,6 +461,136 @@ for string in DIR_STRINGS + FILE_STRINGS:
     for _game_id, addresses in STRING_ADDRESSES.items():
         assert string in addresses
 
+START_SOUND_ASSEMBLY = textwrap.dedent("""\
+    .loc_0x0:
+        mr r11, r0 #Copy r0's value to r11
+        mflr r12 #Copy LR's value to r12
+        stwu sp,-0x80 (sp) #Push stack, make space for 29 registers
+        stmw r3, 0x8 (sp)
+
+        lis       r3, 0x8050        # Set values in r3, r4, r5, and r6 as seen in
+        ori       r3, r3, 0x0a90    # legitimate calls to the function.
+        lis       r4, 0x803e
+        ori       r4, r4, 0x2210
+        lis       r5, 0x803b
+        ori       r5, r5, 0x0758
+        li        r6, 0x0
+        lis       r0, 0x2           # 0x2000c (Sound ID)
+        ori       r0, r0, 0xc
+        stw       r0, 0x0(r4)       # Sound ID is stored in the address that is
+                                    # currently sitting in r4.
+
+        lis       r12, 0x8008       # 0x8008b3d0 JAISeMgr::startSound()
+        ori       r12, r12, 0xb3d0
+
+        mtlr r12 #Copy r12 to the Link Register
+        blrl #Call the function via the LR and have it return back to us
+
+        lmw r3, 0x8 (sp)
+        addi sp, sp, 0x80 #Pop stack
+        mtlr r12 #Restore LR's value
+        mr r0, r11 #Restore r0's value
+    """)
+"""
+This is the assembly code that plays a sound ID by invoking `JAISeMgr::startSound()`.
+
+While that symbol is placed in the same memory address for all three regions (`0x8008b3d0`), the
+addresses of the arguments it takes differ between regions.
+
+In order to determine the value of these arguments (stored in r3, r4, r5, and r6), a breakpoint is
+set in `JAUSoundMgr::startSound()` on the instruction where `JAISeMgr::startSound()` is invoked,
+which is `0x800a4e2c`. Go to the course/cup selection screen, and switch between courses or cups
+to hit the breakpoint. These should be the relevant addresses:
+
+NTSC:
+r3 0x80500a90
+r4 0x803e2210
+r5 0x803b0758
+r6 0x00000000
+
+PAL:
+r3 0x8050a8d0
+r4 0x803ec050
+r5 0x803ba578
+r6 0x00000000
+
+JAP:
+r3 0x8051b0b0
+r4 0x803fc830
+r5 0x803cad78
+r6 0x00000000
+
+Note that the address in r4 changes when the sound is played from a different screen (e.g. from the
+select mode screen). It's not really relevant to us, because we only want to play sounds from the
+course/cup selection screen. The address in r3 and r5 don't seem to change regardless of the screen.
+The memory pointed by r5 holds `0x0`. And r6 is `0x0` always (my bet is this is the pointer to the
+optional 3D position that `JAISeMgr::startSound()` accepts, which is not needed for 2D sounds).
+
+The memory addressed by r4 needs to hold the sound ID (`0x20000` is the sound that is played when
+the player navigates courses or cups; `0x2000c` can be used for a different sound, the one that is
+played when the player accepts a letter in the initialism screen).
+
+The assembly code merely sets the value of the relevant registers, and invokes the function.
+
+Instructions for pushing/popping registry stack, and invoking the function, have been sourced from
+https://mariokartwii.com/showthread.php?tid=1052.
+
+Other nice sources:
+- https://www.cs.uaf.edu/2011/fall/cs301/lecture/11_21_PowerPC.html
+- https://mariapilot.noblogs.org/files/2021/01/CodeWarrior-C-C-and-Assembly-Language-Reference.pdf
+  (but reponds with 404 now)
+"""
+
+START_SOUND_ASSEMBLED = {
+    'GM4E01':
+    textwrap.dedent("""\
+        7C0B0378 7D8802A6
+        9421FF80 BC610008
+        3C608050 60630A90
+        3C80803E 60842210
+        3CA0803B 60A50758
+        38C00000 3C000002
+        6000000C 90040000
+        3D808008 618CB3D0
+        7D8803A6 4E800021
+        B8610008 38210080
+        7D8803A6 7D605B78
+    """),
+    'GM4P01':
+    textwrap.dedent("""\
+        7C0B0378 7D8802A6
+        9421FF80 BC610008
+        3C608050 6063A8D0
+        3C80803E 6084C050
+        3CA0803B 60A5A578
+        38C00000 3C000002
+        6000000C 90040000
+        3D808008 618CB3D0
+        7D8803A6 4E800021
+        B8610008 38210080
+        7D8803A6 7D605B78
+    """),
+    'GM4J01':
+    textwrap.dedent("""\
+        7C0B0378 7D8802A6
+        9421FF80 BC610008
+        3C608051 6063B0B0
+        3C80803F 6084C830
+        3CA0803C 60A5AD78
+        38C00000 3C000002
+        6000000C 90040000
+        3D808008 618CB3D0
+        7D8803A6 4E800021
+        B8610008 38210080
+        7D8803A6 7D605B78
+    """),
+}
+"""
+Code in `START_SOUND_ASSEMBLY` that has been assembled with PyiiASMH 3.
+
+Same code for all regions, except for the three memory addresses store in r3, r4, and r5.
+"""
+
 
 def encode_address(code_type: str, operand: int = None) -> int:
     """
@@ -481,6 +612,13 @@ def encode_address(code_type: str, operand: int = None) -> int:
         return 0xF0000000
 
     raise RuntimeError(f'Unknown code type: "{code_type}".')
+
+
+def encode_asm(text: str) -> 'list[str]':
+    lines = text.splitlines()
+    lines = [f'C0000000 {len(lines) + 1:08X}'] + lines
+    lines.append('4E800020 00000000')
+    return lines
 
 
 def get_line(encoded_address: int, value: int) -> str:
@@ -610,6 +748,12 @@ def write_code(game_id: str, minimap_data: dict, audio_track_data: tuple, filepa
         get_line(encoded_redraw_courseselect_address, 0x41500000),  # 13.0f
         get_line(encoded_spam_flag_address, 0x00000000)  # Anything that is not SPAM_FLAG_VALUE.
     ]
+
+    # Lines for playing the sound effect.
+    for line in encode_asm(START_SOUND_ASSEMBLED[game_id]):
+        for page_index in range(3):
+            lines_for_activator[page_index].append(line)
+        lines_for_deactivator.append(line)
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
