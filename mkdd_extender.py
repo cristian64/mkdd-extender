@@ -556,8 +556,8 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
                                      last_block_size=last_block_size)
 
 
-def patch_bnr_file(gcm_tmp_dir: str):
-    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+def patch_bnr_file(iso_tmp_dir: str):
+    files_dirpath = os.path.join(iso_tmp_dir, 'files')
     bnr_filepath = os.path.join(files_dirpath, 'opening.bnr')
 
     checksum = md5sum(bnr_filepath)
@@ -624,8 +624,8 @@ def patch_bnr_file(gcm_tmp_dir: str):
     log.info(f'Game title tweaked.')
 
 
-def patch_title_lines(gcm_tmp_dir: str):
-    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+def patch_title_lines(iso_tmp_dir: str):
+    files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
     log.info(f'Patching title lines...')
@@ -678,8 +678,8 @@ def patch_title_lines(gcm_tmp_dir: str):
     log.info('Title lines patched.')
 
 
-def patch_cup_names(gcm_tmp_dir: str):
-    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+def patch_cup_names(iso_tmp_dir: str):
+    files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
     log.info(f'Patching cup names...')
@@ -719,12 +719,12 @@ def patch_cup_names(gcm_tmp_dir: str):
     log.info('Cup names patched.')
 
 
-def meld_courses(args: argparse.Namespace, gcm_tmp_dir: str) -> dict:
+def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
     tracks_dirpath = args.tracks
 
     minimap_data = {}
 
-    files_dirpath = os.path.join(gcm_tmp_dir, 'files')
+    files_dirpath = os.path.join(iso_tmp_dir, 'files')
 
     stream_dirpath = os.path.join(files_dirpath, 'AudioRes', 'Stream')
     course_dirpath = os.path.join(files_dirpath, 'Course')
@@ -772,7 +772,7 @@ def meld_courses(args: argparse.Namespace, gcm_tmp_dir: str) -> dict:
                         filepath = os.path.join(rootdir, filename)
                         conform_audio_file(filepath, args.mix_to_mono, args.sample_rate)
 
-        # Copy files into the GCM temporariy dirctory.
+        # Copy files into the ISO temporariy directory.
         log.info(f'Melding extracted directories...')
         melded = 0
         for prefix in PREFIXES:
@@ -1057,11 +1057,11 @@ def meld_courses(args: argparse.Namespace, gcm_tmp_dir: str) -> dict:
     return minimap_data
 
 
-def gather_audio_file_indices(gcm_tmp_dir: str) -> tuple:
+def gather_audio_file_indices(iso_tmp_dir: str) -> tuple:
     # The Gecko code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
 
-    file_list = build_file_list(gcm_tmp_dir)
+    file_list = build_file_list(iso_tmp_dir)
 
     COURSE_STREAM_ORDER = {
         'BabyLuigi': 'BABY',
@@ -1130,8 +1130,8 @@ def gather_audio_file_indices(gcm_tmp_dir: str) -> tuple:
     return tuple(tuple(l) for l in audio_track_data)
 
 
-def patch_dol_file(minimap_data: dict, gcm_tmp_dir: str):
-    sys_dirpath = os.path.join(gcm_tmp_dir, 'sys')
+def patch_dol_file(minimap_data: dict, iso_tmp_dir: str):
+    sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
 
     assert os.path.isfile(dol_path)
@@ -1151,7 +1151,7 @@ def patch_dol_file(minimap_data: dict, gcm_tmp_dir: str):
         game_id = game_id.decode('ascii')
         assert game_id in ('GM4E01', 'GM4P01', 'GM4J01')
 
-    audio_track_data = gather_audio_file_indices(gcm_tmp_dir)
+    audio_track_data = gather_audio_file_indices(iso_tmp_dir)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
@@ -1170,14 +1170,14 @@ def patch_dol_file(minimap_data: dict, gcm_tmp_dir: str):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('input', type=str, help='Path to the original ISO/GCM file.')
+    parser.add_argument('input', type=str, help='Path to the original ISO file.')
     parser.add_argument('tracks',
                         type=str,
-                        help='Path to the directory containing the ZIP archives for each of the '
-                        'tracks that will be added to the game.')
+                        help='Path to the directory containing the archives for each of the tracks '
+                        'that will be added to the game.')
     parser.add_argument('output',
                         type=str,
-                        help='Filepath where the modified ISO/GCM file will be written.')
+                        help='Path where the modified ISO file will be written.')
 
     audio_group = parser.add_argument_group('Audio options')
     audio_group.add_argument('--mix-to-mono',
@@ -1193,28 +1193,28 @@ def main():
 
     args = parser.parse_args()
 
-    gcm_tmp_dir = tempfile.mkdtemp()
+    iso_tmp_dir = tempfile.mkdtemp()
     try:
-        # Extract the GCM file entirely for now. In the future, only extracting the files that need
+        # Extract the ISO file entirely for now. In the future, only extracting the files that need
         # to be read might be ideal performance-wise.
-        log.info(f'Extracting "{args.input}" image to "{gcm_tmp_dir}"...')
+        log.info(f'Extracting "{args.input}" image to "{iso_tmp_dir}"...')
         gcm_file = gcm.GCM(args.input)
         gcm_file.read_entire_disc()
         files_extracted = 0
-        for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(gcm_tmp_dir):
+        for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):
             if files_done > 0:
                 files_extracted = files_done
         log.info(f'Image extracted ({files_extracted} files).')
 
         # To determine which have been added, build the initial list now.
         log.info('Building initial file list...')
-        initial_file_list = build_file_list(gcm_tmp_dir)
+        initial_file_list = build_file_list(iso_tmp_dir)
         log.info(f'File list built ({len(initial_file_list)} entries).')
 
         # Extract the relevant RARC files that will be modified.
         log.info(f'Extracting RARC files...')
         RARC_FILENAMES = ('courseselect.arc', 'LANPlay.arc', 'titleline.arc')
-        scenedata_dirpath = os.path.join(gcm_tmp_dir, 'files', 'SceneData')
+        scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData')
         scenedata_filenames = os.listdir(scenedata_dirpath)
         rarc_extracted = 0
         for language in LANGUAGES:
@@ -1226,11 +1226,11 @@ def main():
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
 
-        patch_bnr_file(gcm_tmp_dir)
-        patch_title_lines(gcm_tmp_dir)
-        patch_cup_names(gcm_tmp_dir)
-        minimap_data = meld_courses(args, gcm_tmp_dir)
-        patch_dol_file(minimap_data, gcm_tmp_dir)
+        patch_bnr_file(iso_tmp_dir)
+        patch_title_lines(iso_tmp_dir)
+        patch_cup_names(iso_tmp_dir)
+        minimap_data = meld_courses(args, iso_tmp_dir)
+        patch_dol_file(minimap_data, iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')
@@ -1251,27 +1251,27 @@ def main():
         # could be more efficient to compare timestamps and import only the ones that have really
         # changed, the truth is that the ISO image is going to be written straight away, and every
         # file will have to be read regardless.
-        log.info('Preparing ISO/GCM image...')
-        final_file_list = build_file_list(gcm_tmp_dir)
+        log.info('Preparing ISO image...')
+        final_file_list = build_file_list(iso_tmp_dir)
         for path in final_file_list:
             if path not in initial_file_list:
-                if os.path.isfile(os.path.join(gcm_tmp_dir, path)):
+                if os.path.isfile(os.path.join(iso_tmp_dir, path)):
                     gcm_file.add_new_file(path)
                 else:
                     gcm_file.add_new_directory(path)
-        gcm_file.import_all_files_from_disk(gcm_tmp_dir)
-        log.info('ISO/GCM image prepared.')
+        gcm_file.import_all_files_from_disk(iso_tmp_dir)
+        log.info('ISO image prepared.')
 
-        # Write extended GCM file to final location.
-        log.info(f'Writing extended ISO/GCM image to "{args.output}"...')
+        # Write the extended ISO file to the final location.
+        log.info(f'Writing extended ISO image to "{args.output}"...')
         files_written = 0
         for _filepath, files_done in gcm_file.export_disc_to_iso_with_changed_files(args.output):
             if files_done > 0:
                 files_written = files_done
-        log.info(f'ISO/GCM image written ({files_written} files).')
+        log.info(f'ISO image written ({files_written} files).')
 
     finally:
-        shutil.rmtree(gcm_tmp_dir)
+        shutil.rmtree(iso_tmp_dir)
 
 
 if __name__ == '__main__':
