@@ -1191,6 +1191,14 @@ def main():
                              'to reduce the size of the ISO image notably. Stock courses use 32000 '
                              'Hz.')
 
+    dangerous_group = parser.add_argument_group('Dangerous options')
+    dangerous_group.add_argument(
+        '--skip-filesize-check',
+        action='store_true',
+        help='If specified, no filesize check will be performed. It is known that certain files '
+        'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected crashes '
+        'can occur when the limits are exceeded.')
+
     args = parser.parse_args()
 
     iso_tmp_dir = tempfile.mkdtemp()
@@ -1246,6 +1254,24 @@ def main():
                 shutil.rmtree(dirpath)
                 rarc_packed += 1
         log.info(f'{rarc_packed} files packed.')
+
+        # Verify that the `courseselect.arc` files haven't grown too large.
+        for language in LANGUAGES:
+            if language not in scenedata_filenames:
+                continue
+            filepath = os.path.join(scenedata_dirpath, language, 'courseselect.arc')
+            filesize = os.path.getsize(filepath)
+            COURSESELECT_MAX_FILESIZE = 1792 * 1024
+            if filesize > COURSESELECT_MAX_FILESIZE:
+                message = (f'Size of the "{filepath}" file ({filesize} bytes) is greater than '
+                           f'the maximum size that is considered safe ({COURSESELECT_MAX_FILESIZE} '
+                           'bytes).')
+                if args.skip_filesize_check:
+                    log.warning(message)
+                    continue
+                log.error(f'{message} This is fatal. Re-run with --skip-filesize-check to '
+                          'circumvent this safety measure.')
+                sys.exit(1)
 
         # Cross-check which files have been added, and then import all files from disk. While it
         # could be more efficient to compare timestamps and import only the ones that have really
