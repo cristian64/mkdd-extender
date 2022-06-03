@@ -1163,9 +1163,14 @@ def patch_dol_file(minimap_data: dict, iso_tmp_dir: str):
     assert os.path.isfile(dol_path)
 
     checksum = md5sum(dol_path)
-    if checksum not in ('edb478baec557381d10137035a72bdcc', '3a8e73b977368d1e53293d36f634e3c7',
-                        '81f1b05c6650d65326f757bb25bad604'):
-        log.error(f'Checksum failed: DOL file ("{dol_path}") is not original. This is fatal.')
+    if checksum not in (
+            'edb478baec557381d10137035a72bdcc',  # GM4E01
+            '3a8e73b977368d1e53293d36f634e3c7',  # GM4P01
+            '81f1b05c6650d65326f757bb25bad604',  # GM4J01
+            'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
+    ):
+        log.error(f'Checksum failed: DOL file ("{dol_path}") is not original (checksum: '
+                  f'{checksum}). This is fatal.')
         sys.exit(1)
 
     with open(dol_path, 'rb') as f:
@@ -1176,6 +1181,16 @@ def patch_dol_file(minimap_data: dict, iso_tmp_dir: str):
         game_id = data[game_id_offset:game_id_offset + len('GM4x')] + b'01'
         game_id = game_id.decode('ascii')
         assert game_id in ('GM4E01', 'GM4P01', 'GM4J01')
+
+    if game_id == 'GM4E01':
+        boot_path = os.path.join(sys_dirpath, 'boot.bin')
+
+        with open(boot_path, 'rb') as f:
+            f.seek(0x23)
+            DEBUG_BUILD_DATE = b'2004.07.05'
+            data = f.read(len(DEBUG_BUILD_DATE))
+            if data == DEBUG_BUILD_DATE:
+                game_id += 'dbg'
 
     audio_track_data = gather_audio_file_indices(iso_tmp_dir)
 

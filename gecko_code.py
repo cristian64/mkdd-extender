@@ -11,6 +11,7 @@ BUTTONS_STATE_ADDRESSES = {
     'GM4E01': 0x003A4D6C,
     'GM4P01': 0x003AEB8C,
     'GM4J01': 0x003BF38C,
+    'GM4E01dbg': 0x003FA764,
 }
 """
 These addresses point to a 6-byte structure that store the state of all buttons in the game pad.
@@ -31,6 +32,7 @@ REDRAW_COURSESELECT_SCREEN_ADDRESSES = {
     'GM4E01': 0x003CE5B4,
     'GM4P01': 0x003D83D4,
     'GM4J01': 0x003E8BD4,
+    'GM4E01dbg': 0x00419954,
 }
 """
 This is the address of a "variable" (likely a constant in static memory) that usually holds the
@@ -156,12 +158,30 @@ COURSE_TO_MINIMAP_ADDRESSES = {
         'Rainbow': (0x003E8590, 0x003E8594, 0x003E8598, 0x003E859C, 0x001428D0),
         'Desert': (0x003E85A4, 0x003E85A8, 0x003E85AC, 0x003E85B0, 0x0014299C),
         'Snow': (0x003E85C4, 0x003E85C8, 0x003E85CC, 0x003E85D0, 0x00142A68),
+    },
+    'GM4E01dbg': {
+        'BabyLuigi': (0x00419100, 0x00419104, 0x00419108, 0x0041910C, 0x0015415c),
+        'Peach': (0x00419120, 0x00419124, 0x00419128, 0x0041912C, 0x00154254),
+        'Daisy': (0x00419148, 0x0041914C, 0x00419150, 0x00419154, 0x001543ac),
+        'Luigi': (0x00419170, 0x00419174, 0x00419178, 0x0041917C, 0x001544a4),
+        'Mario': (0x00419188, 0x0041918C, 0x00419190, 0x00419194, 0x0015459c),
+        'Yoshi': (0x004191A4, 0x004191A8, 0x004191AC, 0x004191B0, 0x00154694),
+        'Nokonoko': (0x004191C4, 0x004191C8, 0x004191CC, 0x004191D0, 0x0015478c),
+        'Patapata': (0x004191DC, 0x004191E0, 0x004191E4, 0x004191E8, 0x00154884),
+        'Waluigi': (0x004191FC, 0x00419200, 0x00419204, 0x00419208, 0x0015497c),
+        'Wario': (0x00419220, 0x00419224, 0x00419228, 0x0041922C, 0x00154a74),
+        'Diddy': (0x0041923C, 0x00419240, 0x00419244, 0x00419248, 0x00154b6c),
+        'Donkey': (0x00419254, 0x00419258, 0x0041925C, 0x00419260, 0x00154c64),
+        'Koopa': (0x00419270, 0x00419274, 0x00419278, 0x0041927C, 0x00154d5c),
+        'Rainbow': (0x00419284, 0x00419288, 0x0041928C, 0x00419290, 0x00154e54),
+        'Desert': (0x00419298, 0x0041929C, 0x004192A0, 0x004192A4, 0x00154f4c),
+        'Snow': (0x004192B8, 0x004192BC, 0x004192C0, 0x004192C4, 0x00155044),
     }
 }
 """
 The addresses (for each region) where the minimap values are stored.
 
-Addresses have been borrowed from the MKDD Track Patcher:
+Addresses (except the ones for the debug build) have been borrowed from the MKDD Track Patcher:
 
 https://github.com/RenolY2/mkdd-track-patcher/blob/c0a8c7c97a9d9519888d7374c13cf31e010d82c4/src/resources/minimap_locations.json
 """
@@ -192,6 +212,7 @@ COURSE_TO_STREAM_FILE_INDEX_ADDRESSES = {
     'GM4E01': 0x0052EB04,
     'GM4P01': 0x00538944,
     'GM4J01': 0x0053FC5C,
+    'GM4E01dbg': 0x0057AA64,
 }
 """
 This address points to a `int[50]` structure where the file index of each audio track is stored for
@@ -450,6 +471,49 @@ STRING_ADDRESSES = {
         'CupName_STAR_CUP.bti': 0x0034C530,
         'CupName_SPECIAL_CUP.bti': 0x0034C548,
         'CupName_REVERSE2_CUP.bti': 0x0034C560,
+    },
+    'GM4E01dbg': {
+        '/Course/%s%s.arc': 0x0037D4E0,
+        '/Course/Luigi2%s.arc': 0x0037D4C8,
+        '/CourseName/%s/%s_name.bti': 0x0037D498,
+        '/StaffGhosts/%s.ght': 0x0037D4B4,
+        'COP_LUIGI_CIRCUIT.bti': 0x0037548C,
+        'COP_PEACH_BEACH.bti': 0x003754BC,
+        'COP_BABY_PARK.bti': 0x003754E8,
+        'COP_KARA_KARA_DESERT.bti': 0x00375518,
+        'COP_KINOKO_BRIDGE.bti': 0x00375550,
+        'COP_MARIO_CIRCUIT.bti': 0x00375584,
+        'COP_DAISY_SHIP.bti': 0x003755B4,
+        'COP_WALUIGI_STADIUM.bti': 0x003755E4,
+        'COP_SHERBET_LAND.bti': 0x00375614,
+        'COP_KONOKO_CITY.bti': 0x00375644,
+        'COP_YOSHI_CIRCUIT.bti': 0x00375674,
+        'COP_DK_MOUNTAIN.bti': 0x003756A4,
+        'COP_WARIO_COLOSSEUM.bti': 0x003756D4,
+        'COP_DINO_DINO_JUNGLE.bti': 0x00375708,
+        'COP_BOWSER_CASTLE.bti': 0x00375740,
+        'COP_RAINBOW_ROAD.bti': 0x00375770,
+        'CoName_LUIGI_CIRCUIT.bti': 0x00375470,
+        'CoName_PEACH_BEACH.bti': 0x003754A4,
+        'CoName_BABY_PARK.bti': 0x003754D0,
+        'CoName_KARA_KARA_DESERT.bti': 0x003754FC,
+        'CoName_KINOKO_BRIDGE.bti': 0x00375534,
+        'CoName_MARIO_CIRCUIT.bti': 0x00375568,
+        'CoName_DAISY_SHIP.bti': 0x0037559C,
+        'CoName_WALUIGI_STADIUM.bti': 0x003755C8,
+        'CoName_SHERBET_LAND.bti': 0x003755FC,
+        'CoName_KINOKO_CITY.bti': 0x0037562C,
+        'CoName_YOSHI_CIRCUIT.bti': 0x00375658,
+        'CoName_DK_MOUNTAIN.bti': 0x0037568C,
+        'CoName_WARIO_COLOSSEUM.bti': 0x003756B8,
+        'CoName_DINO_DINO_JUNGLE.bti': 0x003756EC,
+        'CoName_BOWSER_CASTLE.bti': 0x00375724,
+        'CoName_RAINBOW_ROAD.bti': 0x00375758,
+        'CupName_MUSHROOM_CUP.bti': 0x0037537C,
+        'CupName_FLOWER_CUP.bti': 0x00375398,
+        'CupName_STAR_CUP.bti': 0x003753B0,
+        'CupName_SPECIAL_CUP.bti': 0x003753C8,
+        'CupName_REVERSE2_CUP.bti': 0x003753E0,
     }
 }
 
@@ -520,6 +584,13 @@ r4 0x803fc830
 r5 0x803cad78
 r6 0x00000000
 
+NTSC (debug):
+JAISeMgr::startSound() 0x80089974
+r3 0x8054c9f0
+r4 0x8042e170
+r5 0x803fb2a4
+r6 0x00000000
+
 Note that the address in r4 changes when the sound is played from a different screen (e.g. from the
 select mode screen). It's not really relevant to us, because we only want to play sounds from the
 course/cup selection screen. The address in r3 and r5 don't seem to change regardless of the screen.
@@ -539,6 +610,8 @@ Other nice sources:
 - https://www.cs.uaf.edu/2011/fall/cs301/lecture/11_21_PowerPC.html
 - https://mariapilot.noblogs.org/files/2021/01/CodeWarrior-C-C-and-Assembly-Language-Reference.pdf
   (but reponds with 404 now)
+
+Note that the address of the function in the debug build does change.
 """
 
 START_SOUND_ASSEMBLED = {
@@ -580,6 +653,20 @@ START_SOUND_ASSEMBLED = {
         38C00000 3C000002
         6000000C 90040000
         3D808008 618CB3D0
+        7D8803A6 4E800021
+        B8610008 38210080
+        7D8803A6 7D605B78
+    """),
+    'GM4E01dbg':
+    textwrap.dedent("""\
+        7C0B0378 7D8802A6
+        9421FF80 BC610008
+        3C608054 6063C9F0
+        3C808042 6084E170
+        3CA0803F 60A5B2A4
+        38C00000 3C000002
+        6000000C 90040000
+        3D808008 618C9974
         7D8803A6 4E800021
         B8610008 38210080
         7D8803A6 7D605B78
