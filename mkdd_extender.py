@@ -1209,7 +1209,9 @@ def main():
     audio_group.add_argument('--mix-to-mono',
                              action='store_true',
                              help='If enabled, custom audio tracks will be mixed into mono audio. '
-                             'This reduces the size of the ISO image considerably.')
+                             'Whilst this reduces the size of the ISO image considerably, the game '
+                             'will only play mono AST files from the left speaker. As a '
+                             'workaround, the in-game **SOUND** option can be switched to `MONO`.')
     audio_group.add_argument('--sample-rate',
                              type=int,
                              help='If set (in Hz), custom audio tracks that have a greater sample '
