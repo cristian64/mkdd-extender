@@ -928,7 +928,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 trackname = trackinfo['Config']['trackname']
                 main_language = trackinfo['Config']['main_language']
             except Exception:
-                log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}".')
+                log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
+                            'the `trackname` field or `main_language` field.')
                 trackinfo = None
                 trackname = prefix
                 main_language = None
