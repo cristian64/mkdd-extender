@@ -982,7 +982,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 shutil.copy2(logo_filepath, page_coursename_filepath)
 
             # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
-            PREVIEW_IMAGE_SIZE = 256 // 2, 184 // 2
+            # However, if extended memory has been set, the retail dimensions can be used instead.
+            if args.extended_memory:
+                PREVIEW_IMAGE_SIZE = 256, 184
+            else:
+                PREVIEW_IMAGE_SIZE = 256 // 2, 184 // 2
 
             def resize_preview_image(filepath: str):
                 with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1025,14 +1029,15 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 sys.exit(1)
 
             # Downscale preview images in all available languages.
-            for language in expected_languages:
-                language_dirpath = os.path.join(course_images_dirpath, language)
-                if not os.path.isdir(language_dirpath):
-                    continue
-                for filename in os.listdir(language_dirpath):
-                    if filename == 'track_image.bti':
-                        filepath = os.path.join(language_dirpath, filename)
-                        resize_preview_image(filepath)
+            if not args.extended_memory:
+                for language in expected_languages:
+                    language_dirpath = os.path.join(course_images_dirpath, language)
+                    if not os.path.isdir(language_dirpath):
+                        continue
+                    for filename in os.listdir(language_dirpath):
+                        if filename == 'track_image.bti':
+                            filepath = os.path.join(language_dirpath, filename)
+                            resize_preview_image(filepath)
 
             # Copy preview image and label image.
             preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
@@ -1156,11 +1161,13 @@ def gather_audio_file_indices(iso_tmp_dir: str) -> tuple:
     return tuple(tuple(l) for l in audio_track_data)
 
 
-def patch_dol_file(minimap_data: dict, iso_tmp_dir: str):
+def patch_dol_file(args: argparse.Namespace, minimap_data: dict, iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
+    bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
 
     assert os.path.isfile(dol_path)
+    assert os.path.isfile(bi2_path)
 
     checksum = md5sum(dol_path)
     if checksum not in (
@@ -1191,6 +1198,66 @@ def patch_dol_file(minimap_data: dict, iso_tmp_dir: str):
             data = f.read(len(DEBUG_BUILD_DATE))
             if data == DEBUG_BUILD_DATE:
                 game_id += 'dbg'
+
+    if args.extended_memory:
+        # The simulated memory size in the disk information header needs to be updated to the new
+        # value. See http://hitmen.c02.at/files/yagcd/yagcd/chap13.html.
+        # NOTE: The change in the `bi2.bin` file doesn't seem to be required. For correctness, and
+        # in case it becomes relevant in the future, it will be updated regardless.
+        ORIGINAL_SIMULATED_MEMORY_SIZE = 24 * 1024 * 1024
+        EXTENDED_SIMULATED_MEMORY_SIZE = 32 * 1024 * 1024
+        log.info('Simulated memory size will be extended from {} MiB to {} MiB...'.format(
+            ORIGINAL_SIMULATED_MEMORY_SIZE // 1024 // 1024,
+            EXTENDED_SIMULATED_MEMORY_SIZE // 1024 // 1024,
+        ))
+        with open(bi2_path, 'r+b') as f:
+            f.seek(0x04)
+            f.write(struct.pack('>L', EXTENDED_SIMULATED_MEMORY_SIZE))
+
+        # In the DOL file, a heap needs to be extended from 6656 KiB to 10752 KiB. This value is
+        # hardcoded in `SequenceApp::__ct()` (at `0x801d93c4` in the NTSC version) to `0x00680000`,
+        # and will be changed to `0x00A80000`. The instruction is:
+        #
+        #   801d93dc 3c 80 00 68     lis        r4,0x68
+        #
+        # The instruction is pretty specific, and is unique in the instruction set (including the
+        # debug build), so it can be replaced safely (assuming that the input DOL file is unedited).
+        #
+        # The instruction in the PAL version varies slightly. `SequenceApp::__ct()` is located at
+        # `0x801d93a4`, which was found by searching for functions that look like the decompiled
+        # function in Ghidra of the NTSC version (basically, sorting by number of instructions in
+        # the **Functions** view, and comparing the decompiled source of functions of similar size).
+        # In this case, the heap size is hardcoded to 6525 KiB (`0x0065F400`):
+        #
+        #   801d93b0 3c c0 00 66     lis        r6,0x66
+        #   801d93b4 90 01 00 14     stw        r0,local_res4(r1)
+        #   801d93b8 38 a4 0e d8     addi       r5=>s_Sequence_80340ed8,r4,0xed8      = "Sequence"
+        #   801d93bc 38 86 f4 00     subi       r4,r6,0xc00
+        #
+        # Note that the value in PAL is set in two instructions. Only the first one will need to be
+        # modified, though.
+        ORIGINAL_HEAP_SIZE = 0x00680000 if game_id != 'GM4P01' else 0x0065F400
+        EXTENDED_HEAP_SIZE = ORIGINAL_HEAP_SIZE + 0x00400000
+        log.info('Heap memory size will be extended from {} KiB to {} KiB...'.format(
+            ORIGINAL_HEAP_SIZE // 1024,
+            EXTENDED_HEAP_SIZE // 1024,
+        ))
+        if game_id != 'GM4P01':
+            ORIGINAL_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0x80, 0x00, 0x68))
+            EXTENDED_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0x80, 0x00, 0xA8))
+        else:
+            ORIGINAL_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0xc0, 0x00, 0x66))
+            EXTENDED_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0xc0, 0x00, 0xA6))
+        with open(dol_path, 'rb') as f:
+            data = f.read()
+        assert data.count(ORIGINAL_HEAP_SIZE_INSTRUCTION) == 1
+        offset = data.find(ORIGINAL_HEAP_SIZE_INSTRUCTION)
+        with open(dol_path, 'r+b') as f:
+            f.seek(offset)
+            f.write(EXTENDED_HEAP_SIZE_INSTRUCTION)
+
+        # NOTE: After this change, it will be mandatory to increase the emulated memory size in
+        # Dolphin to 32 MiB, or else the game will crash to a green screen.
 
     audio_track_data = gather_audio_file_indices(iso_tmp_dir)
 
@@ -1233,6 +1300,23 @@ def main():
                              'rate than the provided value will be downsampled. This can be used '
                              'to reduce the size of the ISO image notably. Stock courses use 32000 '
                              'Hz.')
+
+    expert_group = parser.add_argument_group('Expert options')
+    expert_group.add_argument(
+        '--extended-memory',
+        action='store_true',
+        help='If specified, the simulated memory size in the ISO image will be extended from '
+        '24 MiB to 32 MiB. This permits a greater heap size in the game, which is incremented too '
+        'from 6656 KiB to 10752 KiB (or from 6525 KiB to 10621 KiB in the PAL version), allowing '
+        'certain files to grow larger without causing crashes.'
+        '\n\n'
+        'By default, preview images of the extra courses are halved due to limited space in the '
+        '`courseselect.arc` file. When --extended-memory is provided, the full size is used.'
+        '\n\n'
+        'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to also '
+        'extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory Override** in '
+        'Dolphin. Failing to enable the emulated memory size in Dolphin will make the game crash '
+        'to a green screen.')
 
     dangerous_group = parser.add_argument_group('Dangerous options')
     dangerous_group.add_argument(
@@ -1281,7 +1365,7 @@ def main():
         patch_title_lines(iso_tmp_dir)
         patch_cup_names(iso_tmp_dir)
         minimap_data = meld_courses(args, iso_tmp_dir)
-        patch_dol_file(minimap_data, iso_tmp_dir)
+        patch_dol_file(args, minimap_data, iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')
@@ -1305,9 +1389,12 @@ def main():
             filepath = os.path.join(scenedata_dirpath, language, 'courseselect.arc')
             filesize = os.path.getsize(filepath)
             COURSESELECT_MAX_FILESIZE = 1792 * 1024
-            if filesize > COURSESELECT_MAX_FILESIZE:
+            courseselect_max_filesize = COURSESELECT_MAX_FILESIZE
+            if args.extended_memory:
+                courseselect_max_filesize += 2048 * 1024
+            if filesize > courseselect_max_filesize:
                 message = (f'Size of the "{filepath}" file ({filesize} bytes) is greater than '
-                           f'the maximum size that is considered safe ({COURSESELECT_MAX_FILESIZE} '
+                           f'the maximum size that is considered safe ({courseselect_max_filesize} '
                            'bytes).')
                 if args.skip_filesize_check:
                     log.warning(message)
