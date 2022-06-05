@@ -311,6 +311,27 @@ FILE_STRINGS = (
     'CupName_STAR_CUP.bti',
     'CupName_SPECIAL_CUP.bti',
     'CupName_REVERSE2_CUP.bti',
+    # LAN mode.
+    'LUIGI_CIRCUIT',
+    'PEACH_BEACH',
+    'BABY_PARK',
+    'KARA_KARA_DESERT',
+    'KINOKO_BRIDGE',
+    'MARIO_CIRCUIT',
+    'DAISY_SHIP',
+    'WALUIGI_STADIUM',
+    'SHERBET_LAND',
+    'KINOKO_CITY',
+    'YOSHI_CIRCUIT',
+    'DK_MOUNTAIN',
+    'WARIO_COLOSSEUM',
+    'DINO_DINO_JUNGLE',
+    'BOWSER_CASTLE',
+    'RAINBOW_ROAD',
+    'CupName_MUSHROOM_CUP',
+    'CupName_FLOWER_CUP',
+    'CupName_STAR_CUP',
+    'CupName_SPECIAL_CUP',
 )
 
 
@@ -334,9 +355,18 @@ def find_addresses():
         assert address > 0
         print(f'        \'{dir_string}\': 0x{address:08X},')
 
+    unique_addresses = set()
+
     for file_string in FILE_STRINGS:
         address = data.find(file_string.encode('ascii'))
         assert address > 0
+        if address in unique_addresses:
+            # Some substrings (LAN mode) may find strings previously assigned to longer strings.
+            ARBITRARY_OFFSET = 100  # Long enough to skip the used one.
+            address = data.find(file_string.encode('ascii'), address + ARBITRARY_OFFSET)
+            assert address > 0
+        for i in range(len(file_string)):
+            unique_addresses.add(address + i)
         print(f'        \'{file_string}\': 0x{address:08X},')
 
     print('    }')
@@ -385,6 +415,26 @@ STRING_ADDRESSES = {
         'CupName_STAR_CUP.bti': 0x00331F10,
         'CupName_SPECIAL_CUP.bti': 0x00331F28,
         'CupName_REVERSE2_CUP.bti': 0x00331F40,
+        'LUIGI_CIRCUIT': 0x00337698,
+        'PEACH_BEACH': 0x003376A8,
+        'BABY_PARK': 0x003376B4,
+        'KARA_KARA_DESERT': 0x003376C0,
+        'KINOKO_BRIDGE': 0x003376D4,
+        'MARIO_CIRCUIT': 0x003376E4,
+        'DAISY_SHIP': 0x003376F4,
+        'WALUIGI_STADIUM': 0x00337700,
+        'SHERBET_LAND': 0x00337710,
+        'KINOKO_CITY': 0x00337720,
+        'YOSHI_CIRCUIT': 0x0033772C,
+        'DK_MOUNTAIN': 0x0033773C,
+        'WARIO_COLOSSEUM': 0x00337748,
+        'DINO_DINO_JUNGLE': 0x00337758,
+        'BOWSER_CASTLE': 0x0033776C,
+        'RAINBOW_ROAD': 0x0033777C,
+        'CupName_MUSHROOM_CUP': 0x00337624,
+        'CupName_FLOWER_CUP': 0x0033763C,
+        'CupName_STAR_CUP': 0x00337650,
+        'CupName_SPECIAL_CUP': 0x00337664,
     },
     'GM4P01': {
         '/Course/%s%s.arc': 0x00340B7C,
@@ -428,6 +478,26 @@ STRING_ADDRESSES = {
         'CupName_STAR_CUP.bti': 0x0033BCE0,
         'CupName_SPECIAL_CUP.bti': 0x0033BCF8,
         'CupName_REVERSE2_CUP.bti': 0x0033BD10,
+        'LUIGI_CIRCUIT': 0x003414D8,
+        'PEACH_BEACH': 0x003414E8,
+        'BABY_PARK': 0x003414F4,
+        'KARA_KARA_DESERT': 0x00341500,
+        'KINOKO_BRIDGE': 0x00341514,
+        'MARIO_CIRCUIT': 0x00341524,
+        'DAISY_SHIP': 0x00341534,
+        'WALUIGI_STADIUM': 0x00341540,
+        'SHERBET_LAND': 0x00341550,
+        'KINOKO_CITY': 0x00341560,
+        'YOSHI_CIRCUIT': 0x0034156C,
+        'DK_MOUNTAIN': 0x0034157C,
+        'WARIO_COLOSSEUM': 0x00341588,
+        'DINO_DINO_JUNGLE': 0x00341598,
+        'BOWSER_CASTLE': 0x003415AC,
+        'RAINBOW_ROAD': 0x003415BC,
+        'CupName_MUSHROOM_CUP': 0x00341464,
+        'CupName_FLOWER_CUP': 0x0034147C,
+        'CupName_STAR_CUP': 0x00341490,
+        'CupName_SPECIAL_CUP': 0x003414A4,
     },
     'GM4J01': {
         '/Course/%s%s.arc': 0x0035135C,
@@ -471,6 +541,26 @@ STRING_ADDRESSES = {
         'CupName_STAR_CUP.bti': 0x0034C530,
         'CupName_SPECIAL_CUP.bti': 0x0034C548,
         'CupName_REVERSE2_CUP.bti': 0x0034C560,
+        'LUIGI_CIRCUIT': 0x00351CB8,
+        'PEACH_BEACH': 0x00351CC8,
+        'BABY_PARK': 0x00351CD4,
+        'KARA_KARA_DESERT': 0x00351CE0,
+        'KINOKO_BRIDGE': 0x00351CF4,
+        'MARIO_CIRCUIT': 0x00351D04,
+        'DAISY_SHIP': 0x00351D14,
+        'WALUIGI_STADIUM': 0x00351D20,
+        'SHERBET_LAND': 0x00351D30,
+        'KINOKO_CITY': 0x00351D40,
+        'YOSHI_CIRCUIT': 0x00351D4C,
+        'DK_MOUNTAIN': 0x00351D5C,
+        'WARIO_COLOSSEUM': 0x00351D68,
+        'DINO_DINO_JUNGLE': 0x00351D78,
+        'BOWSER_CASTLE': 0x00351D8C,
+        'RAINBOW_ROAD': 0x00351D9C,
+        'CupName_MUSHROOM_CUP': 0x00351C44,
+        'CupName_FLOWER_CUP': 0x00351C5C,
+        'CupName_STAR_CUP': 0x00351C70,
+        'CupName_SPECIAL_CUP': 0x00351C84,
     },
     'GM4E01dbg': {
         '/Course/%s%s.arc': 0x0037D4E0,
@@ -514,6 +604,26 @@ STRING_ADDRESSES = {
         'CupName_STAR_CUP.bti': 0x003753B0,
         'CupName_SPECIAL_CUP.bti': 0x003753C8,
         'CupName_REVERSE2_CUP.bti': 0x003753E0,
+        'LUIGI_CIRCUIT': 0x0037E808,
+        'PEACH_BEACH': 0x0037E818,
+        'BABY_PARK': 0x0037E824,
+        'KARA_KARA_DESERT': 0x0037E830,
+        'KINOKO_BRIDGE': 0x0037E844,
+        'MARIO_CIRCUIT': 0x0037E854,
+        'DAISY_SHIP': 0x0037E864,
+        'WALUIGI_STADIUM': 0x0037E870,
+        'SHERBET_LAND': 0x0037E880,
+        'KINOKO_CITY': 0x0037E890,
+        'YOSHI_CIRCUIT': 0x0037E89C,
+        'DK_MOUNTAIN': 0x0037E8AC,
+        'WARIO_COLOSSEUM': 0x0037E8B8,
+        'DINO_DINO_JUNGLE': 0x0037E8C8,
+        'BOWSER_CASTLE': 0x0037E8DC,
+        'RAINBOW_ROAD': 0x0037E8EC,
+        'CupName_MUSHROOM_CUP': 0x0037E794,
+        'CupName_FLOWER_CUP': 0x0037E7AC,
+        'CupName_STAR_CUP': 0x0037E7C0,
+        'CupName_SPECIAL_CUP': 0x0037E7D4,
     }
 }
 
