@@ -788,6 +788,178 @@ Code in `START_SOUND_ASSEMBLY` that has been assembled with PyiiASMH 3.
 Same code for all regions, except for the three memory addresses store in r3, r4, and r5.
 """
 
+CURRENT_APP_ID_ADDRESSES = {
+    'GM4E01': 0x003CBDA0,
+    'GM4P01': 0x003D5BE0,
+    'GM4J01': 0x003E63C0,
+    'GM4E01dbg': 0x00416998,
+}
+"""
+The address to the integer that holds the ID of the current "app". Some of these IDs are:
+    - Nintendo logo: 0x04
+    - In race:       0x08
+    - Main menus:    0x0A
+    - Demo video:    0x0C
+    - LAN menus:     0x0B
+
+The current values are necessary to determine when the LAN menus need to be refreshed, as otherwise
+it is not safe to invoke the `setNextApp()` function to force a refresh.
+
+These values are seen in `setNextApp()`, in the first part of the early-out check, which in the
+NTSC region it is the value in r13 with the -0x5680 offset.
+"""
+
+CUE_NETGATE_APP_ASSEMBLY = textwrap.dedent("""\
+    .loc_0x0:
+        stwu sp,-0x80 (sp) #Push stack, make space for 29 registers
+        stmw r3, 0x8 (sp)
+
+        lis       r3, 0x803d       # Address to...
+        ori       r3, r3, 0x1420   # ...the static memory (r13).
+
+        li        r4, 0xB          # LAN menus app ID.
+        stw       r4, -0x567c(r3)  # Set next app ID. First statement in the setNextApp() function.
+
+        li        r4, 0x1
+        stb       r4, -0x5666(r3)  # The last two statements...
+        stb       r4, -0x5668(r3)  # ...in the setNextApp() function.
+
+        li        r4, 0x0          # Set the LAN mode's SELECT MODE screen, or else...
+        stb       r4, -0x55f4(r3)  # ...it may land on the main screen.
+
+        lwz       r4, -0x566c(r3)  # To mark the current app...
+        ori       r4, r4, 0x1      # ...for deletion, the last bit is...
+        stw       r4, -0x566c(r3)  # ...set to 1.
+
+        lmw r3, 0x8 (sp)
+        addi sp, sp, 0x80 #Pop stack
+    """)
+"""
+In the LAN menus, the images won't be refresh unless `setNextApp()` is called again. To replicate
+that behavior, this assembly code is used, which matches in principle the body of the function
+(except for its early-out check, that is omitted).
+
+These are the last three statements in the `setNextApp()` function, which are replicated in the this
+assembly code:
+
+  *(int *)(in_r13 + -0x567c) = param_1;
+  *(undefined *)(in_r13 + -0x5666) = 1;
+  *(undefined *)(in_r13 + -0x5668) = 1;
+
+Note that the first statement appears to be setting what appears to be the ID of "the next app".
+That is, `param_1` (r3) is the next app ID, and is always 0x0B (LAN menus) for this use case. The
+second statement seems to indicate that the app ID has changed (it is read in `AppMgr::calc()`). The
+third/last statement is used to indicate that the next draw call needs to be skipped (see
+`AppMgr::draw()`).
+
+r13 is a pointer to some memory where many variables are stored, and that the assembly codes will be
+modified, based on some offsets, as seen in the functions that the assembly code is replicating.
+
+The assembly also includes another statement seen in `NetGateApp::call()`, that seems to be setting
+another substate: 0x0 (SELECT MODE screen; the one with the options), 0x1 (main screen in the LAN
+menus; the one with three entries: START GAME, SELECT MODE, QUIT LAN MODE). The one we want is 0x0.
+(This part becomes relevant after the first race, as the value is changed to 0x1.)
+
+The last offset was spotted in use in `AppMgr::calc()`, and it seems to be used as the last check
+to determine whether the current app needs to be deleted. That is, it is used to mark the app for
+deletion. It appears nested under two if conditions; the ones testing the first two offsets. This
+offset can be seen in `AppMgr::deleteCurrentApp()`, a function (only seen in the debug build) that
+all it does is set that bit to 1. There are also other places that do not use the function but also
+set the bit to 1.
+
+The offsets, as well as the content of r13, vary between regions, and are:
+
+    NTSC:         0x803d1420  -0x567c  -0x5666  -0x5668  -0x55f4  -0x566C
+    PAL:          0x803db240  -0x565c  -0x5646  -0x5648  -0x55d4  -0x564C
+    JAP:          0x803eba40  -0x567c  -0x5666  -0x5668  -0x55f4  -0x566C
+    NTSC (debug): 0x8041bf80  -0x55e4  -0x55ce  -0x55d0  -0x555c  -0x55d4
+
+Hypothetical variables names for these "r13 + offset" variables:
+    #1: eNextAppID
+    #2: bAppIDChanged
+    #3: bSkipNextDraw
+    #4: eNetGateAppSubstateID
+    #5: bMarkForDeletion
+
+Basically, a breakpoint is set in `setNextApp()` to write down the first three offsets, and r13. In
+the regions without symbols, `setNextApp()` is found by searching for
+`28 00 00 00 41 82 00 1c 80 0d` (two instructions and a half), which returns a single result; these
+are the addresses to the `setNextApp()` symbol:
+
+    NTSC:         0x801d1d78
+    PAL:          0x801d1d04
+    JAP:          0x801d1d78
+    NTSC (debug): 0x80200c90
+
+`NetGateApp::call()` can be located by searching for the place where `setNextApp()` is invoked with
+the argument set to `0xB`. The forth offset is sourced from this function, whose addresses are:
+
+    NTSC:         0x801d9b58
+    PAL:          0x801d9b3c
+    JAP:          0x801d9b80
+    NTSC (debug): 0x80209474
+
+`AppMgr::calc()` can be located by searching for `54 80 07 fa 54 83 07 f8 90 0d` (two instructions
+and a half). The fifth and final offset is sourced from this function, and can be spotted in a
+[nested] condition after two other conditions that evaluate some variables using the first two
+offsets. The addresses of the function are:
+
+    NTSC:         0x801d1b68
+    PAL:          0x801d1af4
+    JAP:          0x801d1b68
+    NTSC (debug): 0x80200a80
+"""
+
+CUE_NETGATE_APP_ASSEMBLED = {
+    'GM4E01':
+    textwrap.dedent("""\
+        9421FF80 BC610008
+        3C60803D 60631420
+        3880000B 9083A984
+        38800001 9883A99A
+        9883A998 38800000
+        9883AA0C 8083A994
+        60840001 9083A994
+        B8610008 38210080
+    """),
+    'GM4P01':
+    textwrap.dedent("""\
+        9421FF80 BC610008
+        3C60803D 6063B240
+        3880000B 9083A9A4
+        38800001 9883A9BA
+        9883A9B8 38800000
+        9883AA2C 8083A9B4
+        60840001 9083A9B4
+        B8610008 38210080
+    """),
+    'GM4J01':
+    textwrap.dedent("""\
+        9421FF80 BC610008
+        3C60803E 6063BA40
+        3880000B 9083A984
+        38800001 9883A99A
+        9883A998 38800000
+        9883AA0C 8083A994
+        60840001 9083A994
+        B8610008 38210080
+    """),
+    'GM4E01dbg':
+    textwrap.dedent("""\
+        9421FF80 BC610008
+        3C608041 6063BF80
+        3880000B 9083AA1C
+        38800001 9883AA32
+        9883AA30 38800000
+        9883AAA4 8083AA2C
+        60840001 9083AA2C
+        B8610008 38210080
+    """),
+}
+"""
+Code in `CUE_NETGATE_APP_ASSEMBLY` that has been assembled with PyiiASMH 3.
+"""
+
 
 def encode_address(code_type: str, operand: int = None) -> int:
     """
@@ -797,6 +969,8 @@ def encode_address(code_type: str, operand: int = None) -> int:
         return operand
     if code_type == 'write32':
         return 0x04000000 | operand
+    if code_type == 'if32':
+        return 0x20000000 | operand
     if code_type == 'ifnot32':
         return 0x22000000 | operand
     if code_type == 'if16':
@@ -995,6 +1169,38 @@ def write_code(game_id: str, minimap_data: dict, audio_track_data: tuple, filepa
         f.write(deactivator_line)
         f.write('\n')
         for line in lines_for_deactivator:
+            f.write(line)
+            f.write('\n')
+        f.write(full_terminator_line)
+        f.write('\n')
+        f.write('\n')
+
+        # LAN mode from here.
+
+        # If current app ID is not the NetGate, end.
+        f.write(get_line(encode_address('if32', CURRENT_APP_ID_ADDRESSES[game_id]), 0x0000000B))
+        f.write('\n')
+        f.write(get_line(encode_address('goto', 1), 0))  # Skips line below.
+        f.write('\n')
+        f.write(get_line(encode_address('end'), 0))
+        f.write('\n')
+        f.write(full_terminator_line)
+        f.write('\n')
+        f.write('\n')
+
+        for page_index in range(3):
+            f.write(activator_lines[page_index])
+            f.write('\n')
+            for line in encode_asm(CUE_NETGATE_APP_ASSEMBLED[game_id]):
+                f.write(line)
+                f.write('\n')
+            f.write(full_terminator_line)
+            f.write('\n')
+            f.write('\n')
+
+        f.write(deactivator_line)
+        f.write('\n')
+        for line in encode_asm(CUE_NETGATE_APP_ASSEMBLED[game_id]):
             f.write(line)
             f.write('\n')
         f.write(full_terminator_line)
