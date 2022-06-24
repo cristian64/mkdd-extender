@@ -6,6 +6,7 @@ import argparse
 import audioop
 import configparser
 import contextlib
+import difflib
 import hashlib
 import itertools
 import json
@@ -51,6 +52,28 @@ COURSES = (
 )
 """
 Internal names of the courses, in order of appearance.
+"""
+
+COURSE_TO_NAME = {
+    'BabyLuigi': 'Baby Park',
+    'Koopa': 'Bowser\'s Castle',
+    'Daisy': 'Daisy Cruiser',
+    'Diddy': 'Dino Dino Jungle',
+    'Donkey': 'DK Mountain',
+    'Desert': 'Dry Dry Desert',
+    'Nokonoko': 'Mushroom Bridge',
+    'Patapata': 'Mushroom City',
+    'Luigi': 'Luigi Circuit',
+    'Mario': 'Mario Circuit',
+    'Peach': 'Peach Beach',
+    'Rainbow': 'Rainbow Road',
+    'Snow': 'Sherbet Land',
+    'Waluigi': 'Waluigi Stadium',
+    'Wario': 'Wario Colosseum',
+    'Yoshi': 'Yoshi Circuit',
+}
+"""
+Map from the course internal name to the course natural name.
 """
 
 COURSE_TO_PREVIEW_IMAGE_NAME = {
@@ -203,6 +226,15 @@ def extract_and_flatten(src_path: str, dst_dirpath: str):
             os.makedirs(dst_dirpath, exist_ok=True)
             for path in paths:
                 shutil.move(path, dst_dirpath)
+
+
+def course_name_to_course(course_name: str) -> str:
+    # A distance between strings is used for the comparison, as there are some courses names that
+    # are often used inaccurately (e.g. missing apostrophe in Bowser's Castle).
+    courses_weight = [(course, difflib.SequenceMatcher(None, other_course_name,
+                                                       course_name).ratio())
+                      for course, other_course_name in COURSE_TO_NAME.items()]
+    return sorted(courses_weight, key=lambda e: e[1])[-1][0]
 
 
 def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
@@ -510,6 +542,9 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
 
 
 def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate: int):
+    if not mix_to_mono and not downsample_sample_rate:
+        return
+
     ast_info = ast_converter.get_ast_info(filepath)
 
     bit_depth = ast_info['bit_depth']
@@ -748,6 +783,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
     tracks_dirpath = args.tracks
 
     minimap_data = {}
+    auxiliary_audio_data = {}
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
 
@@ -788,15 +824,6 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         else:
             log.warning(f'No archive has been extracted.')
 
-        # Reduce size of the audio files by converting to mono.
-        if args.mix_to_mono or args.sample_rate:
-            for rootdir, dirnames, filenames in os.walk(tracks_tmp_dir):
-                dirnames.sort()
-                for filename in sorted(filenames):
-                    if filename.endswith('.ast'):
-                        filepath = os.path.join(rootdir, filename)
-                        conform_audio_file(filepath, args.mix_to_mono, args.sample_rate)
-
         # Copy files into the ISO temporariy directory.
         log.info(f'Melding extracted directories...')
         melded = 0
@@ -829,6 +856,25 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 shutil.copytree(coursename_dirpath, page_coursename_dirpath)
             if not os.path.isdir(page_staffghosts_dirpath):
                 shutil.copytree(staffghosts_dirpath, page_staffghosts_dirpath)
+
+            # Parse INI file.
+            try:
+                trackinfo_filepath = os.path.join(track_dirpath, 'trackinfo.ini')
+                trackinfo = configparser.ConfigParser()
+                trackinfo.read(trackinfo_filepath)
+                trackname = trackinfo['Config']['trackname']
+                main_language = trackinfo['Config']['main_language']
+                auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
+            except Exception:
+                log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
+                            'the `trackname` field or `main_language` field.')
+                trackinfo = None
+                trackname = prefix
+                main_language = None
+                auxiliary_audio_track = None
+
+            if auxiliary_audio_track:
+                auxiliary_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
 
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
@@ -909,30 +955,24 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             if os.path.isfile(lap_music_normal_filepath):
                 dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
                 shutil.copy2(lap_music_normal_filepath, dst_ast_filepath)
+                conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
 
                 lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
                 if os.path.isfile(lap_music_fast_filepath):
                     dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
                     shutil.copy2(lap_music_fast_filepath, dst_ast_filepath)
+                    conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
                 else:
                     log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
                                 '`lap_music_normal.ast` will be used.')
             else:
-                log.warning(f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
-                            'Circuit\'s sound track will be used.')
-
-            try:
-                trackinfo_filepath = os.path.join(track_dirpath, 'trackinfo.ini')
-                trackinfo = configparser.ConfigParser()
-                trackinfo.read(trackinfo_filepath)
-                trackname = trackinfo['Config']['trackname']
-                main_language = trackinfo['Config']['main_language']
-            except Exception:
-                log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
-                            'the `trackname` field or `main_language` field.')
-                trackinfo = None
-                trackname = prefix
-                main_language = None
+                if auxiliary_audio_track:
+                    course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
+                    log.info(f'Unable to locate `lap_music_normal.ast` in "{nodename}". Auxiliary '
+                             f'audio track ("{course_name}") will be used.')
+                else:
+                    log.warning(f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
+                                'Circuit\'s sound track will be used.')
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
@@ -1085,10 +1125,10 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         else:
             log.warning(f'No directory has been melded.')
 
-    return minimap_data
+    return minimap_data, auxiliary_audio_data
 
 
-def gather_audio_file_indices(iso_tmp_dir: str) -> tuple:
+def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str, str]') -> tuple:
     # The Gecko code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
 
@@ -1141,6 +1181,16 @@ def gather_audio_file_indices(iso_tmp_dir: str) -> tuple:
         stock_audio_track_indices,
     )
 
+    for prefix, auxiliary_audio_track in auxiliary_audio_data.items():
+        page_index = ord(prefix[0]) - ord('A')
+        track_index = int(prefix[1:3]) - 1
+        auxiliary_audio_index = course_stream_order.index(auxiliary_audio_track)
+        mapped_offset = course_stream_order.index(COURSES[track_index])
+        audio_track_data_page = audio_track_data[page_index]
+        audio_track_data_page[mapped_offset] = stock_audio_track_indices[auxiliary_audio_index]
+        audio_track_data_page[mapped_offset + 16] = \
+            stock_audio_track_indices[auxiliary_audio_index + 16]
+
     for prefix in PREFIXES:
         page_index = ord(prefix[0]) - ord('A')
         track_index = int(prefix[1:3]) - 1
@@ -1161,7 +1211,8 @@ def gather_audio_file_indices(iso_tmp_dir: str) -> tuple:
     return tuple(tuple(l) for l in audio_track_data)
 
 
-def patch_dol_file(args: argparse.Namespace, minimap_data: dict, iso_tmp_dir: str):
+def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
+                   auxiliary_audio_data: 'dict[str, str]', iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
     bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
@@ -1259,7 +1310,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict, iso_tmp_dir: st
         # NOTE: After this change, it will be mandatory to increase the emulated memory size in
         # Dolphin to 32 MiB, or else the game will crash to a green screen.
 
-    audio_track_data = gather_audio_file_indices(iso_tmp_dir)
+    audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
@@ -1364,8 +1415,8 @@ def main():
         patch_bnr_file(iso_tmp_dir)
         patch_title_lines(iso_tmp_dir)
         patch_cup_names(iso_tmp_dir)
-        minimap_data = meld_courses(args, iso_tmp_dir)
-        patch_dol_file(args, minimap_data, iso_tmp_dir)
+        minimap_data, auxiliary_audio_data = meld_courses(args, iso_tmp_dir)
+        patch_dol_file(args, minimap_data, auxiliary_audio_data, iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')
