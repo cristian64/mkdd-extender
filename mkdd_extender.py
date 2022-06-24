@@ -944,35 +944,45 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             else:
                 log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
 
-            # Copy audio files. Unlike with the previous files, audio files are stored in the stock
-            # directory. The names of the audio files strategically start with a "X_" prefix to
-            # ensure they are inserted after the stock audio files.
-            lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_normal.ast')
-            if not os.path.isfile(lap_music_normal_filepath):
-                # If there is only the fast version (single-lap course?), it will be used for both,
-                # and no warning is needed.
-                lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
-            if os.path.isfile(lap_music_normal_filepath):
-                dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
-                shutil.copy2(lap_music_normal_filepath, dst_ast_filepath)
-                conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
+            # Force use of auxiliary audio track if argument has been provided and the custo track
+            # has the field defined.
+            use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
 
-                lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
-                if os.path.isfile(lap_music_fast_filepath):
-                    dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
-                    shutil.copy2(lap_music_fast_filepath, dst_ast_filepath)
+            if not use_auxiliary_audio_track:
+                # Copy audio files. Unlike with the previous files, audio files are stored in the
+                # stock directory. The names of the audio files strategically start with a "X_"
+                # prefix to ensure they are inserted after the stock audio files.
+                lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_normal.ast')
+                if not os.path.isfile(lap_music_normal_filepath):
+                    # If there is only the fast version (single-lap course?), it will be used for
+                    # both, and no warning is needed.
+                    lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
+                if os.path.isfile(lap_music_normal_filepath):
+                    dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
+                    shutil.copy2(lap_music_normal_filepath, dst_ast_filepath)
                     conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
+
+                    lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
+                    if os.path.isfile(lap_music_fast_filepath):
+                        dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
+                        shutil.copy2(lap_music_fast_filepath, dst_ast_filepath)
+                        conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
+                    else:
+                        log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
+                                    '`lap_music_normal.ast` will be used.')
                 else:
-                    log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
-                                '`lap_music_normal.ast` will be used.')
+                    if auxiliary_audio_track:
+                        course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
+                        log.info(
+                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Auxiliary '
+                            f'audio track ("{course_name}") will be used.')
+                    else:
+                        log.warning(
+                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
+                            'Circuit\'s sound track will be used.')
             else:
-                if auxiliary_audio_track:
-                    course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
-                    log.info(f'Unable to locate `lap_music_normal.ast` in "{nodename}". Auxiliary '
-                             f'audio track ("{course_name}") will be used.')
-                else:
-                    log.warning(f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
-                                'Circuit\'s sound track will be used.')
+                course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
+                log.info(f'Auxiliary audio track ("{course_name}") will be used.')
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
@@ -1351,6 +1361,13 @@ def main():
                              'rate than the provided value will be downsampled. This can be used '
                              'to reduce the size of the ISO image notably. Stock courses use 32000 '
                              'Hz.')
+    audio_group.add_argument(
+        '--use-auxiliary-audio-track',
+        action='store_true',
+        help='If specified, audio files of the custom tracks that provide the '
+        '`auxiliary_audio_track` field in their `trackinfo.ini` file will be excluded from the ISO '
+        'image. Instead, the audio track of the defined retail course will be used. This can be '
+        'used to reduce the size of the ISO image.')
 
     expert_group = parser.add_argument_group('Expert options')
     expert_group.add_argument(
