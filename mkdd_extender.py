@@ -140,9 +140,16 @@ class _CustomFormatter(logging.Formatter):
         return self.__formatters[record.levelno].format(record)
 
 
+class NoInternalModuleFilter(logging.Filter):
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno > logging.WARNING or record.module not in ('rarc', 'ast_converter')
+
+
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(_CustomFormatter())
+console_handler.addFilter(NoInternalModuleFilter())
 
 logging.basicConfig(datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO, handlers=(console_handler, ))
 
