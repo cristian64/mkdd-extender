@@ -1,0 +1,3 @@
+chardet
+numpy  # Optional. Faster audio processing if library is available.
+Pillow
