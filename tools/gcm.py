@@ -280,25 +280,25 @@ class GCM:
       
       if file_entry.is_dir:
         assert directory_file_entry.file_index == file_entry.parent_fst_index
-        subdir_path = dir_path + "/" + file_entry.name
+        subdir_path = os.path.join(dir_path, file_entry.name)
         file_entry.file_path = subdir_path
         self.read_directory(file_entry, subdir_path)
         i = file_entry.next_fst_index
       else:
-        file_path = dir_path + "/" + file_entry.name
+        file_path = os.path.join(dir_path, file_entry.name)
         self.files_by_path[file_path] = file_entry
         file_entry.file_path = file_path
         i += 1
   
   def read_system_data(self):
-    self.files_by_path["sys/boot.bin"] = SystemFile(0, 0x440, "boot.bin")
-    self.files_by_path["sys/bi2.bin"] = SystemFile(0x440, 0x2000, "bi2.bin")
+    self.files_by_path[os.path.join("sys", "boot.bin")] = SystemFile(0, 0x440, "boot.bin")
+    self.files_by_path[os.path.join("sys", "bi2.bin")] = SystemFile(0x440, 0x2000, "bi2.bin")
     
     apploader_header_size = 0x20
     apploader_size = read_u32(self.iso_file, 0x2440 + 0x14)
     apploader_trailer_size = read_u32(self.iso_file, 0x2440 + 0x18)
     apploader_full_size = apploader_header_size + apploader_size + apploader_trailer_size
-    self.files_by_path["sys/apploader.img"] = SystemFile(0x2440, apploader_full_size, "apploader.img")
+    self.files_by_path[os.path.join("sys", "apploader.img")] = SystemFile(0x2440, apploader_full_size, "apploader.img")
     
     dol_offset = read_u32(self.iso_file, 0x420)
     main_dol_size = 0
@@ -314,16 +314,16 @@ class GCM:
       section_end_offset = section_offset + section_size
       if section_end_offset > main_dol_size:
         main_dol_size = section_end_offset
-    self.files_by_path["sys/main.dol"] = SystemFile(dol_offset, main_dol_size, "main.dol")
+    self.files_by_path[os.path.join("sys", "main.dol")] = SystemFile(dol_offset, main_dol_size, "main.dol")
     
-    self.files_by_path["sys/fst.bin"] = SystemFile(self.fst_offset, self.fst_size, "fst.bin")
+    self.files_by_path[os.path.join("sys", "fst.bin")] = SystemFile(self.fst_offset, self.fst_size, "fst.bin")
     
     self.system_files = [
-      self.files_by_path["sys/boot.bin"],
-      self.files_by_path["sys/bi2.bin"],
-      self.files_by_path["sys/apploader.img"],
-      self.files_by_path["sys/main.dol"],
-      self.files_by_path["sys/fst.bin"],
+      self.files_by_path[os.path.join("sys", "boot.bin")],
+      self.files_by_path[os.path.join("sys", "bi2.bin")],
+      self.files_by_path[os.path.join("sys", "apploader.img")],
+      self.files_by_path[os.path.join("sys", "main.dol")],
+      self.files_by_path[os.path.join("sys", "fst.bin")],
     ]
   
   def read_file_data(self, file_path):
@@ -416,7 +416,7 @@ class GCM:
     self.output_iso = open(output_file_path, "wb")
     try:
       self.export_system_data_to_iso()
-      yield("sys/main.dol", 5) # 5 system files
+      yield(os.path.join("sys", "main.dol"), 5) # 5 system files
       
       generator = self.export_filesystem_to_iso()
       while True:
@@ -527,19 +527,19 @@ class GCM:
     self.pad_output_iso_by(padding_needed)
   
   def export_system_data_to_iso(self):
-    boot_bin_data = self.get_changed_file_data("sys/boot.bin")
+    boot_bin_data = self.get_changed_file_data(os.path.join("sys", "boot.bin"))
     assert data_len(boot_bin_data) == 0x440
     self.output_iso.seek(0)
     boot_bin_data.seek(0)
     self.output_iso.write(boot_bin_data.read())
     
-    bi2_data = self.get_changed_file_data("sys/bi2.bin")
+    bi2_data = self.get_changed_file_data(os.path.join("sys", "bi2.bin"))
     assert data_len(bi2_data) == 0x2000
     self.output_iso.seek(0x440)
     bi2_data.seek(0)
     self.output_iso.write(bi2_data.read())
     
-    apploader_data = self.get_changed_file_data("sys/apploader.img")
+    apploader_data = self.get_changed_file_data(os.path.join("sys", "apploader.img"))
     apploader_header_size = 0x20
     apploader_size = read_u32(apploader_data, 0x14)
     apploader_trailer_size = read_u32(apploader_data, 0x18)
@@ -553,7 +553,7 @@ class GCM:
     self.align_output_iso_to_nearest(0x100)
     
     dol_offset = self.output_iso.tell()
-    dol_data = self.get_changed_file_data("sys/main.dol")
+    dol_data = self.get_changed_file_data(os.path.join("sys", "main.dol"))
     dol_size = data_len(dol_data)
     dol_data.seek(0)
     self.output_iso.write(dol_data.read())
@@ -711,7 +711,7 @@ class SystemFile:
     self.file_size = file_size
     
     self.name = name
-    self.file_path = "sys/" + name
+    self.file_path = os.path.join("sys", name)
     
     self.is_dir = False
     self.is_system_file = True
