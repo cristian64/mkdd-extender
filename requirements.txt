@@ -1,3 +1,4 @@
 chardet
 numpy  # Optional. Faster audio processing if library is available.
 Pillow
+PySide6  # Optional. Command-line mode is functional without the GUI.

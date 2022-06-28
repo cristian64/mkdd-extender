@@ -1392,6 +1392,13 @@ def create_args_parser() -> argparse.ArgumentParser:
                         type=str,
                         help='Path where the modified ISO file will be written.')
 
+    parser.add_argument(
+        '--gui',
+        action='store_true',
+        help='If specified, the application will be launched in GUI mode.\n\n'
+        'This argument is provided for discoverability and documentation purposes; when the '
+        'application is executed with no arguments, it will be launched in GUI mode by default.')
+
     general_group = parser.add_argument_group('General options')
     general_group.add_argument(
         '--skip-banner',
@@ -1579,6 +1586,14 @@ def extend_game(args: argparse.Namespace):
 
 
 def main():
+    # When no arguments are provided, the application will be launched in GUI mode.
+    if len(sys.argv) == 1 or '--gui' in sys.argv:
+        try:
+            import gui
+            sys.exit(gui.run())
+        except ImportError as e:
+            log.warning(f'Unable to launch GUI ("{str(e)}"). Switching to command-line mode...')
+
     args = create_args_parser().parse_args()
 
     try:
