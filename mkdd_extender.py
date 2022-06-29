@@ -1411,7 +1411,10 @@ def extend_game(args: argparse.Namespace):
         # to be read might be ideal performance-wise.
         log.info(f'Extracting "{args.input}" image to "{iso_tmp_dir}"...')
         gcm_file = gcm.GCM(args.input)
-        gcm_file.read_entire_disc()
+        try:
+            gcm_file.read_entire_disc()
+        except Exception as e:
+            raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}')
         files_extracted = 0
         for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):
             if files_done > 0:
