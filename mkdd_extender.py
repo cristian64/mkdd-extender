@@ -1351,7 +1351,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             raise RuntimeError(f'Error occurred while injecting Gecko code into DOL file.')
 
 
-def main():
+def create_args_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the original ISO file.')
     parser.add_argument('tracks',
@@ -1408,8 +1408,10 @@ def main():
         'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected crashes '
         'can occur when the limits are exceeded.')
 
-    args = parser.parse_args()
+    return parser
 
+
+def extend_game(args: argparse.Namespace):
     iso_tmp_dir = tempfile.mkdtemp()
     try:
         # Extract the ISO file entirely for now. In the future, only extracting the files that need
@@ -1510,6 +1512,11 @@ def main():
 
     finally:
         shutil.rmtree(iso_tmp_dir)
+
+
+def main():
+    args = create_args_parser().parse_args()
+    extend_game(args)
 
 
 if __name__ == '__main__':
