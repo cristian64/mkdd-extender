@@ -161,6 +161,10 @@ tools_dir = os.path.join(script_dir, 'tools')
 data_dir = os.path.join(script_dir, 'data')
 
 
+class MKDDExtenderError(Exception):
+    pass
+
+
 @contextlib.contextmanager
 def current_directory(dirpath):
     cwd = os.getcwd()
@@ -294,9 +298,8 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
 
         dirnames = os.listdir(tmp_dir)
         if len(dirnames) != 1:
-            log.error(f'Unable to rename entries in "{archive_filepath}". Unexpected number of '
-                      'root entries in directory. This is fatal.')
-            sys.exit(1)
+            raise MKDDExtenderError(f'Unable to rename entries in "{archive_filepath}". Unexpected '
+                                    'number of root entries in directory.')
 
         dirname = dirnames[0]
         dirpath = os.path.join(tmp_dir, dirname)
@@ -316,10 +319,9 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
                 if os.path.isfile(filepath):
                     parts = filename.split('_', maxsplit=1)
                     if len(parts) > 2:
-                        log.error(
+                        raise MKDDExtenderError(
                             f'Unable to rename entries in "{archive_filepath}". Unrecognized '
-                            f'filename with multiple "_" characters ("{filename}"). This is fatal.')
-                        sys.exit(1)
+                            f'filename with multiple "_" characters ("{filename}").')
                     new_filename = f'{course_name}_{parts[1]}'
                     new_filepath = os.path.join(new_dirpath, new_filename)
                     os.rename(filepath, new_filepath)
@@ -559,9 +561,8 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
     sample_rate = ast_info['sample_rate']
 
     if channel_count not in (1, 2, 4):
-        log.error(f'Unsupported channel count ({channel_count}) in "{filepath}". '
-                  'Expected 1, 2, or 4 channels.')
-        sys.exit(1)
+        raise MKDDExtenderError(f'Unsupported channel count ({channel_count}) in "{filepath}". '
+                                'Expected 1, 2, or 4 channels.')
 
     needs_mixing = mix_to_mono and channel_count != 1
     needs_downsampling = downsample_sample_rate and sample_rate != downsample_sample_rate
@@ -824,8 +825,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 # - Disable slot by making the label and preview images transparent or black, and
                 #   replacing the course with the smallest, viable track that doesn't make the game
                 #   crash if the player ends up selecting the track.
-                log.error(f'No track assigned to {prefix}. This is fatal.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'No track assigned to slot {prefix}.')
         if extracted > 0:
             log.info(f'{extracted} archives extracted.')
         else:
@@ -886,8 +886,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
             if not os.path.isfile(track_filepath):
-                log.error(f'Unable to locate `track.arc` file in "{nodename}". This is fatal.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'Unable to locate `track.arc` file in "{nodename}".')
             track_mp_filepath = os.path.join(track_dirpath, 'track_mp.arc')
             if not os.path.isfile(track_mp_filepath):
                 log.warning(f'Unable to locate `track_mp.arc` file in "{nodename}". '
@@ -1024,9 +1023,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             expected_languages = os.listdir(page_coursename_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
-                log.error(f'Unable to locate language directories in "{nodename}" for course '
-                          'logo. This is fatal.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'Unable to locate language directories in "{nodename}" '
+                                        'for course logo.')
             for language in expected_languages:
                 logo_filepath = find_or_generate_image_path(language, 'track_big_logo.bti', 208,
                                                             104, 'RGB5A3', (0, 0, 0, 0))
@@ -1088,9 +1086,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
-                log.error(f'Unable to locate `SceneData/language` directories in "{nodename}". '
-                          'This is fatal.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'Unable to locate `SceneData/language` directories in '
+                                        '"{nodename}".')
 
             # Downscale preview images in all available languages.
             if not args.extended_memory:
@@ -1140,9 +1137,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                     int(minimap_json['Orientation']),
                 )
             except Exception as e:
-                log.error(f'Unable to parse minimap data in "{nodename}": {str(e)}. This is '
-                          'fatal.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": {str(e)}.')
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
@@ -1188,8 +1183,7 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
                     stock_audio_track_indices.append(file_index)
                     break
             else:
-                log.error(f'Unable to locate audio track "{filename}" in file list. This is fatal.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'Unable to locate audio track "{filename}" in file list.')
     stock_audio_track_indices = tuple(stock_audio_track_indices)
 
     FALLBACK_AUDIO_COURSE = 'Luigi'
@@ -1251,9 +1245,8 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             '81f1b05c6650d65326f757bb25bad604',  # GM4J01
             'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
     ):
-        log.error(f'Checksum failed: DOL file ("{dol_path}") is not original (checksum: '
-                  f'{checksum}). This is fatal.')
-        sys.exit(1)
+        raise MKDDExtenderError(f'Checksum failed: DOL file ("{dol_path}") is not original '
+                                f'(checksum: {checksum}).')
 
     with open(dol_path, 'rb') as f:
         data = f.read()
@@ -1483,9 +1476,8 @@ def extend_game(args: argparse.Namespace):
                 if args.skip_filesize_check:
                     log.warning(message)
                     continue
-                log.error(f'{message} This is fatal. Re-run with --skip-filesize-check to '
-                          'circumvent this safety measure.')
-                sys.exit(1)
+                raise MKDDExtenderError(f'{message}. Re-run with --skip-filesize-check to '
+                                        'circumvent this safety measure.')
 
         # Cross-check which files have been added, and then import all files from disk. While it
         # could be more efficient to compare timestamps and import only the ones that have really
@@ -1516,7 +1508,15 @@ def extend_game(args: argparse.Namespace):
 
 def main():
     args = create_args_parser().parse_args()
-    extend_game(args)
+
+    try:
+        extend_game(args)
+    except MKDDExtenderError as e:
+        log.error(str(e))
+        sys.exit(1)
+    except Exception as e:
+        log.exception(str(e))
+        sys.exit(1)
 
 
 if __name__ == '__main__':
