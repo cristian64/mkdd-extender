@@ -748,7 +748,7 @@ def patch_title_lines(iso_tmp_dir: str):
     log.info('Title lines patched.')
 
 
-def patch_cup_names(iso_tmp_dir: str):
+def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -779,11 +779,13 @@ def patch_cup_names(iso_tmp_dir: str):
 
                 page_cupname_filepath = with_page_index_suffix(cupname_filepath)
                 shutil.copyfile(cupname_filepath, page_cupname_filepath)
-                add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
+                if not skip_cup_names:
+                    add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
                 shutil.copyfile(page_cupname_filepath,
                                 page_cupname_filepath.replace('courseselect', 'lanplay'))
 
-            add_dpad_to_cup_name_image(cupname_filepath, -1)
+            if not skip_cup_names:
+                add_dpad_to_cup_name_image(cupname_filepath, -1)
             shutil.copyfile(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
 
     log.info('Cup names patched.')
@@ -1357,6 +1359,23 @@ def create_args_parser() -> argparse.ArgumentParser:
                         type=str,
                         help='Path where the modified ISO file will be written.')
 
+    general_group = parser.add_argument_group('General options')
+    general_group.add_argument(
+        '--skip-banner',
+        action='store_true',
+        help='If specified, the BNR file will be left untouched. By default, the banner image is '
+        'replaced with a custom bitmap, and "Extended!!" is appended to the game title too.')
+    general_group.add_argument(
+        '--skip-menu-titles',
+        action='store_true',
+        help='If specified, menu titles will be left untouched. By default, the menu titles in the '
+        '**SELECT COURSE** and **SELECT CUP** screens are modified to include the controls icon.')
+    general_group.add_argument(
+        '--skip-cup-names',
+        action='store_true',
+        help='If specified, cup names will be left untouched. By default, cup names are modified '
+        'to include an icon that indicates the currently selected course page.')
+
     audio_group = parser.add_argument_group('Audio options')
     audio_group.add_argument('--mix-to-mono',
                              action='store_true',
@@ -1443,9 +1462,11 @@ def extend_game(args: argparse.Namespace):
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
 
-        patch_bnr_file(iso_tmp_dir)
-        patch_title_lines(iso_tmp_dir)
-        patch_cup_names(iso_tmp_dir)
+        if not args.skip_banner:
+            patch_bnr_file(iso_tmp_dir)
+        if not args.skip_menu_titles:
+            patch_title_lines(iso_tmp_dir)
+        patch_cup_names(args.skip_cup_names, iso_tmp_dir)
         minimap_data, auxiliary_audio_data = meld_courses(args, iso_tmp_dir)
         patch_dol_file(args, minimap_data, auxiliary_audio_data, iso_tmp_dir)
 
