@@ -1249,8 +1249,12 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             '81f1b05c6650d65326f757bb25bad604',  # GM4J01
             'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
     ):
-        raise MKDDExtenderError(f'Checksum failed: DOL file ("{dol_path}") is not original '
-                                f'(checksum: {checksum}).')
+        message = (f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}')
+        if args.skip_dol_checksum_check:
+            log.warning(message)
+        else:
+            raise MKDDExtenderError(f'{message} Re-run with --skip-dol-checksum-check to '
+                                    'circumvent this safety measure.')
 
     with open(dol_path, 'rb') as f:
         data = f.read()
@@ -1415,6 +1419,11 @@ def create_args_parser() -> argparse.ArgumentParser:
         'to a green screen.')
 
     dangerous_group = parser.add_argument_group('Dangerous options')
+    dangerous_group.add_argument(
+        '--skip-dol-checksum-check',
+        action='store_true',
+        help='If specified, unrecognized checksums of the DOL file will not fail the program.'
+        'Unexpected errors or misbehavior may occur when a non-retail DOL file is encountered.')
     dangerous_group.add_argument(
         '--skip-filesize-check',
         action='store_true',
