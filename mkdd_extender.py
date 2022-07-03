@@ -27,6 +27,8 @@ import gecko_code
 import rarc
 from tools import bti, gcm
 
+__version__ = '0.0.0'
+
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
 List of all the known languages in the three regions.
