@@ -1441,6 +1441,14 @@ def create_args_parser() -> argparse.ArgumentParser:
 
 
 def extend_game(args: argparse.Namespace):
+    if not args.input:
+        raise MKDDExtenderError('Path to the input ISO file cannot be empty.')
+    if not args.output:
+        raise MKDDExtenderError('Path to the output ISO file cannot be empty.')
+
+    if args.input == args.output:
+        raise MKDDExtenderError(f'Paths to the input and output ISO files must be different.')
+
     iso_tmp_dir = tempfile.mkdtemp()
     try:
         # Extract the ISO file entirely for now. In the future, only extracting the files that need
