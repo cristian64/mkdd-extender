@@ -1355,10 +1355,16 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
 def create_args_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the original ISO file.')
-    parser.add_argument('tracks',
-                        type=str,
-                        help='Path to the directory containing the archives for each of the tracks '
-                        'that will be added to the game.')
+    parser.add_argument(
+        'tracks',
+        type=str,
+        help='Path to the directory containing the files for each of the custom tracks that will '
+        'be added to the game.\n\n'
+        'Custom tracks must be provided in the MKDD Track Patcher format: either compressed in a '
+        'ZIP archive, or as a directory that contains the relevant files for the custom track.\n\n'
+        'Each archive name (or directory name) needs to be prefixed with a letter (A, B, or C), '
+        'and a number in the range `[01, 16]` (one-digit numbers padded with a 0).\n\n'
+        'Exactly 48 custom tracks must be provided: "A01...", "A02...", ..., "C16...".')
     parser.add_argument('output',
                         type=str,
                         help='Path where the modified ISO file will be written.')
