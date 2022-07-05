@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import wave
+import zipfile
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -208,6 +209,28 @@ def build_file_list(dirpath: str) -> 'tuple[str]':
 
     with current_directory(dirpath):
         return _build_file_list('')
+
+
+def may_be_custom_track(path: str) -> bool:
+    # If it's a directory, check if it contains the `trackinfo.ini` file. If it contains a single
+    # directory, check also in that directory.
+    if os.path.isdir(path):
+        names = os.listdir(path)
+        if 'trackinfo.ini' in names:
+            return True
+        if len(names) == 1:
+            return may_be_custom_track(os.path.join(path, names[0]))
+        return False
+
+    # If it's an archive, check if the `trackinfo.ini` file can be found in the entry list.
+    if path.endswith('.zip'):
+        with zipfile.ZipFile(path, 'r') as f:
+            names = f.namelist()
+        for name in names:
+            if os.path.basename(name) == 'trackinfo.ini':
+                return True
+
+    return False
 
 
 def extract_and_flatten(src_path: str, dst_dirpath: str):
