@@ -10,7 +10,10 @@ import re
 import signal
 import sys
 import textwrap
+import threading
 import traceback
+
+from typing import Any
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -324,6 +327,85 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
                 item = self.item(row, column)
                 if item is None:
                     self.setItem(row, column, QtWidgets.QTableWidgetItem(str()))
+
+
+class ProgressDialog(QtWidgets.QProgressDialog):
+
+    def __init__(self, text: str, func: callable, parent: QtWidgets.QWidget = None):
+        super().__init__(parent)
+
+        self.setMinimum(0)
+        self.setMaximum(0)
+        self.setValue(0)
+        self.setCancelButton(None)
+        self.setLabelText(text)
+
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+
+        self._func = func
+        self._finished = False
+
+    def closeEvent(self, event: QtGui.QCloseEvent):
+        if not self._finished:
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent):
+        if not self._finished:
+            event.ignore()
+            return
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event: QtGui.QKeyEvent):
+        if not self._finished:
+            event.ignore()
+            return
+        super().keyReleaseEvent(event)
+
+    def execute_and_wait(self) -> Any:
+        result = None
+        exc_info = None
+
+        def wrapped_func():
+            try:
+                nonlocal result
+                result = self._func()
+            except Exception:
+                nonlocal exc_info
+                exc_info = sys.exc_info()
+
+        thread = threading.Thread(target=wrapped_func)
+        thread.start()
+
+        timer = QtCore.QTimer()
+        timer.setInterval(10)
+
+        def check_completion():
+            if self._finished or not thread.is_alive():
+                self._finished = True
+                self.close()
+
+        timer.timeout.connect(check_completion)
+        timer.start()
+
+        # Only if the operation takes longer than 100 ms will the progress dialog be displayed. This
+        # prevents some flickering when potentially-slow operations happen to return quickly (I/O
+        # responsiveness can vary dramatically between different file systems).
+        thread.join(0.1)
+        if thread.is_alive():
+            self.exec_()
+        else:
+            self._finished = True
+            self.close()
+
+        timer.stop()
+        thread.join()
+
+        if exc_info is not None:
+            raise exc_info[1].with_traceback(exc_info[2])
+
+        return result
 
 
 class MKDDExtenderWindow(QtWidgets.QMainWindow):
@@ -798,7 +880,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             args.skip_dol_checksum_check = None
             args.skip_filesize_check = None
 
-            mkdd_extender.extend_game(args)
+            progress_dialog = ProgressDialog('Building ISO file...',
+                                             lambda: mkdd_extender.extend_game(args), self)
+            progress_dialog.execute_and_wait()
 
         except mkdd_extender.MKDDExtenderError as e:
             error_message = str(e)
