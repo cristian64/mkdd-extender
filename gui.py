@@ -462,6 +462,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         input_form_layout.addRow('Output ISO File', self._output_iso_file_edit)
         input_form_layout.addRow('Custom Tracks Directory', self._custom_tracks_directory_edit)
 
+        self._custom_tracks_filter_edit = QtWidgets.QLineEdit()
+        self._custom_tracks_filter_edit.textChanged.connect(self._update_custom_tracks_filter)
+        self._custom_tracks_filter_edit.setPlaceholderText('Filter')
+        clear_icon_path = os.path.join(data_dir, 'gui', 'clear.svg')
+        clear_icon = QtGui.QIcon(clear_icon_path)
+        self._clear_filter_action = self._custom_tracks_filter_edit.addAction(
+            clear_icon, QtWidgets.QLineEdit.TrailingPosition)
+        self._clear_filter_action.triggered.connect(self._custom_tracks_filter_edit.clear)
+        self._clear_filter_action.setVisible(False)
         self._custom_tracks_table = QtWidgets.QTableWidget()
         self._custom_tracks_table.setItemDelegate(
             SelectionStyledItemDelegate(self._custom_tracks_table))
@@ -479,6 +488,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_table.setWordWrap(False)
         self._custom_tracks_table_label = 'Custom Tracks'
         self._custom_tracks_table.setHorizontalHeaderLabels([self._custom_tracks_table_label])
+        custom_tracks_widget = QtWidgets.QWidget()
+        custom_tracks_layout = QtWidgets.QVBoxLayout(custom_tracks_widget)
+        custom_tracks_layout.setContentsMargins(0, 0, 0, 0)
+        custom_tracks_layout.setSpacing(2)
+        custom_tracks_layout.addWidget(self._custom_tracks_filter_edit)
+        custom_tracks_layout.addWidget(self._custom_tracks_table)
         pages_widget = QtWidgets.QWidget()
         pages_layout = QtWidgets.QVBoxLayout(pages_widget)
         pages_layout.setContentsMargins(0, 0, 0, 0)
@@ -519,7 +534,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
         self._splitter = QtWidgets.QSplitter()
-        self._splitter.addWidget(self._custom_tracks_table)
+        self._splitter.addWidget(custom_tracks_widget)
         self._splitter.addWidget(pages_widget)
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 4)
@@ -579,6 +594,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 self._custom_tracks_directory_edit.get_path())
         self._settings.setValue('miscellaneous/tracks_last_dir',
                                 self._custom_tracks_directory_edit.get_last_dir())
+        self._settings.setValue('miscellaneous/tracks_filter',
+                                self._custom_tracks_filter_edit.text())
 
         page_item_values = self._get_page_item_values()
         self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
@@ -614,6 +631,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         path = self._settings.value('miscellaneous/tracks_last_dir')
         if path:
             self._custom_tracks_directory_edit.set_last_dir(path)
+
+        text = self._settings.value('miscellaneous/tracks_filter')
+        if text:
+            self._custom_tracks_filter_edit.setText(text)
 
         page_item_values = self._settings.value('miscellaneous/page_item_values')
         if page_item_values:
@@ -690,6 +711,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if os.path.isfile(text) and ext in ('.iso', '.gcm'):
             self._output_iso_file_edit.set_path(f'{root}_extended.iso')
 
+    def _update_custom_tracks_filter(self):
+        custom_tracks_filter = self._custom_tracks_filter_edit.text()
+        self._clear_filter_action.setVisible(bool(custom_tracks_filter))
+
+        if not self._custom_tracks_table.isEnabled():
+            return
+
+        custom_tracks_filter = custom_tracks_filter.lower()
+
+        for row in range(self._custom_tracks_table.rowCount()):
+            item = self._custom_tracks_table.item(row, 0)
+            visible = custom_tracks_filter in item.text().lower()
+            if visible:
+                self._custom_tracks_table.showRow(row)
+            else:
+                self._custom_tracks_table.hideRow(row)
+
     def _load_custom_tracks_directory(self, dirpath: str = ''):
         self._custom_tracks_table.setEnabled(False)
         self._custom_tracks_table.setRowCount(0)
@@ -736,6 +774,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 for i, name in enumerate(names):
                     self._custom_tracks_table.setItem(i, 0, QtWidgets.QTableWidgetItem(name))
                 self._custom_tracks_table.setEnabled(True)
+                self._update_custom_tracks_filter()
 
         self._sync_emblems()
 
