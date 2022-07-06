@@ -555,7 +555,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
             page_table.itemChanged.connect(self._on_page_table_itemChanged)
 
-        self._load_custom_tracks_directory(self._custom_tracks_directory_edit.get_path())
+        # Custom tracks (and indirectly emblems) to be updated in the next iteration, to guarantee
+        # that the main window has been shown before showing a potential progress dialog.
+        QtCore.QTimer.singleShot(0, self._load_custom_tracks_directory)
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         self._save_settings()
@@ -688,15 +690,34 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if os.path.isfile(text) and ext in ('.iso', '.gcm'):
             self._output_iso_file_edit.set_path(f'{root}_extended.iso')
 
-    def _load_custom_tracks_directory(self, dirpath: str):
+    def _load_custom_tracks_directory(self, dirpath: str = ''):
         self._custom_tracks_table.setEnabled(False)
         self._custom_tracks_table.setRowCount(0)
 
+        dirpath = dirpath or self._custom_tracks_directory_edit.get_path()
         if dirpath:
-            try:
-                names = sorted(os.listdir(dirpath))
-            except Exception:
-                names = None
+
+            def scan_custom_tracks_directory():
+                try:
+                    names = sorted(os.listdir(dirpath))
+                except Exception:
+                    return None
+
+                filtered_names = []
+                for name in names:
+                    try:
+                        path = os.path.join(dirpath, name)
+                        potential_custom_track = mkdd_extender.may_be_custom_track(path)
+                        if potential_custom_track:
+                            filtered_names.append(name)
+                    except Exception:
+                        pass
+
+                return filtered_names
+
+            progress_dialog = ProgressDialog('Scanning custom tracks directory...',
+                                             scan_custom_tracks_directory, self)
+            names = progress_dialog.execute_and_wait()
 
             if not names:
                 if names is None:
