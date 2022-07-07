@@ -537,6 +537,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_table.horizontalHeader().setSectionsMovable(False)
             page_table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
             page_table.verticalHeader().hide()
+            page_table.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+            clear_selection_action = QtGui.QAction('Clear', page_table)
+            clear_selection_action.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete))
+            clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
+            clear_selection_action.triggered.connect(self._clear_selection)
+            page_table.addAction(clear_selection_action)
             pages_layout.addLayout(page_label_layout)
             pages_layout.addWidget(page_table)
         for page_table in self._page_tables:
@@ -609,6 +615,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._save_settings()
 
         super().closeEvent(event)
+
+    def keyReleaseEvent(self, event: QtGui.QKeyEvent):
+        super().keyReleaseEvent(event)
+
+        if not event.isAccepted():
+            if event.modifiers() in (QtCore.Qt.NoModifier, QtCore.Qt.KeypadModifier):
+                if event.key() in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
+                    if self.hasFocus():
+                        self._clear_selection()
 
     def _save_settings(self):
         self._settings.setValue('window/geometry', self.saveGeometry())
@@ -945,6 +960,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _on_page_table_itemChanged(self, item: QtWidgets.QTableWidgetItem):
         _ = item
+        self._sync_emblems()
+
+    def _clear_selection(self):
+        with self._blocked_page_signals():
+            for item in self._get_page_items():
+                if item.isSelected():
+                    item.setText(str())
         self._sync_emblems()
 
     def _on_options_action_triggered(self):
