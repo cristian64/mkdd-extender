@@ -4,7 +4,9 @@ Graphical user interface for the MKDD Extender.
 import argparse
 import collections
 import contextlib
+import datetime
 import json
+import logging
 import os
 import re
 import signal
@@ -408,6 +410,69 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         return result
 
 
+class LogTable(QtWidgets.QTableWidget):
+
+    log_message_received = QtCore.Signal(tuple)
+
+    def __init__(self, parent: QtWidgets.QWidget = None):
+        super().__init__(parent)
+
+        font_size = round(self.font().pointSize() * 0.80)
+        self.setStyleSheet(
+            f'QTableWidget {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
+
+        self.setItemDelegate(SelectionStyledItemDelegate(self))
+        self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setColumnCount(4)
+        self.setHorizontalHeaderLabels(('Timestamp', 'Level', 'System', 'Message'))
+        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setSectionsClickable(False)
+        self.horizontalHeader().setSectionsMovable(False)
+        self.verticalHeader().hide()
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.setWordWrap(False)
+
+        self.log_message_received.connect(self._on_log_handler_log_message_received)
+
+        log_table = self
+
+        class LogHandler(logging.Handler):
+
+            def emit(self, record: logging.LogRecord):
+                timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+                log_message = (timestamp, record.levelno, record.levelname.title(), record.name,
+                               record.msg)
+                log_table.log_message_received.emit(log_message)
+
+        self._log_handler = LogHandler()
+        mkdd_extender.log.addHandler(self._log_handler)
+
+    def _on_log_handler_log_message_received(self, log_message: 'tuple[str, int, str, str, str]'):
+        row = self.rowCount()
+        self.insertRow(row)
+
+        color = QtGui.QBrush()
+        if log_message[1] == logging.WARNING:
+            color = QtGui.QColor(239, 204, 0)
+        elif log_message[1] == logging.ERROR:
+            color = QtGui.QColor(215, 40, 40)
+        elif log_message[1] == logging.CRITICAL:
+            color = QtGui.QColor(166, 58, 199)
+
+        for column, column_value in enumerate(
+            (log_message[0], log_message[2], log_message[3], log_message[4])):
+            item = QtWidgets.QTableWidgetItem(column_value)
+            item.setForeground(color)
+            self.setItem(row, column, item)
+
+        scroll_bar = self.verticalScrollBar()
+        QtCore.QTimer.singleShot(0, lambda: scroll_bar.setSliderPosition(scroll_bar.maximum()))
+
+
 class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def __init__(self,
@@ -587,14 +652,26 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         bottom_layout.addStretch()
         bottom_layout.addWidget(self._build_button)
 
-        widget = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(widget)
+        main_widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(main_widget)
         layout.addLayout(input_form_layout)
         layout.addWidget(self._splitter)
         layout.addLayout(options_layout)
         layout.addLayout(bottom_layout)
 
-        self.setCentralWidget(widget)
+        log_table = LogTable()
+
+        self._log_splitter = QtWidgets.QSplitter()
+        self._log_splitter.setOrientation(QtCore.Qt.Vertical)
+        self._log_splitter.addWidget(main_widget)
+        self._log_splitter.addWidget(log_table)
+        self._log_splitter.setStretchFactor(0, 4)
+        self._log_splitter.setStretchFactor(1, 1)
+        self._log_splitter.setCollapsible(0, False)
+        self._log_splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                         QtWidgets.QSizePolicy.Expanding)
+
+        self.setCentralWidget(self._log_splitter)
 
         self._restore_settings()
 
@@ -629,6 +706,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('window/geometry', self.saveGeometry())
         self._settings.setValue('window/state', self.saveState())
         self._settings.setValue('window/splitter', self._splitter.saveState())
+        self._settings.setValue('window/log_splitter', self._log_splitter.saveState())
 
         self._settings.setValue('miscellaneous/input_path', self._input_iso_file_edit.get_path())
         self._settings.setValue('miscellaneous/input_last_dir',
@@ -666,6 +744,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         state = self._settings.value('window/splitter')
         if state:
             self._splitter.restoreState(state)
+        state = self._settings.value('window/log_splitter')
+        if state:
+            self._log_splitter.restoreState(state)
 
         path = self._settings.value('miscellaneous/input_path')
         if path:
