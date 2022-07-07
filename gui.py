@@ -418,6 +418,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._red_color = QtGui.QColor(215, 40, 40)
         self._yellow_color = QtGui.QColor(239, 204, 0)
 
+        for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
+            for option_label, _option_type, _option_help in group_options:
+                option_member_name = f'_{option_label.lower().replace(" ", "_")}'
+                setattr(self, option_member_name, None)
+
         organization = application = 'mkdd-extender'
         self._settings = QtCore.QSettings(QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope,
                                           organization, application)
@@ -434,11 +439,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._error_icon = QtGui.QIcon(error_icon_path)
         warning_icon_path = os.path.join(data_dir, 'gui', 'warning.svg')
         self._warning_icon = QtGui.QIcon(warning_icon_path)
+        options_icon_path = os.path.join(data_dir, 'gui', 'options.svg')
+        options_icon = QtGui.QIcon(options_icon_path)
 
         menu = self.menuBar()
         file_menu = menu.addMenu('File')
         quit_action = file_menu.addAction('Quit')
         quit_action.triggered.connect(self.close)
+        edit_menu = menu.addMenu('Edit')
+        options_action = edit_menu.addAction('Options')
+        options_action.setIcon(options_icon)
+        options_action.triggered.connect(self._on_options_action_triggered)
         help_menu = menu.addMenu('Help')
         instructions_action = help_menu.addAction('Instructions')
         instructions_action.triggered.connect(self._open_instructions_dialog)
@@ -541,6 +552,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                      QtWidgets.QSizePolicy.Expanding)
 
+        options_button = QtWidgets.QPushButton('Options')
+        options_button.clicked.connect(self._on_options_action_triggered)
+        options_button.setIcon(options_icon)
+        self._options_edit = QtWidgets.QLineEdit()
+        self._options_edit.setFocusPolicy(QtCore.Qt.NoFocus)
+        self._options_edit.setPlaceholderText('No options set')
+        self._options_edit.setReadOnly(True)
+        font_size = round(self._options_edit.font().pointSize() * 0.75)
+        self._options_edit.setStyleSheet(
+            f'QLineEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
+
+        options_layout = QtWidgets.QHBoxLayout()
+        options_layout.setContentsMargins(0, 0, 0, 0)
+        options_layout.setSpacing(0)
+        options_layout.addWidget(options_button)
+        options_layout.addWidget(self._options_edit)
+
         self._build_button = QtWidgets.QPushButton('Build')
         hpadding = self._build_button.fontMetrics().averageCharWidth()
         vpadding = self._build_button.fontMetrics().height() // 2
@@ -557,6 +585,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(widget)
         layout.addLayout(input_form_layout)
         layout.addWidget(self._splitter)
+        layout.addLayout(options_layout)
         layout.addLayout(bottom_layout)
 
         self.setCentralWidget(widget)
@@ -569,6 +598,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         for page_table in self._page_tables:
             page_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
             page_table.itemChanged.connect(self._on_page_table_itemChanged)
+
+        self._update_options_string()
 
         # Custom tracks (and indirectly emblems) to be updated in the next iteration, to guarantee
         # that the main window has been shown before showing a potential progress dialog.
@@ -599,6 +630,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         page_item_values = self._get_page_item_values()
         self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
+
+        options = []
+        for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
+            for option_label, _option_type, _option_help in group_options:
+                option_variable_name = f'{option_label.lower().replace(" ", "_")}'
+                option_member_name = f'_{option_variable_name}'
+                option_value = getattr(self, option_member_name)
+                if option_value:
+                    options.append((option_variable_name, option_value))
+        self._settings.setValue('miscellaneous/options', json.dumps(options))
 
     def _restore_settings(self):
         geometry = self._settings.value('window/geometry')
@@ -644,6 +685,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 pass
             else:
                 self._set_page_item_values(page_item_values, also_selected_state=False)
+
+        options = self._settings.value('miscellaneous/options')
+        if options:
+            try:
+                options = json.loads(options)
+            except json.decoder.JSONDecodeError:
+                pass
+            else:
+                for option_variable_name, option_value in options:
+                    option_member_name = f'_{option_variable_name}'
+                    setattr(self, option_member_name, option_value)
 
     def _open_instructions_dialog(self):
         text = textwrap.dedent(f"""\
@@ -895,6 +947,98 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         _ = item
         self._sync_emblems()
 
+    def _on_options_action_triggered(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle('Options')
+        layout = QtWidgets.QVBoxLayout(dialog)
+
+        def markdown_to_html(title: str, text: str) -> str:
+            html = f'<h3>{title}</h3>\n'
+            for paragraph in text.split('\n\n'):
+                paragraph = paragraph.strip()
+                paragraph = paragraph.replace('\n', ' ')
+                paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
+                                   paragraph)
+                paragraph = re.sub(
+                    r'`([^`]+)`',
+                    r'<code style="background: #1B1B1B; white-space: nowrap;">&nbsp;\1&nbsp;</code>',
+                    paragraph)
+                html += f'<p>{paragraph}</p>\n'
+            return html
+
+        for group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
+            group_box = QtWidgets.QGroupBox(group_name)
+            group_box.setLayout(QtWidgets.QVBoxLayout())
+
+            for option_label, option_type, option_help in group_options:
+                option_member_name = f'_{option_label.lower().replace(" ", "_")}'
+                option_value = getattr(self, option_member_name)
+                option_help = markdown_to_html(option_label, option_help)
+
+                if option_type is bool:
+                    option_widget = QtWidgets.QCheckBox(option_label)
+                    option_widget.setToolTip(option_help)
+                    option_widget.setChecked(bool(option_value))
+
+                    def on_toggled(checked, option_member_name=option_member_name):
+                        setattr(self, option_member_name, checked)
+
+                    option_widget.toggled.connect(on_toggled)
+                    option_widget.toggled.connect(self._update_options_string)
+                    group_box.layout().addWidget(option_widget)
+
+                if option_type is int:
+                    option_widget_label = QtWidgets.QLabel(option_label)
+                    option_widget_label.setToolTip(option_help)
+                    option_widget = QtWidgets.QLineEdit(str(option_value or 0))
+                    option_widget.setToolTip(option_help)
+                    validator = QtGui.QIntValidator()
+                    validator.setBottom(0)
+                    option_widget.setValidator(validator)
+                    option_widget_layout = QtWidgets.QHBoxLayout()
+                    option_widget_layout.addWidget(option_widget_label)
+                    option_widget_layout.addWidget(option_widget)
+
+                    def on_textChanged(text, option_member_name=option_member_name):
+                        try:
+                            value = int(text)
+                        except ValueError:
+                            value = 0
+                        setattr(self, option_member_name, value)
+
+                    option_widget.textChanged.connect(on_textChanged)
+                    option_widget.textChanged.connect(self._update_options_string)
+                    group_box.layout().addLayout(option_widget_layout)
+
+            layout.addWidget(group_box)
+
+        layout.addStretch()
+        layout.addSpacing(dialog.fontMetrics().height() * 2)
+        close_button = QtWidgets.QPushButton('Close')
+        close_button.clicked.connect(dialog.close)
+        bottom_layout = QtWidgets.QHBoxLayout()
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(close_button)
+        layout.addLayout(bottom_layout)
+        dialog.exec_()
+
+    def _update_options_string(self):
+        options_strings = []
+        for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
+            for option_label, option_type, _option_help in group_options:
+                option_member_name = f'_{option_label.lower().replace(" ", "_")}'
+                option_value = getattr(self, option_member_name)
+                option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
+
+                if option_type is bool:
+                    if option_value:
+                        options_strings.append(option_as_argument)
+
+                if option_type is int:
+                    if option_value:
+                        options_strings.append(f'{option_as_argument}={option_value}')
+        self._options_edit.setText(' '.join(options_strings))
+
     def _build(self):
         error_message = None
         exception_info = None
@@ -930,15 +1074,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for name in names:
                 args.tracks.append(os.path.join(tracks_dirpath, name))
 
-            args.skip_banner = None
-            args.skip_menu_titles = None
-            args.skip_cup_names = None
-            args.mix_to_mono = None
-            args.sample_rate = None
-            args.use_auxiliary_audio_track = None
-            args.extended_memory = None
-            args.skip_dol_checksum_check = None
-            args.skip_filesize_check = None
+            for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
+                for option_label, _option_type, _option_help in group_options:
+                    option_variable_name = f'{option_label.lower().replace(" ", "_")}'
+                    option_member_name = f'_{option_variable_name}'
+                    option_value = getattr(self, option_member_name) or None
+                    setattr(args, option_variable_name, option_value)
 
             progress_dialog = ProgressDialog('Building ISO file...',
                                              lambda: mkdd_extender.extend_game(args), self)
