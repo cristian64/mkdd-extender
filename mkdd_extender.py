@@ -1375,6 +1375,89 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             raise RuntimeError(f'Error occurred while injecting Gecko code into DOL file.')
 
 
+OPTIONAL_ARGUMENTS = {
+    'General options': (
+        (
+            'Skip Banner',
+            bool,
+            'If specified, the BNR file will be left untouched.\n\n'
+            'By default, the banner image is replaced with a custom bitmap, and "Extended!!" is '
+            'appended to the game title.',
+        ),
+        (
+            'Skip Menu Titles',
+            bool,
+            'If specified, menu titles will be left untouched.\n\n'
+            'By default, the menu titles in the **SELECT COURSE** and **SELECT CUP** screens are '
+            'modified to include an icon that shows the controls to switch betweeen course pages.',
+        ),
+        (
+            'Skip Cup Names',
+            bool,
+            'If specified, cup names will be left untouched.\n\n'
+            'By default, cup names are modified to include an icon that indicates the currently '
+            'selected course page.',
+        ),
+    ),
+    'Audio options': (
+        (
+            'Sample Rate',
+            int,
+            'If set (in Hz), custom audio tracks that have a greater sample rate than the provided '
+            'value will be downsampled. This can be used to reduce the size of the ISO image '
+            'notably. Stock courses use 32000 Hz.',
+        ),
+        (
+            'Use Auxiliary Audio Track',
+            bool,
+            'If specified, audio files of the custom tracks that provide the '
+            '`auxiliary_audio_track` field in their `trackinfo.ini` file will be excluded from the '
+            'ISO image. Instead, the audio track of the defined retail course will be used. This '
+            'can be used to reduce the size of the ISO image.',
+        ),
+        (
+            'Mix to Mono',
+            bool,
+            'If enabled, custom audio tracks will be mixed into mono audio.\n\n'
+            'Although this reduces the size of the ISO image considerably, the game will only play '
+            'mono AST files on the left speaker. As a workaround, the in-game **SOUND** option can '
+            'be switched to `MONO`.',
+        ),
+    ),
+    'Expert options': ((
+        'Extended Memory',
+        bool,
+        'If specified, the simulated memory size in the ISO image will be extended from 24 MiB to '
+        '32 MiB. This permits a greater heap size in the game, which is incremented too from 6656 '
+        'KiB to 10752 KiB (or from 6525 KiB to 10621 KiB in the PAL version), allowing certain '
+        'files to grow larger without causing crashes.'
+        '\n\n'
+        'By default, preview images of the extra courses are halved due to limited space in the '
+        '`courseselect.arc` file. When `--extended-memory` is provided, the full size is used.'
+        '\n\n'
+        'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to also '
+        'extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory Override** in '
+        'Dolphin. Failing to enable the emulated memory size in Dolphin will make the game crash '
+        'to a green screen.',
+    ), ),
+    'Dangerous options': (
+        (
+            'Skip DOL Checksum Check',
+            bool,
+            'If specified, unrecognized checksums of the DOL file will not fail the program. '
+            'Unexpected errors or misbehavior may occur when a non-retail DOL file is encountered.',
+        ),
+        (
+            'Skip Filesize Check',
+            bool,
+            'If specified, no filesize check will be performed. It is known that certain files '
+            'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected crashes '
+            'can occur when the limits are exceeded.',
+        ),
+    ),
+}
+
+
 def create_args_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the original ISO file.')
@@ -1399,73 +1482,18 @@ def create_args_parser() -> argparse.ArgumentParser:
         'This argument is provided for discoverability and documentation purposes; when the '
         'application is executed with no arguments, it will be launched in GUI mode by default.')
 
-    general_group = parser.add_argument_group('General options')
-    general_group.add_argument(
-        '--skip-banner',
-        action='store_true',
-        help='If specified, the BNR file will be left untouched. By default, the banner image is '
-        'replaced with a custom bitmap, and "Extended!!" is appended to the game title too.')
-    general_group.add_argument(
-        '--skip-menu-titles',
-        action='store_true',
-        help='If specified, menu titles will be left untouched. By default, the menu titles in the '
-        '**SELECT COURSE** and **SELECT CUP** screens are modified to include the controls icon.')
-    general_group.add_argument(
-        '--skip-cup-names',
-        action='store_true',
-        help='If specified, cup names will be left untouched. By default, cup names are modified '
-        'to include an icon that indicates the currently selected course page.')
+    for group_name, group_options in OPTIONAL_ARGUMENTS.items():
+        argument_group = parser.add_argument_group(group_name)
+        for option_label, option_type, option_help in group_options:
+            option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
 
-    audio_group = parser.add_argument_group('Audio options')
-    audio_group.add_argument('--mix-to-mono',
-                             action='store_true',
-                             help='If enabled, custom audio tracks will be mixed into mono audio. '
-                             'Whilst this reduces the size of the ISO image considerably, the game '
-                             'will only play mono AST files from the left speaker. As a '
-                             'workaround, the in-game **SOUND** option can be switched to `MONO`.')
-    audio_group.add_argument('--sample-rate',
-                             type=int,
-                             help='If set (in Hz), custom audio tracks that have a greater sample '
-                             'rate than the provided value will be downsampled. This can be used '
-                             'to reduce the size of the ISO image notably. Stock courses use 32000 '
-                             'Hz.')
-    audio_group.add_argument(
-        '--use-auxiliary-audio-track',
-        action='store_true',
-        help='If specified, audio files of the custom tracks that provide the '
-        '`auxiliary_audio_track` field in their `trackinfo.ini` file will be excluded from the ISO '
-        'image. Instead, the audio track of the defined retail course will be used. This can be '
-        'used to reduce the size of the ISO image.')
+            if option_type is bool:
+                argument_group.add_argument(option_as_argument,
+                                            action='store_true',
+                                            help=option_help)
 
-    expert_group = parser.add_argument_group('Expert options')
-    expert_group.add_argument(
-        '--extended-memory',
-        action='store_true',
-        help='If specified, the simulated memory size in the ISO image will be extended from '
-        '24 MiB to 32 MiB. This permits a greater heap size in the game, which is incremented too '
-        'from 6656 KiB to 10752 KiB (or from 6525 KiB to 10621 KiB in the PAL version), allowing '
-        'certain files to grow larger without causing crashes.'
-        '\n\n'
-        'By default, preview images of the extra courses are halved due to limited space in the '
-        '`courseselect.arc` file. When --extended-memory is provided, the full size is used.'
-        '\n\n'
-        'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to also '
-        'extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory Override** in '
-        'Dolphin. Failing to enable the emulated memory size in Dolphin will make the game crash '
-        'to a green screen.')
-
-    dangerous_group = parser.add_argument_group('Dangerous options')
-    dangerous_group.add_argument(
-        '--skip-dol-checksum-check',
-        action='store_true',
-        help='If specified, unrecognized checksums of the DOL file will not fail the program.'
-        'Unexpected errors or misbehavior may occur when a non-retail DOL file is encountered.')
-    dangerous_group.add_argument(
-        '--skip-filesize-check',
-        action='store_true',
-        help='If specified, no filesize check will be performed. It is known that certain files '
-        'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected crashes '
-        'can occur when the limits are exceeded.')
+            if option_type is int:
+                argument_group.add_argument(option_as_argument, type=int, help=option_help)
 
     return parser
 
