@@ -130,7 +130,7 @@ class _CustomFormatter(logging.Formatter):
     def __init__(self):
         super().__init__()
 
-        fmt = '%(asctime)s %(levelname)-8s %(module)-15s %(message)s'
+        fmt = '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
         self.__formatters = {
             logging.DEBUG: logging.Formatter(fmt),
             logging.INFO: logging.Formatter(fmt),
