@@ -557,8 +557,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_table.setColumnCount(1)
         self._custom_tracks_table.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.Stretch)
-        self._custom_tracks_table.horizontalHeader().setSectionsClickable(False)
         self._custom_tracks_table.horizontalHeader().setSectionsMovable(False)
+        # NOTE: It is important to make the table sortable before making the indicator clearable, or
+        # else the label in the header would be boldified. An odd behavior in Qt that may bite back.
+        self._custom_tracks_table.setSortingEnabled(True)
+        self._custom_tracks_table.horizontalHeader().setSortIndicatorClearable(True)
+        self._custom_tracks_table.horizontalHeader().sortIndicatorChanged.connect(
+            self._on_custom_tracks_table_sortIndicatorChanged)
         self._custom_tracks_table.verticalHeader().hide()
         self._custom_tracks_table.verticalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeToContents)
@@ -723,6 +728,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('miscellaneous/tracks_filter',
                                 self._custom_tracks_filter_edit.text())
 
+        custom_tracks_table_header = self._custom_tracks_table.horizontalHeader()
+        self._settings.setValue('miscellaneous/tracks_order',
+                                (f'{custom_tracks_table_header.sortIndicatorSection()} '
+                                 f'{int(custom_tracks_table_header.sortIndicatorOrder())}'))
+
         page_item_values = self._get_page_item_values()
         self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
 
@@ -774,6 +784,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         text = self._settings.value('miscellaneous/tracks_filter')
         if text:
             self._custom_tracks_filter_edit.setText(text)
+
+        text = self._settings.value('miscellaneous/tracks_order')
+        if text:
+            custom_tracks_table_header = self._custom_tracks_table.horizontalHeader()
+            logical_index = int(text.split(' ')[0])
+            if logical_index >= 0:
+                order = QtCore.Qt.SortOrder(int(text.split(' ')[1]))
+                custom_tracks_table_header.setSortIndicator(logical_index, order)
 
         page_item_values = self._settings.value('miscellaneous/page_item_values')
         if page_item_values:
@@ -1062,6 +1080,30 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if item.isSelected():
                     item.setText(str())
         self._sync_emblems()
+
+    def _on_custom_tracks_table_sortIndicatorChanged(self, logical_index: int,
+                                                     order: QtCore.Qt.SortOrder):
+        _ = order
+
+        # When the sort indicator is unset, Qt won't reset the order to the original; it will be
+        # done manually.
+        if logical_index == -1:
+            # Initialize dictionary in the correct [insertion] order.
+            item_text_to_item = {item_text: None for item_text in self._item_text_to_name}
+
+            # Take all the items and add in dictionary in the new order.
+            for row in range(self._custom_tracks_table.rowCount()):
+                item_text = self._custom_tracks_table.item(row, 0).text()
+                if item_text not in item_text_to_item:
+                    # Early out if the text in the row is not recognized (it could be a warning or
+                    # error message in the first row).
+                    return
+                item = self._custom_tracks_table.takeItem(row, 0)
+                item_text_to_item[item_text] = item
+
+            # Reinsert the items back to the table.
+            for row, item in enumerate(item_text_to_item.values()):
+                self._custom_tracks_table.setItem(row, 0, item)
 
     def _on_options_action_triggered(self):
         dialog = QtWidgets.QDialog(self)
