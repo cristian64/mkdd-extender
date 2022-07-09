@@ -27,6 +27,7 @@ import ast_converter
 import gecko_code
 import rarc
 from tools import bti, gcm
+from tools.GeckoLoader import GeckoLoader
 
 __version__ = '0.0.0'
 
@@ -1387,11 +1388,10 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
 
         log.info(f'Injecting Gecko code into "{dol_path}"...')
 
-        geckoloader_filepath = os.path.join(tools_dir, 'GeckoLoader', 'GeckoLoader.py')
-        command = (sys.executable, geckoloader_filepath, dol_path, tmp_gecko_code_filepath,
-                   '--dest', dol_path, '--hooktype', 'GX')
-        if 0 != run(command):
-            raise RuntimeError(f'Error occurred while injecting Gecko code into DOL file.')
+        cli = GeckoLoader.GeckoLoaderCli('GeckoLoader')
+        args = cli.parse_args(
+            (dol_path, tmp_gecko_code_filepath, '--dest', dol_path, '--hooktype', 'GX', '--quiet'))
+        cli._exec(args, tmp_dir)
 
 
 OPTIONAL_ARGUMENTS = {
