@@ -584,11 +584,24 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._directory_watcher = DelayedDirectoryWatcher()
         self._directory_watcher.changed.connect(self._load_custom_tracks_directory)
 
+        self._undo_history = []
+        self._redo_history = []
+        self._pending_undo_actions = 0
+
         menu = self.menuBar()
         file_menu = menu.addMenu('File')
         quit_action = file_menu.addAction('Quit')
         quit_action.triggered.connect(self.close)
         edit_menu = menu.addMenu('Edit')
+        self._undo_action = edit_menu.addAction('Undo')
+        self._undo_action.setShortcut(QtGui.QKeySequence('Ctrl+Z'))
+        self._undo_action.triggered.connect(self._undo)
+        self._redo_action = edit_menu.addAction('Redo')
+        self._redo_action.setShortcuts(
+            [QtGui.QKeySequence('Ctrl+Shift+Z'),
+             QtGui.QKeySequence('Ctrl+Y')])
+        self._redo_action.triggered.connect(self._redo)
+        edit_menu.addSeparator()
         options_action = edit_menu.addAction('Options')
         options_action.setIcon(options_icon)
         options_action.triggered.connect(self._on_options_action_triggered)
@@ -769,6 +782,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         # Custom tracks (and indirectly emblems) to be updated in the next iteration, to guarantee
         # that the main window has been shown before showing a potential progress dialog.
         QtCore.QTimer.singleShot(0, self._load_custom_tracks_directory)
+
+        self._pending_undo_actions = 1
+        QtCore.QTimer.singleShot(0, self._process_undo_action)
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         self._save_settings()
@@ -1153,12 +1169,69 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         _ = item
         self._sync_emblems()
 
+        # Drag and drop events may generate several of these events in bursts. They need to be
+        # grouped together as a single undo action.
+        self._pending_undo_actions += 1
+        QtCore.QTimer.singleShot(0, self._process_undo_action)
+
     def _clear_selection(self):
         with self._blocked_page_signals():
             for item in self._get_page_items():
                 if item.isSelected():
                     item.setText(str())
         self._sync_emblems()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
+    def _process_undo_action(self):
+        if not self._pending_undo_actions:
+            return
+        self._pending_undo_actions = 0
+
+        # Resolve any potential pending event (e.g. item selection changed events).
+        QtWidgets.QApplication.instance().processEvents()
+
+        page_item_values = self._get_page_item_values()
+
+        # Undo action is only collected if the values (excluding the selection state) are actually
+        # different.
+        page_item_values_texts = [value for _, _, _, value, _ in page_item_values]
+        if self._undo_history:
+            previous_page_item_values = self._undo_history[-1]
+            previous_page_item_values_texts = [
+                value for _, _, _, value, _ in previous_page_item_values
+            ]
+        else:
+            previous_page_item_values_texts = None
+
+        if page_item_values_texts != previous_page_item_values_texts:
+            self._undo_history.append(page_item_values)
+            self._redo_history.clear()
+
+            self._update_undo_redo_actions()
+
+    def _undo(self):
+        if len(self._undo_history) > 1:
+            self._redo_history.insert(0, self._undo_history.pop())
+            page_item_values = self._undo_history[-1]
+            self._set_page_item_values(page_item_values)
+            self._sync_emblems()
+
+            self._update_undo_redo_actions()
+
+    def _redo(self):
+        if self._redo_history:
+            page_item_values = self._redo_history.pop(0)
+            self._undo_history.append(page_item_values)
+            self._set_page_item_values(page_item_values)
+            self._sync_emblems()
+
+            self._update_undo_redo_actions()
+
+    def _update_undo_redo_actions(self):
+        self._undo_action.setEnabled(len(self._undo_history) > 1)
+        self._redo_action.setEnabled(bool(self._redo_history))
 
     def _on_custom_tracks_table_sortIndicatorChanged(self, logical_index: int,
                                                      order: QtCore.Qt.SortOrder):
