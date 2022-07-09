@@ -4,6 +4,7 @@ MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 48 extra cou
 """
 import argparse
 import audioop
+import collections
 import configparser
 import contextlib
 import difflib
@@ -835,8 +836,6 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
 
 
 def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
-    tracks_dirpath = args.tracks
-
     minimap_data = {}
     auxiliary_audio_data = {}
 
@@ -848,38 +847,58 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
     staffghosts_dirpath = os.path.join(files_dirpath, 'StaffGhosts')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
+    if isinstance(args.tracks, str):
+        paths = tuple(os.path.join(args.tracks, p) for p in sorted(os.listdir(args.tracks)))
+        tracks_is_dir = True
+    elif isinstance(args.tracks, collections.abc.Sequence) and len(args.tracks) == len(PREFIXES):
+        paths = args.tracks
+        tracks_is_dir = False
+    else:
+        raise MKDDExtenderError('Unexpected value in `tracks` argument.')
+
     with tempfile.TemporaryDirectory() as tracks_tmp_dir:
-        # Extract all ZIP archives to their respective directories.
-        paths = tuple(os.path.join(tracks_dirpath, p) for p in sorted(os.listdir(tracks_dirpath)))
+        # Unpack ZIP archives (or copy directory is pre-unpacked) to their respective directories.
         prefix_to_nodename = {}
-        extracted = 0
-        log.info(f'Extracting ZIP archives...')
-        for prefix in PREFIXES:
-            for path in paths:
-                filename = os.path.basename(path)
-                if filename.startswith(prefix):
-                    track_dirpath = os.path.join(tracks_tmp_dir, prefix)
-                    log.info(f'Extracting "{path}" into "{track_dirpath}"...')
-                    extract_and_flatten(path, track_dirpath)
-                    prefix_to_nodename[prefix] = filename
-                    extracted += 1
-                    break
-            else:
-                # For now, missing an archive will be considered an error. Perhaps a program
-                # argument (e.g. `--on-missing`) can be added, so that the user can choose between:
-                # - Print error and exit script. Default?
-                # - Fall back to the stock course in the slot that he missing track would occupy.
-                # - Disable slot by making the label and preview images transparent or black, and
-                #   replacing the course with the smallest, viable track that doesn't make the game
-                #   crash if the player ends up selecting the track.
-                raise MKDDExtenderError(f'No track assigned to slot {prefix}.')
-        if extracted > 0:
-            log.info(f'{extracted} archives extracted.')
+        processed = 0
+        log.info(f'Preparing custom tracks...')
+        if tracks_is_dir:
+            for prefix in PREFIXES:
+                for path in paths:
+                    filename = os.path.basename(path)
+                    if filename.startswith(prefix):
+                        track_dirpath = os.path.join(tracks_tmp_dir, prefix)
+                        log.info(f'Extracting and flattening "{path}" into "{track_dirpath}"...')
+                        extract_and_flatten(path, track_dirpath)
+                        prefix_to_nodename[prefix] = filename
+                        processed += 1
+                        break
+                else:
+                    # For now, missing an archive will be considered an error. Perhaps a program
+                    # argument (e.g. `--on-missing`) can be added, so that the user can choose
+                    # between:
+                    # - Print error and exit script. Default?
+                    # - Fall back to the stock course in the slot that he missing track would
+                    #   occupy.
+                    # - Disable slot by making the label and preview images transparent or black,
+                    #   and replacing the course with the smallest, viable track that doesn't make
+                    #   the game crash if the player ends up selecting the track.
+                    raise MKDDExtenderError(f'No track assigned to slot {prefix}.')
         else:
-            log.warning(f'No archive has been extracted.')
+            for i, prefix in enumerate(PREFIXES):
+                path = paths[i]
+                filename = os.path.basename(path)
+                track_dirpath = os.path.join(tracks_tmp_dir, prefix)
+                log.info(f'Extracting and flattening "{path}" into "{track_dirpath}"...')
+                extract_and_flatten(path, track_dirpath)
+                prefix_to_nodename[prefix] = filename
+                processed += 1
+        if processed > 0:
+            log.info(f'{processed} custom tracks have been processed.')
+        else:
+            log.warning(f'No archive has been processed.')
 
         # Copy files into the ISO temporariy directory.
-        log.info(f'Melding extracted directories...')
+        log.info(f'Melding directories...')
         melded = 0
         for prefix in PREFIXES:
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
