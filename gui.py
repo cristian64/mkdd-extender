@@ -436,6 +436,11 @@ class LogTable(QtWidgets.QTableWidget):
         self.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.setWordWrap(False)
 
+        self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        clear_log_action = QtGui.QAction('Clear Log', self)
+        clear_log_action.triggered.connect(lambda: self.setRowCount(0))
+        self.addAction(clear_log_action)
+
         self.log_message_received.connect(self._on_log_handler_log_message_received)
 
         log_table = self
