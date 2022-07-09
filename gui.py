@@ -507,6 +507,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options_icon_path = os.path.join(data_dir, 'gui', 'options.svg')
         options_icon = QtGui.QIcon(options_icon_path)
 
+        self._item_text_to_name = {}
+
         menu = self.menuBar()
         file_menu = menu.addMenu('File')
         quit_action = file_menu.addAction('Quit')
@@ -880,6 +882,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_table.setEnabled(False)
         self._custom_tracks_table.setRowCount(0)
 
+        self._item_text_to_name = {}
+
         dirpath = dirpath or self._custom_tracks_directory_edit.get_path()
         if dirpath:
 
@@ -889,24 +893,24 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 except Exception:
                     return None
 
-                filtered_names = []
+                names_to_track_name = {}
                 for name in names:
                     try:
                         path = os.path.join(dirpath, name)
-                        potential_custom_track = mkdd_extender.may_be_custom_track(path)
-                        if potential_custom_track:
-                            filtered_names.append(name)
+                        track_name = mkdd_extender.get_custom_track_name(path)
+                        if track_name:
+                            names_to_track_name[name] = track_name
                     except Exception:
                         pass
 
-                return filtered_names
+                return names_to_track_name
 
             progress_dialog = ProgressDialog('Scanning custom tracks directory...',
                                              scan_custom_tracks_directory, self)
-            names = progress_dialog.execute_and_wait()
+            names_to_track_name = progress_dialog.execute_and_wait()
 
-            if not names:
-                if names is None:
+            if not names_to_track_name:
+                if names_to_track_name is None:
                     label = 'Directory not accessible.'
                     color = self._red_color
                 else:
@@ -918,9 +922,18 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._custom_tracks_table.setItem(0, 0, item)
 
             else:
-                self._custom_tracks_table.setRowCount(len(names))
-                for i, name in enumerate(names):
-                    self._custom_tracks_table.setItem(i, 0, QtWidgets.QTableWidgetItem(name))
+                self._custom_tracks_table.setRowCount(len(names_to_track_name))
+                track_names = tuple(names_to_track_name.values())
+
+                for i, (name, track_name) in enumerate(names_to_track_name.items()):
+                    # If the track name is not unique (e.g. different versions of the same course),
+                    # the entry name is added to the text).
+                    if track_names.count(track_name) > 1:
+                        text = f'{track_name} ({name})'
+                    else:
+                        text = track_name
+                    self._item_text_to_name[text] = name
+                    self._custom_tracks_table.setItem(i, 0, QtWidgets.QTableWidgetItem(text))
                 self._custom_tracks_table.setEnabled(True)
                 self._update_custom_tracks_filter()
 
@@ -1159,11 +1172,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             if input_path == output_path:
                 raise mkdd_extender.MKDDExtenderError('Input and output paths cannot be identical.')
 
-            custom_tracks = self._get_custom_track_names()
             names = []
             for item in self._get_page_items():
-                name = item.text()
-                if name and name in custom_tracks:
+                name = self._item_text_to_name.get(item.text())
+                if name:
                     names.append(name)
             if len(names) != 48:
                 raise mkdd_extender.MKDDExtenderError(
