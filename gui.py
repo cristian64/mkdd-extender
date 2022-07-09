@@ -478,6 +478,73 @@ class LogTable(QtWidgets.QTableWidget):
         QtCore.QTimer.singleShot(0, lambda: scroll_bar.setSliderPosition(scroll_bar.maximum()))
 
 
+class DelayedDirectoryWatcher(QtCore.QObject):
+
+    changed = QtCore.Signal()
+
+    def __init__(self):
+        super().__init__()
+
+        self._watcher = QtCore.QFileSystemWatcher(self)
+        self._directory = None
+        self._notification_scheduled = False
+
+        # If the watched directory disappears, Qt's implementation won't tell about it. A cheap
+        # implementation is to periodically check the existence of the watched directory. If it
+        # changes, we know that it needs to be re-watched. This is a very naive approach, but it
+        # should work on every known file system. A more clever approach (but less trivial) would be
+        # to check the inode/file ID of the directory.
+        self._exists = None
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(500)
+        self._timer.timeout.connect(self._verify_existence)
+        self._timer.start()
+
+        self._watcher.directoryChanged.connect(self._on_watcher_directoryChanged)
+
+    def set_directory(self, dirpath: str):
+        directories = self._watcher.directories()
+        if directories:
+            self._watcher.removePaths(directories)
+
+        self._directory = dirpath
+        try:
+            self._exists = os.path.isdir(self._directory)
+        except Exception:
+            self._exists = False
+
+        if dirpath and os.path.isdir(dirpath):
+            self._watcher.addPath(dirpath)
+
+    def get_directory(self) -> str:
+        return self._directory
+
+    def _verify_existence(self):
+        try:
+            exists = os.path.isdir(self._directory)
+        except Exception:
+            exists = False
+
+        if self._exists != exists:
+            self._exists = exists
+
+            self.set_directory(self._directory)
+            self.changed.emit()
+
+    def _notify_change(self):
+        self._notification_scheduled = False
+        self.changed.emit()
+
+    def _on_watcher_directoryChanged(self, dirpath: str):
+        _ = dirpath
+
+        if self._notification_scheduled:
+            return
+
+        QtCore.QTimer.singleShot(1000, self._notify_change)
+        self._notification_scheduled = True
+
+
 class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def __init__(self,
@@ -513,6 +580,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options_icon = QtGui.QIcon(options_icon_path)
 
         self._item_text_to_name = {}
+
+        self._directory_watcher = DelayedDirectoryWatcher()
+        self._directory_watcher.changed.connect(self._load_custom_tracks_directory)
 
         menu = self.menuBar()
         file_menu = menu.addMenu('File')
@@ -908,6 +978,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._item_text_to_name = {}
 
         dirpath = dirpath or self._custom_tracks_directory_edit.get_path()
+
+        if self._directory_watcher.get_directory() != dirpath:
+            self._directory_watcher.set_directory(dirpath)
+
         if dirpath:
 
             def scan_custom_tracks_directory():
