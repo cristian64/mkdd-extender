@@ -165,6 +165,8 @@ script_dir = os.path.dirname(script_path)
 tools_dir = os.path.join(script_dir, 'tools')
 data_dir = os.path.join(script_dir, 'data')
 
+TEMP_DIR_PREFIX = 'mkddext'
+
 
 class MKDDExtenderError(Exception):
     pass
@@ -178,6 +180,18 @@ def current_directory(dirpath):
         yield
     finally:
         os.chdir(cwd)
+
+
+def clean_stale_temp_dirs():
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        user_tmp_dir = os.path.dirname(tmp_dir)
+
+    for name in os.listdir(user_tmp_dir):
+        if name.startswith(TEMP_DIR_PREFIX):
+            try:
+                shutil.rmtree(os.path.join(user_tmp_dir, name))
+            except Exception:
+                pass
 
 
 def run(command: list, verbose: bool = False, cwd: str = None) -> int:
@@ -245,7 +259,7 @@ def get_custom_track_name(path: str) -> str:
             # Only accepted if there is a single entry.
             if len(trackinfo_entries) == 1:
                 trackinfo_entry = trackinfo_entries[0]
-                with tempfile.TemporaryDirectory() as tmp_dir:
+                with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
                     f.extract(trackinfo_entry, tmp_dir)
                     f.close()
 
@@ -257,7 +271,7 @@ def get_custom_track_name(path: str) -> str:
 def extract_and_flatten(src_path: str, dst_dirpath: str):
     # Extracts a ZIP archive into the given directory. If the archive contains a single directory,
     # it will be unwrapped. If the archive contains a nested archive, it will be extracted too.
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         if os.path.isfile(src_path):
             shutil.unpack_archive(src_path, tmp_dir)
         else:
@@ -320,7 +334,7 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
 
     # Otherwise, extract the RARC file, locate the BOL file in the directory, patch the BOL file,
     # and re-pack the RARC archive.
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         rarc.extract(course_filepath, tmp_dir)
 
         course_dirpath = os.path.join(tmp_dir, os.listdir(tmp_dir)[0])
@@ -339,7 +353,7 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
     """
     Extracts a RARC archive, renames its root directory and its files, and re-packs it.
     """
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         rarc.extract(archive_filepath, tmp_dir)
 
         dirnames = os.listdir(tmp_dir)
@@ -442,7 +456,7 @@ def split_image(image: Image.Image) -> 'list[Image.Image]':
 
 
 def add_controls_to_title_image(filepath: str, language: str):
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         title_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, title_filename[:-len('.bti')] + '.png')
 
@@ -492,7 +506,7 @@ def add_controls_to_title_image(filepath: str, language: str):
 
 
 def add_dpad_to_cup_name_image(filepath: str, page_index: int):
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         cupname_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, cupname_filename[:-len('.bti')] + '.png')
 
@@ -588,7 +602,7 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
 
     draw.text((x, y), filtered_text, font=font, fill=(255, 255, 255, 255))
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         tmp_filepath = os.path.join(tmp_dir,
                                     f'{os.path.splitext(os.path.basename(filepath))[0]}.png')
         image.save(tmp_filepath)
@@ -618,7 +632,7 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
 
     log.info(f'Conforming audio file ("{filepath}")...')
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         wav_filepath = os.path.join(tmp_dir,
                                     os.path.splitext(os.path.basename(filepath))[0] + '.wav')
         ast_converter.convert_to_wav(filepath, wav_filepath)
@@ -856,7 +870,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
     else:
         raise MKDDExtenderError('Unexpected value in `tracks` argument.')
 
-    with tempfile.TemporaryDirectory() as tracks_tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tracks_tmp_dir:
         # Unpack ZIP archives (or copy directory is pre-unpacked) to their respective directories.
         prefix_to_nodename = {}
         processed = 0
@@ -1110,7 +1124,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 PREVIEW_IMAGE_SIZE = 256 // 2, 184 // 2
 
             def resize_preview_image(filepath: str):
-                with tempfile.TemporaryDirectory() as tmp_dir:
+                with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
                     png_tmp_filepath = os.path.join(
                         tmp_dir,
                         os.path.splitext(os.path.basename(filepath))[0] + '.png')
@@ -1399,7 +1413,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
 
     audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data)
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
         log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
 
@@ -1545,8 +1559,7 @@ def extend_game(args: argparse.Namespace):
     if args.input == args.output:
         raise MKDDExtenderError(f'Paths to the input and output ISO files must be different.')
 
-    iso_tmp_dir = tempfile.mkdtemp()
-    try:
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as iso_tmp_dir:
         # Extract the ISO file entirely for now. In the future, only extracting the files that need
         # to be read might be ideal performance-wise.
         log.info(f'Extracting "{args.input}" image to "{iso_tmp_dir}"...')
@@ -1647,11 +1660,10 @@ def extend_game(args: argparse.Namespace):
                 files_written = files_done
         log.info(f'ISO image written ({files_written} files).')
 
-    finally:
-        shutil.rmtree(iso_tmp_dir)
-
 
 def main():
+    clean_stale_temp_dirs()
+
     # When no arguments are provided, the application will be launched in GUI mode.
     if len(sys.argv) == 1 or '--gui' in sys.argv:
         try:
