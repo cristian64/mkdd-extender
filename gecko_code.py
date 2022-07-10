@@ -7,6 +7,8 @@ import os
 import struct
 import textwrap
 
+from tools.GeckoLoader import dolreader
+
 BUTTONS_STATE_ADDRESSES = {
     'GM4E01': 0x003A4D6C,
     'GM4P01': 0x003AEB8C,
@@ -207,6 +209,47 @@ COURSE_TO_MINIMAP_VALUES = {
 """
 The stock minimap values for each course.
 """
+
+
+def read_minimap_values(game_id: str,
+                        dol_path: str) -> 'dict[str, tuple[float, float, float, float, int]]':
+    """
+    Helper function that reads the minimap values from the DOL file.
+
+    For unmodified, retail DOL files, it is expected that the return dictionary should match the
+    dictionary held in the `COURSE_TO_MINIMAP_VALUES` constant.
+    """
+    minimap_values = {}
+
+    with open(dol_path, 'rb') as f:
+        dol_file = dolreader.DolFile(f)
+
+        for course, addresses in COURSE_TO_MINIMAP_ADDRESSES[game_id].items():
+            dol_file.seek(0x80000000 + addresses[0])
+            v0 = struct.unpack('>f', dol_file.read(4))[0]
+            dol_file.seek(0x80000000 + addresses[1])
+            v1 = struct.unpack('>f', dol_file.read(4))[0]
+            dol_file.seek(0x80000000 + addresses[2])
+            v2 = struct.unpack('>f', dol_file.read(4))[0]
+            dol_file.seek(0x80000000 + addresses[3])
+            v3 = struct.unpack('>f', dol_file.read(4))[0]
+            dol_file.seek(0x80000000 + addresses[4] + 3)
+            v4 = struct.unpack('>B', dol_file.read(1))[0]
+
+            for v in (v0, v1, v2, v3):
+                if -10000000.0 <= v <= 10000000.0:
+                    continue
+                raise RuntimeError('Unable to extract minimap values values from DOL file. '
+                                   f'Corner value ({v4}) is unexpectedly large.')
+
+            if v4 not in (0, 1, 2, 3):
+                raise RuntimeError('Unable to extract minimap orientation values from DOL file. '
+                                   f'Orientation enum value ({v4}) not in [0, 3].')
+
+            minimap_values[course] = (v0, v1, v2, v3, v4)
+
+    return minimap_values
+
 
 COURSE_TO_STREAM_FILE_INDEX_ADDRESSES = {
     'GM4E01': 0x0052EB04,
@@ -1000,7 +1043,8 @@ def float_to_hex(value: float) -> int:
     return struct.unpack('>L', struct.pack('>f', value))[0]
 
 
-def write_code(game_id: str, minimap_data: dict, audio_track_data: tuple, filepath: str):
+def write_code(game_id: str, dol_path: str, minimap_data: dict, audio_track_data: tuple,
+               filepath: str):
 
     encoded_buttons_state_address = encode_address('if16', BUTTONS_STATE_ADDRESSES[game_id])
 
@@ -1071,9 +1115,10 @@ def write_code(game_id: str, minimap_data: dict, audio_track_data: tuple, filepa
                 get_line(encode_address('write32', addresses[3]), float_to_hex(values[3])),
                 get_line(encode_address('write8', addresses[4] + 3), values[4]),
             ))
+    initial_minimap_values = read_minimap_values(game_id, dol_path)
     for track_index in range(16):
         addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
-        values = COURSE_TO_MINIMAP_VALUES[COURSES[track_index]]
+        values = initial_minimap_values[COURSES[track_index]]
 
         lines_for_deactivator.extend((
             get_line(encode_address('write32', addresses[0]), float_to_hex(values[0])),

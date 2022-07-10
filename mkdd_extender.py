@@ -1448,7 +1448,8 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
         log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
 
-        gecko_code.write_code(game_id, minimap_data, audio_track_data, tmp_gecko_code_filepath)
+        gecko_code.write_code(game_id, dol_path, minimap_data, audio_track_data,
+                              tmp_gecko_code_filepath)
 
         log.info(f'Injecting Gecko code into "{dol_path}"...')
 
