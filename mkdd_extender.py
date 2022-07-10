@@ -19,6 +19,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import wave
 import zipfile
 
@@ -1551,6 +1552,8 @@ def create_args_parser() -> argparse.ArgumentParser:
 
 
 def extend_game(args: argparse.Namespace):
+    start_time = time.monotonic()
+
     if not args.input:
         raise MKDDExtenderError('Path to the input ISO file cannot be empty.')
     if not args.output:
@@ -1658,7 +1661,11 @@ def extend_game(args: argparse.Namespace):
         for _filepath, files_done in gcm_file.export_disc_to_iso_with_changed_files(args.output):
             if files_done > 0:
                 files_written = files_done
-        log.info(f'ISO image written ({files_written} files).')
+        iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
+        log.info(f'ISO image written ({files_written} files - {iso_size} MiB).')
+
+        elapsed_time = time.monotonic() - start_time
+        log.info(f'Process completed in {elapsed_time:.2f} seconds.')
 
 
 def main():
