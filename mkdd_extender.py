@@ -183,6 +183,18 @@ def current_directory(dirpath):
         os.chdir(cwd)
 
 
+def remove_file(filepath: str):
+    try:
+        os.remove(filepath)
+    except Exception:
+        pass
+
+
+def make_link(src_filepath: str, dst_filepath: str):
+    remove_file(dst_filepath)
+    os.link(src_filepath, dst_filepath)
+
+
 def clean_stale_temp_dirs():
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         user_tmp_dir = os.path.dirname(tmp_dir)
@@ -347,6 +359,8 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
             f.seek(MUSIC_ID_OFFSET)
             f.write(bytes([music_id]))
 
+        remove_file(course_filepath)  # It may be a hard link; unlink early.
+
         rarc.pack(course_dirpath, course_filepath)
 
 
@@ -386,6 +400,8 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
                     new_filename = f'{course_name}_{parts[1]}'
                     new_filepath = os.path.join(new_dirpath, new_filename)
                     os.rename(filepath, new_filepath)
+
+        remove_file(archive_filepath)  # It may be a hard link; unlink early.
 
         rarc.pack(new_dirpath, archive_filepath)
 
@@ -503,6 +519,8 @@ def add_controls_to_title_image(filepath: str, language: str):
             image.paste(word, box, word)
         image.save(tmp_filepath)
 
+        remove_file(filepath)  # It may be a hard link; unlink early.
+
         convert_png_to_bti(tmp_filepath, filepath, 'RGB5A3')
 
 
@@ -557,6 +575,8 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
         image = image.convert(original_mode)
         image.save(tmp_filepath)
 
+        remove_file(filepath)  # It may be a hard link; unlink early.
+
         convert_png_to_bti(tmp_filepath, filepath, 'IA4')
 
 
@@ -607,6 +627,8 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
         tmp_filepath = os.path.join(tmp_dir,
                                     f'{os.path.splitext(os.path.basename(filepath))[0]}.png')
         image.save(tmp_filepath)
+
+        remove_file(filepath)  # It may be a hard link; unlink early.
 
         convert_png_to_bti(tmp_filepath, filepath, image_format)
 
@@ -674,6 +696,8 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
 
         # If the audio has been resampled, let the last block size be auto-determined.
         last_block_size = ast_info['last_block_size'] if sample_rate_ratio == 1 else None
+
+        remove_file(filepath)  # It may be a hard link; unlink early.
 
         ast_converter.convert_to_ast(wav_filepath,
                                      filepath,
@@ -837,15 +861,15 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
                     return stem + ext
 
                 page_cupname_filepath = with_page_index_suffix(cupname_filepath)
-                shutil.copyfile(cupname_filepath, page_cupname_filepath)
+                make_link(cupname_filepath, page_cupname_filepath)
                 if not skip_cup_names:
                     add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
-                shutil.copyfile(page_cupname_filepath,
-                                page_cupname_filepath.replace('courseselect', 'lanplay'))
+                make_link(page_cupname_filepath,
+                          page_cupname_filepath.replace('courseselect', 'lanplay'))
 
             if not skip_cup_names:
                 add_dpad_to_cup_name_image(cupname_filepath, -1)
-            shutil.copyfile(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
+            make_link(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
 
     log.info('Cup names patched.')
 
@@ -939,11 +963,15 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             # Start off with a copy of the original directories. Relevant files will be replaced
             # next.
             if not os.path.isdir(page_course_dirpath):
-                shutil.copytree(course_dirpath, page_course_dirpath)
+                shutil.copytree(course_dirpath, page_course_dirpath, copy_function=make_link)
             if not os.path.isdir(page_coursename_dirpath):
-                shutil.copytree(coursename_dirpath, page_coursename_dirpath)
+                shutil.copytree(coursename_dirpath,
+                                page_coursename_dirpath,
+                                copy_function=make_link)
             if not os.path.isdir(page_staffghosts_dirpath):
-                shutil.copytree(staffghosts_dirpath, page_staffghosts_dirpath)
+                shutil.copytree(staffghosts_dirpath,
+                                page_staffghosts_dirpath,
+                                copy_function=make_link)
 
             # Parse INI file.
             try:
@@ -993,10 +1021,10 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                                                         f'{COURSES[track_index]}.arc')
                 page_track_mp_50cc_filepath = os.path.join(page_course_dirpath,
                                                            f'{COURSES[track_index]}L.arc')
-                shutil.copy2(track_filepath, page_track_filepath)
-                shutil.copy2(track_mp_filepath, page_track_mp_filepath)
-                shutil.copy2(track_50cc_filepath, page_track_50cc_filepath)
-                shutil.copy2(track_mp_50cc_filepath, page_track_mp_50cc_filepath)
+                make_link(track_filepath, page_track_filepath)
+                make_link(track_mp_filepath, page_track_mp_filepath)
+                make_link(track_50cc_filepath, page_track_50cc_filepath)
+                make_link(track_mp_50cc_filepath, page_track_mp_50cc_filepath)
 
                 patch_music_id_in_bol_file(page_track_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
@@ -1013,8 +1041,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                                                    f'{COURSES[track_index]}.arc')
                 page_track_mp_filepath = os.path.join(page_course_dirpath,
                                                       f'{COURSES[track_index]}L.arc')
-                shutil.copy2(track_filepath, page_track_filepath)
-                shutil.copy2(track_mp_filepath, page_track_mp_filepath)
+                make_link(track_filepath, page_track_filepath)
+                make_link(track_mp_filepath, page_track_mp_filepath)
 
                 patch_music_id_in_bol_file(page_track_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
@@ -1027,7 +1055,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             if os.path.isfile(ght_filepath):
                 page_ght_filepath = os.path.join(page_staffghosts_dirpath,
                                                  f'{COURSES[track_index]}.ght')
-                shutil.copy2(ght_filepath, page_ght_filepath)
+                make_link(ght_filepath, page_ght_filepath)
             else:
                 log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
 
@@ -1046,13 +1074,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                     lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
                 if os.path.isfile(lap_music_normal_filepath):
                     dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
-                    shutil.copy2(lap_music_normal_filepath, dst_ast_filepath)
+                    make_link(lap_music_normal_filepath, dst_ast_filepath)
                     conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
 
                     lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
                     if os.path.isfile(lap_music_fast_filepath):
                         dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
-                        shutil.copy2(lap_music_fast_filepath, dst_ast_filepath)
+                        make_link(lap_music_fast_filepath, dst_ast_filepath)
                         conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
                     else:
                         log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
@@ -1115,7 +1143,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
 
                 page_coursename_filepath = os.path.join(page_coursename_language_dirpath,
                                                         f'{COURSES[track_index]}_name.bti')
-                shutil.copy2(logo_filepath, page_coursename_filepath)
+                make_link(logo_filepath, page_coursename_filepath)
 
             # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
             # However, if extended memory has been set, the retail dimensions can be used instead.
@@ -1162,6 +1190,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                                          reducing_gap=3.0)
                     image.save(png_tmp_filepath)
 
+                    remove_file(filepath)  # It may be a hard link; unlink early.
+
                     convert_png_to_bti(png_tmp_filepath, filepath, 'CMPR')
 
             expected_languages = os.listdir(scenedata_dirpath)
@@ -1196,14 +1226,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                                                                PREVIEW_IMAGE_SIZE[1], 'CMPR',
                                                                (0, 0, 0, 255))
                 page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
-                shutil.copy2(preview_filepath, page_preview_filepath)
+                make_link(preview_filepath, page_preview_filepath)
 
                 label_filepath = find_or_generate_image_path(language, 'track_name.bti', 256, 32,
                                                              'IA4', (0, 0, 0, 0))
                 page_label_filepath = os.path.join(courseselect_dirpath, page_label_filename)
-                shutil.copy2(label_filepath, page_label_filepath)
+                make_link(label_filepath, page_label_filepath)
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
-                shutil.copy2(label_filepath, page_label_filepath)
+                make_link(label_filepath, page_label_filepath)
 
             # Gather minimap values.
             minimap_filepath = os.path.join(track_dirpath, 'minimap.json')
