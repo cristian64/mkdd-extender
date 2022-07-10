@@ -605,6 +605,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options_action = edit_menu.addAction('Options')
         options_action.setIcon(options_icon)
         options_action.triggered.connect(self._on_options_action_triggered)
+        tools_menu = menu.addMenu('Tools')
+        pack_generator_action = tools_menu.addAction('Pack Generator')
+        pack_generator_action.triggered.connect(self._on_pack_generator_action_triggered)
         help_menu = menu.addMenu('Help')
         instructions_action = help_menu.addAction('Instructions')
         instructions_action.triggered.connect(self._open_instructions_dialog)
@@ -1348,6 +1351,133 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     if option_value:
                         options_strings.append(f'{option_as_argument}={option_value}')
         self._options_edit.setText(' '.join(options_strings))
+
+    def _on_pack_generator_action_triggered(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setMinimumWidth(dialog.fontMetrics().averageCharWidth() * 80)
+        dialog.setWindowTitle('Pack Generator')
+        layout = QtWidgets.QVBoxLayout(dialog)
+        description_label = QtWidgets.QLabel()
+        description_label.setWordWrap(True)
+        description_label.setText(
+            'This is a helper tool that copies, extracts, and flattens the custom tracks that are '
+            'currently mapped to each of the 48 slots.'
+            '\n\n'
+            'Its main purpose is to provide a directory of custom tracks that can be used with the '
+            'MKDD Extender in command-line mode.')
+        layout.addWidget(description_label)
+        layout.addSpacing(dialog.fontMetrics().height())
+        output_directory_layout = QtWidgets.QFormLayout()
+        output_directory_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        output_directory_edit = PathEdit('Select Output Directory',
+                                         QtWidgets.QFileDialog.AcceptSave,
+                                         QtWidgets.QFileDialog.Directory)
+        path = self._settings.value('miscellaneous/pack_generator_path')
+        if path:
+            output_directory_edit.set_path(path)
+        path = self._settings.value('miscellaneous/pack_generator_last_dir')
+        if path:
+            output_directory_edit.set_last_dir(path)
+
+        def on_output_directory_textChanged(dirpath: str):
+            _ = dirpath
+            self._settings.setValue('miscellaneous/pack_generator_path',
+                                    output_directory_edit.get_path())
+            self._settings.setValue('miscellaneous/pack_generator_last_dir',
+                                    output_directory_edit.get_last_dir())
+
+        output_directory_edit.textChanged.connect(on_output_directory_textChanged)
+        output_directory_layout.addRow('Output Directory', output_directory_edit)
+        layout.addLayout(output_directory_layout)
+        layout.addStretch()
+        layout.addSpacing(dialog.fontMetrics().height() * 2)
+
+        def generate_pack():
+            dirpath = output_directory_edit.get_path()
+
+            if not dirpath:
+                raise mkdd_extender.MKDDExtenderError('Output directory has not been set.')
+
+            os.makedirs(dirpath, exist_ok=True)
+
+            if not os.path.isdir(dirpath):
+                raise mkdd_extender.MKDDExtenderError(
+                    'Output path already exists, but it is not a directory.')
+
+            if os.listdir(dirpath):
+                raise mkdd_extender.MKDDExtenderError('Output directory is not empty.')
+
+            names = []
+            for item in self._get_page_items():
+                name = self._item_text_to_name.get(item.text())
+                if name:
+                    names.append(name)
+            if len(names) != 48:
+                raise mkdd_extender.MKDDExtenderError(
+                    'Please make sure that all slots have been assigned to a valid custom track.')
+
+            tracks_dirpath = self._custom_tracks_directory_edit.get_path()
+            for i, name in enumerate(names):
+                src_path = os.path.join(tracks_dirpath, name)
+
+                # If the name had a recognizable prefix (probably as part of a previos run), get rid
+                # of it.
+                parts = name.split('_', maxsplit=1)
+                if len(parts) > 1 and re.match(r'[A-C][0-1][0-9].?', parts[0]):
+                    filtered_name = parts[1]
+                else:
+                    filtered_name = name
+
+                # Also drop the potential exception, as any archive will be extracted.
+                if filtered_name.endswith('.zip'):
+                    filtered_name = filtered_name[:-len('.zip')]
+
+                page_index = i // 16
+                track_number = i % 16 + 1
+                letter = chr(ord('A') + page_index)
+                prefix = f'{letter}{track_number:02}'
+
+                dst_dirname = f'{prefix}_{filtered_name}'
+                dst_dirpath = os.path.join(dirpath, dst_dirname)
+
+                mkdd_extender.extract_and_flatten(src_path, dst_dirpath)
+
+        def on_generate_button_clicked():
+            error_message = None
+            exception_info = None
+
+            try:
+                progress_dialog = ProgressDialog('Processing custom tracks...', generate_pack, self)
+                progress_dialog.execute_and_wait()
+
+            except mkdd_extender.MKDDExtenderError as e:
+                error_message = str(e)
+            except Exception as e:
+                error_message = str(e)
+                exception_info = traceback.format_exc()
+
+            if error_message is not None:
+                error_message = error_message or 'Unknown error'
+
+                icon_name = 'error'
+                title = 'Error'
+                text = error_message
+                detailed_text = exception_info
+            else:
+                icon_name = 'success'
+                title = 'Success!!'
+                text = 'Custom tracks processed successfully.'
+                detailed_text = ''
+
+            show_message(icon_name, title, text, detailed_text, self)
+
+        generate_button = QtWidgets.QPushButton('Generate')
+        generate_button.clicked.connect(on_generate_button_clicked)
+        bottom_layout = QtWidgets.QHBoxLayout()
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(generate_button)
+        layout.addLayout(bottom_layout)
+        dialog.exec_()
 
     def _build(self):
         error_message = None
