@@ -1442,6 +1442,50 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         # NOTE: After this change, it will be mandatory to increase the emulated memory size in
         # Dolphin to 32 MiB, or else the game will crash to a green screen.
 
+    if not args.skip_minimap_transforms_removal:
+        # The game has some logic for modifying the scale and position of the minimaps. This logic
+        # uses hardcoded float values for each course, and for each layout (1P, 2P, and 3P/4P).
+        # Obviously, the hardcoded float values will not suit all custom tracks.
+        #
+        # The float values live in static memory, and it's uncertain from which places these values
+        # are referenced; they cannot be changed. The MKDD Track Patcher modifies the `lfs`
+        # instructions that load the float values to pick and choose some of the smaller values
+        # among the available float values that are hardcoded in the static memory. This is tedious
+        # work that we'd have to do implement with Gecko codes, and there is no guarantee that other
+        # arbitrary numbers will be better (or worse).
+        #
+        # For the MKDD Extender, instead of replacing the `lfs` instructions, the setter functions
+        # that store the values (`Race2DParam::setX()`, `Race2DParam::setY()`, and
+        # `Race2DParam::setS()`) will be incapacitated (no-op). According to Ghidra, functions are
+        # only used from `Race2D::__ct()`, and only for the purpose of setting the float values for
+        # the minimap transforms.
+        #
+        # Luckily, the functions only have two instructions (`stfs` and `blr`), and match in all
+        # regions. The first instruction will be turned into a no-op.
+
+        FUNCTIONS_INSTRUCTIONS = bytes(
+            (0xd0, 0x23, 0x00, 0x14, 0x4e, 0x80, 0x00, 0x20, 0xd0, 0x23, 0x00, 0x10, 0x4e, 0x80,
+             0x00, 0x20, 0xd0, 0x23, 0x00, 0x0c, 0x4e, 0x80, 0x00, 0x20))
+
+        NEW_FUNCTIONS_INSTRUCTIONS = bytes(
+            (0x60, 0x00, 0x00, 0x00, 0x4e, 0x80, 0x00, 0x20, 0x60, 0x00, 0x00, 0x00, 0x4e, 0x80,
+             0x00, 0x20, 0x60, 0x00, 0x00, 0x00, 0x4e, 0x80, 0x00, 0x20))
+
+        log.info('Removing minimap transforms...')
+
+        with open(dol_path, 'rb') as f:
+            data = f.read()
+
+        functions_offset = data.find(FUNCTIONS_INSTRUCTIONS)
+        if functions_offset < 0:
+            raise MKDDExtenderError(
+                'Unable to locate minimap transforms functions in DOL file. Re-run with '
+                '--skip-minimap-transforms-removal to proceed.')
+
+        with open(dol_path, 'r+b') as f:
+            f.seek(functions_offset)
+            f.write(NEW_FUNCTIONS_INSTRUCTIONS)
+
     audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data)
 
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
@@ -1481,6 +1525,16 @@ OPTIONAL_ARGUMENTS = {
             'If specified, cup names will be left untouched.\n\n'
             'By default, cup names are modified to include an icon that indicates the currently '
             'selected course page.',
+        ),
+        (
+            'Skip Minimap Transforms Removal',
+            bool,
+            'If specified, minimap transforms will be left untouched.\n\n'
+            'By default, minimap transforms are removed.\n\n'
+            'These transforms, that depend on hardcoded float values, are used in the game to make '
+            'the minimaps in the stock courses look larger and better aligned. However, custom '
+            'tracks will rarely benefit from these specialized transforms; preserving these '
+            'transforms will likely make some minimaps in custom tracks be cut off screen.',
         ),
     ),
     'Audio options': (
