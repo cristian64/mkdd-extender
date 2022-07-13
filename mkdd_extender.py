@@ -123,6 +123,8 @@ linux = platform.system() == 'Linux'
 windows = platform.system() == 'Windows'
 macos = platform.system() == 'Darwin'
 
+frozen = getattr(sys, 'frozen', False)
+
 
 class _CustomFormatter(logging.Formatter):
     yellow = '\x1b[0;33m' if not windows else ''
@@ -1613,12 +1615,14 @@ def create_args_parser() -> argparse.ArgumentParser:
                         type=str,
                         help='Path where the modified ISO file will be written.')
 
-    parser.add_argument(
-        '--gui',
-        action='store_true',
-        help='If specified, the application will be launched in GUI mode.\n\n'
-        'This argument is provided for discoverability and documentation purposes; when the '
-        'application is executed with no arguments, it will be launched in GUI mode by default.')
+    if not windows or not frozen:
+        parser.add_argument(
+            '--gui',
+            action='store_true',
+            help='If specified, the application will be launched in GUI mode.\n\n'
+            'This argument is provided for discoverability and documentation purposes; when the '
+            'application is executed with no arguments, it will be launched in GUI mode by '
+            'default.')
 
     for group_name, group_options in OPTIONAL_ARGUMENTS.items():
         argument_group = parser.add_argument_group(group_name)
@@ -1756,8 +1760,14 @@ def extend_game(args: argparse.Namespace):
 def main():
     clean_stale_temp_dirs()
 
-    # When no arguments are provided, the application will be launched in GUI mode.
-    if len(sys.argv) == 1 or '--gui' in sys.argv:
+    # When no arguments are provided, the application will be launched in GUI mode. On Windows, if
+    # the application is frozen, the mode is determined by the executable name.
+    if not windows or not frozen:
+        gui_mode = len(sys.argv) == 1 or '--gui' in sys.argv
+    else:
+        gui_mode = '-cli' not in os.path.basename(sys.executable)
+
+    if gui_mode:
         try:
             import gui
             sys.exit(gui.run())
