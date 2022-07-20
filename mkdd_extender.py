@@ -1781,8 +1781,11 @@ def main():
     except MKDDExtenderError as e:
         log.error(str(e))
         sys.exit(1)
+    except AssertionError as e:
+        log.exception(str(e) or 'Assertion error.')
+        sys.exit(1)
     except Exception as e:
-        log.exception(str(e))
+        log.exception(str(e) or 'Unknown error.')
         sys.exit(1)
 
 
