@@ -763,8 +763,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._log_splitter.setOrientation(QtCore.Qt.Vertical)
         self._log_splitter.addWidget(main_widget)
         self._log_splitter.addWidget(log_table)
-        self._log_splitter.setStretchFactor(0, 4)
-        self._log_splitter.setStretchFactor(1, 1)
         self._log_splitter.setCollapsible(0, False)
         self._log_splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                          QtWidgets.QSizePolicy.Expanding)
