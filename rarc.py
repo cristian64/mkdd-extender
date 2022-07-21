@@ -103,7 +103,11 @@ def extract(src_filepath: str, dst_dirpath: str):
     assert entry_section_offset % __ALIGNMENT == 0
     assert string_table_offset % __ALIGNMENT == 0
     assert entry_data_section_size % __ALIGNMENT == 0
-    assert string_table_size % __ALIGNMENT == 0
+    if string_table_size % __ALIGNMENT != 0:
+        # NOTE: Again, there is a tool out there that fails to pad the string table. Instead of
+        # raising an assertion error, a warning will be reported.
+        log.warning(f'String table\'s size ({string_table_size} bytes) is not a multiple of '
+                    f'{__ALIGNMENT}; it should have been padded.')
 
     entry_data_section = data[entry_data_section_offset:entry_data_section_offset +
                               entry_data_section_size]
