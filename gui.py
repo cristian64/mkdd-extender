@@ -457,6 +457,10 @@ class LogTable(QtWidgets.QTableWidget):
         mkdd_extender.log.addHandler(self._log_handler)
 
     def _on_log_handler_log_message_received(self, log_message: 'tuple[str, int, str, str, str]'):
+        MAX_ROW_COUNT = 20000
+        if self.rowCount() >= MAX_ROW_COUNT:
+            self.removeRow(0)
+
         row = self.rowCount()
         self.insertRow(row)
 
