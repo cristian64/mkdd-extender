@@ -300,7 +300,7 @@ In the unedited game, the stock values for the first 32 integers are:
     0x7C    33     Sherbet Land (final lap)
 
 This list matches the order in the BSFT file (and in the BSFT section in the BAA file). The rest of
-the values in the interger array relate to other file indices such as the goal sound or the
+the values in the integer array relate to other file indices such as the goal sound or the
 commemoration sound, but they are not relevant at this point.
 
 For the JAP and PAL versions, the address has been figured out by searching for
@@ -762,7 +762,7 @@ https://mariokartwii.com/showthread.php?tid=1052.
 Other nice sources:
 - https://www.cs.uaf.edu/2011/fall/cs301/lecture/11_21_PowerPC.html
 - https://mariapilot.noblogs.org/files/2021/01/CodeWarrior-C-C-and-Assembly-Language-Reference.pdf
-  (but reponds with 404 now)
+  (but responds with 404 now)
 
 Note that the address of the function in the debug build does change.
 """

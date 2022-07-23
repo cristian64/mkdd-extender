@@ -1422,8 +1422,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for i, name in enumerate(names):
                 src_path = os.path.join(tracks_dirpath, name)
 
-                # If the name had a recognizable prefix (probably as part of a previos run), get rid
-                # of it.
+                # If the name had a recognizable prefix (probably as part of a previous run), get
+                # rid of it.
                 parts = name.split('_', maxsplit=1)
                 if len(parts) > 1 and re.match(r'[A-C][0-1][0-9].?', parts[0]):
                     filtered_name = parts[1]
@@ -1549,7 +1549,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         else:
             icon_name = 'success'
             title = 'Success!!'
-            text = 'ISO file has been generated sucessfully.'
+            text = 'ISO file has been generated successfully.'
             detailed_text = ''
 
         show_message(icon_name, title, text, detailed_text, self)

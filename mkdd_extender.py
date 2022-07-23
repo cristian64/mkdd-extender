@@ -1519,7 +1519,7 @@ OPTIONAL_ARGUMENTS = {
             bool,
             'If specified, menu titles will be left untouched.\n\n'
             'By default, the menu titles in the **SELECT COURSE** and **SELECT CUP** screens are '
-            'modified to include an icon that shows the controls to switch betweeen course pages.',
+            'modified to include an icon that shows the controls to switch between course pages.',
         ),
         (
             'Skip Cup Names',
