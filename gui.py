@@ -441,7 +441,8 @@ class LogTable(QtWidgets.QTableWidget):
         clear_log_action.triggered.connect(lambda: self.setRowCount(0))
         self.addAction(clear_log_action)
 
-        self.log_message_received.connect(self._on_log_handler_log_message_received)
+        self.log_message_received.connect(self._on_log_handler_log_message_received,
+                                          QtCore.Qt.QueuedConnection)
 
         log_table = self
 
