@@ -3,11 +3,14 @@ Graphical user interface for the MKDD Extender.
 """
 import argparse
 import collections
+import concurrent.futures
+import configparser
 import contextlib
 import datetime
 import json
 import logging
 import os
+import queue
 import re
 import signal
 import sys
@@ -329,6 +332,292 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
                 item = self.item(row, column)
                 if item is None:
                     self.setItem(row, column, QtWidgets.QTableWidgetItem(str()))
+
+
+def shutdown_executor(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
+    if sys.version_info >= (3, 9):
+        thread_pool_executor.shutdown(wait=False, cancel_futures=True)
+    else:
+        thread_pool_executor.shutdown(wait=False)
+        cancel_futures(thread_pool_executor)
+
+
+def cancel_futures(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
+    while True:
+        try:
+            work_item = thread_pool_executor._work_queue.get_nowait()
+        except queue.Empty:
+            break
+        if work_item is not None:
+            work_item.future.cancel()
+
+
+class InfoViewWidget(QtWidgets.QScrollArea):
+
+    width_provided = QtCore.Signal()
+
+    _images_loaded = QtCore.Signal(object)
+
+    def __init__(self, parent: QtWidgets.QWidget = None):
+        super().__init__(parent=parent)
+
+        palette = self.palette()
+        palette.setBrush(self.backgroundRole(), palette.dark())
+        self.setPalette(palette)
+        self.setWidgetResizable(True)
+
+        self._pending_image_filepaths_by_language = None
+        self._image_group_boxes = None
+        self._images_loaded.connect(self._on_images_loaded)
+
+        # Loading BTI files is somehow expensive. Once an image is loaded, it is cached using its
+        # checksum as key. Very often custom tracks reuse the same images for all languages; this
+        # helps greatly.
+        # To avoid calculating checksums often, another cache is used to map filepaths to checksums.
+        self._checksum_cache = {}
+        self._pixmap_cache = {}
+        self._thread_pool_executor = concurrent.futures.ThreadPoolExecutor(1)
+        self._child_thread_pool_executor = concurrent.futures.ThreadPoolExecutor(4)
+        self._about_to_quit = False
+
+        def shutdown_executors():
+            self._about_to_quit = True
+            shutdown_executor(self._child_thread_pool_executor)
+            shutdown_executor(self._thread_pool_executor)
+
+        QtWidgets.QApplication.instance().aboutToQuit.connect(shutdown_executors)
+
+        self.show_placeholder_message()
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):
+        super().resizeEvent(event)
+
+        if not event.oldSize().width() and event.size().width():
+            self.width_provided.emit()
+
+    def show_placeholder_message(self):
+        self._build_label('Select a custom track to view its details', QtGui.QColor(100, 100, 100))
+
+    def show_not_valid_message(self):
+        self._build_label('Unable to preview selected custom track', QtGui.QColor(170, 20, 20))
+
+    def set_path(self, path: str):
+        if os.path.isfile(path):
+            self._build_label('Compressed archives cannot be previewed', QtGui.QColor(150, 130, 10))
+            return
+
+        dirpath = path
+
+        trackinfo_filepath = None
+        for rootpath, _dirnames, filenames in os.walk(dirpath):
+            for filename in filenames:
+                if filename == 'trackinfo.ini':
+                    trackinfo_filepath = os.path.join(rootpath, 'trackinfo.ini')
+                    break
+            if trackinfo_filepath is not None:
+                break
+
+        trackinfo = configparser.ConfigParser()
+        try:
+            trackinfo.read(trackinfo_filepath)
+            track_name = trackinfo['Config'].get('trackname') or ''
+            author = trackinfo['Config'].get('author') or ''
+            auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track') or ''
+        except Exception:
+            self.show_not_valid_message()
+            return
+
+        dirpath = os.path.dirname(trackinfo_filepath)
+        dirname = os.path.basename(dirpath)
+
+        minimap_filepath = os.path.join(dirpath, 'minimap.json')
+        minimap_present = os.path.isfile(minimap_filepath)
+        staffghost_filepath = os.path.join(dirpath, 'staffghost.ght')
+        staffghost_present = os.path.isfile(staffghost_filepath)
+
+        IMAGE_FILENAMES = ('track_image.bti', 'track_name.bti', 'track_big_logo.bti',
+                           'track_small_logo.bti')
+
+        image_filepaths_by_language = {}
+        for language in mkdd_extender.LANGUAGES:
+            image_filepaths = list()
+            image_filepaths_by_language[language] = image_filepaths
+            for image_filename in IMAGE_FILENAMES:
+                image_filepaths.append(
+                    os.path.join(dirpath, 'course_images', language, image_filename))
+
+        widget = QtWidgets.QWidget()
+        widget.setPalette(self.palette())  # To inherit background color from parent.
+        layout = QtWidgets.QVBoxLayout(widget)
+
+        info_box = QtWidgets.QGroupBox('Info')
+        info_box.setLayout(QtWidgets.QVBoxLayout())
+        info_widget = QtWidgets.QLabel()
+        info_widget.setText(
+            textwrap.dedent(f"""\
+            <table>
+            <tr><td><b>Track Name: </b> </td><td>{track_name}</td></tr>
+            <tr><td><b>Author: </b> </td><td>{author}</td></tr>
+            <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
+            <tr><td><b>Minimap Coordinates: </b> </td><td>{'Yes' if minimap_present else ''}</td></tr>
+            <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
+            <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
+            </table>
+        """))
+        info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        info_box.layout().addWidget(info_widget)
+        layout.addWidget(info_box)
+
+        self._image_group_boxes = QtWidgets.QWidget()
+        self._image_group_boxes.setLayout(QtWidgets.QVBoxLayout())
+        self._image_group_boxes.layout().setContentsMargins(0, 0, 0, 0)
+        self._show_image_files(image_filepaths_by_language)  # May load images asynchronously.
+        layout.addWidget(self._image_group_boxes)
+
+        layout.addStretch()
+
+        self.setWidget(widget)
+        widget.show()
+
+    def _verify_image_files_ready(self, image_filepaths_by_language: 'dict[str, list[str]]'):
+        for image_filepaths in image_filepaths_by_language.values():
+            for image_filepath in image_filepaths:
+                checksum = self._checksum_cache.get(image_filepath)
+                if checksum is None:
+                    return False
+                pixmap = self._pixmap_cache.get(checksum)
+                if pixmap is None:
+                    return False
+        return True
+
+    def _show_image_files(self, image_filepaths_by_language: 'dict[str, list[str]]'):
+        if not self._verify_image_files_ready(image_filepaths_by_language):
+            # Cancel all pending futures to prioritize the current request.
+            cancel_futures(self._thread_pool_executor)
+
+            self._pending_image_filepaths_by_language = image_filepaths_by_language
+            self._thread_pool_executor.submit(self._load_images_async, image_filepaths_by_language)
+            return
+        self._pending_image_filepaths_by_language = None
+
+        # Get checksums and group them by language. Most custom tracks share the same images for all
+        # the languages, so they are shown within the same box to save vertical space.
+        language_checksums = {}
+        for language, image_filepaths in image_filepaths_by_language.items():
+            checksums = []
+            for image_filepath in image_filepaths:
+                checksum = self._checksum_cache[image_filepath]
+                checksums.append(checksum)
+            checksums = tuple(checksums)
+            if checksums in language_checksums:
+                language_checksums[checksums].append(language)
+            else:
+                language_checksums[checksums] = [language]
+
+        # An group box is created for each language (or languages, if they share checksums).
+        for checksums, languages in language_checksums.items():
+            labels = []
+            at_least_one_image = False
+
+            for checksum in checksums:
+                pixmap = self._pixmap_cache.get(checksum)
+                if pixmap is not None and not pixmap.isNull():
+                    label = QtWidgets.QLabel()
+                    label.setPixmap(pixmap)
+                    labels.append(label)
+                    at_least_one_image = True
+                else:
+                    labels.append(None)
+
+            if not at_least_one_image:
+                continue
+
+            language_box = QtWidgets.QGroupBox(f'{"/".join(languages)} Images')
+            language_box.setLayout(QtWidgets.QHBoxLayout())
+
+            assert len(labels) == 4
+
+            for label_top, label_bottom in (labels[:2], labels[2:4]):
+                if (label_top, label_bottom) == (None, None):
+                    continue
+
+                if label_top is None or label_bottom is None:
+                    language_box.layout().addWidget(label_top or label_bottom)
+                    continue
+
+                double_label_widget = QtWidgets.QWidget()
+                double_label_layout = QtWidgets.QVBoxLayout(double_label_widget)
+                double_label_layout.setContentsMargins(0, 0, 0, 0)
+                double_label_layout.addWidget(label_top)
+                double_label_layout.addWidget(label_bottom)
+                language_box.layout().addWidget(double_label_widget)
+
+            language_box.layout().addStretch()
+
+            self._image_group_boxes.layout().addWidget(language_box)
+
+    def _load_images_async(self, image_filepaths_by_language: 'dict[str, list[str]]'):
+        for _language, image_filepaths in image_filepaths_by_language.items():
+            # The images within a given language will likely be different (different checksum),
+            # which means they can be parallelized without risking loading the same image twice.
+            futures = []
+
+            for image_filepath in image_filepaths:
+                futures.append(
+                    self._child_thread_pool_executor.submit(self._load_image, image_filepath))
+
+            while not self._about_to_quit:
+                done, _undone = concurrent.futures.wait(futures, timeout=0.250)
+                if len(futures) == len(done):
+                    break
+
+            if self._about_to_quit:
+                return
+
+        self._images_loaded.emit(image_filepaths_by_language)
+
+    def _load_image(self, filepath: str):
+        checksum = self._checksum_cache.get(filepath)
+        if checksum is None:
+            try:
+                checksum = mkdd_extender.md5sum(filepath)
+            except Exception:
+                checksum = False
+            self._checksum_cache[filepath] = checksum
+
+        if checksum in self._pixmap_cache:
+            return
+
+        pixmap = QtGui.QPixmap()
+
+        if checksum is not False:
+            try:
+                image = mkdd_extender.convert_bti_to_image(filepath)
+                if image is not None:
+                    if image.mode != 'RGBA':
+                        image = image.convert('RGBA')
+                    data = image.tobytes("raw", "RGBA")
+                    image = QtGui.QImage(data, *image.size, QtGui.QImage.Format_RGBA8888)
+                    pixmap = QtGui.QPixmap.fromImage(image)
+            except Exception:
+                pass
+
+        self._pixmap_cache[checksum] = pixmap
+
+    def _on_images_loaded(self, image_filepaths_by_language: 'dict[str, list[str]]'):
+        if image_filepaths_by_language == self._pending_image_filepaths_by_language:
+            self._show_image_files(image_filepaths_by_language)
+
+    def _build_label(self, text: str, color: QtGui.QColor = None):
+        label = QtWidgets.QLabel(text)
+        label.setWordWrap(True)
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        palette = self.palette()  # To inherit background color from parent.
+        if color is not None:
+            palette.setColor(label.foregroundRole(), color)
+        label.setPalette(palette)
+        self.setWidget(label)
+        label.show()
 
 
 class ProgressDialog(QtWidgets.QProgressDialog):
@@ -718,11 +1007,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if page_table != other_page_table:
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
+        self._info_view = InfoViewWidget()
+        self._info_view.width_provided.connect(self._update_info_view)
         self._splitter = QtWidgets.QSplitter()
         self._splitter.addWidget(custom_tracks_widget)
         self._splitter.addWidget(pages_widget)
+        self._splitter.addWidget(self._info_view)
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 4)
+        self._splitter.setStretchFactor(2, 2)
         self._splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                      QtWidgets.QSizePolicy.Expanding)
 
@@ -1057,6 +1350,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._update_custom_tracks_filter()
 
         self._sync_emblems()
+        self._update_info_view()
 
     @contextlib.contextmanager
     def _blocked_page_signals(self):
@@ -1170,10 +1464,33 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _on_tables_itemSelectionChanged(self):
         self._sync_tables_selection()
+        self._update_info_view()
+
+    def _update_info_view(self):
+        if not self._info_view.width():
+            return
+
+        for table in list(self._page_tables) + [self._custom_tracks_table]:
+            for item in reversed(table.selectedItems()):
+                item_text = item.text()
+                if not item_text:
+                    self._info_view.show_placeholder_message()
+                else:
+                    name = self._item_text_to_name.get(item_text)
+                    if not name:
+                        self._info_view.show_not_valid_message()
+                    else:
+                        tracks_dirpath = self._custom_tracks_directory_edit.get_path()
+                        path = os.path.join(tracks_dirpath, name)
+                        self._info_view.set_path(path)
+                return
+
+        self._info_view.show_placeholder_message()
 
     def _on_page_table_itemChanged(self, item: QtWidgets.QTableWidgetItem):
         _ = item
         self._sync_emblems()
+        self._update_info_view()
 
         # Drag and drop events may generate several of these events in bursts. They need to be
         # grouped together as a single undo action.
@@ -1186,6 +1503,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if item.isSelected():
                     item.setText(str())
         self._sync_emblems()
+        self._update_info_view()
 
         self._pending_undo_actions += 1
         self._process_undo_action()
@@ -1223,6 +1541,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_item_values = self._undo_history[-1]
             self._set_page_item_values(page_item_values)
             self._sync_emblems()
+            self._update_info_view()
 
             self._update_undo_redo_actions()
 
@@ -1232,6 +1551,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._undo_history.append(page_item_values)
             self._set_page_item_values(page_item_values)
             self._sync_emblems()
+            self._update_info_view()
 
             self._update_undo_redo_actions()
 
