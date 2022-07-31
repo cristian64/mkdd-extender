@@ -408,6 +408,29 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
         rarc.pack(new_dirpath, archive_filepath)
 
 
+def convert_bti_to_image(filepath: str) -> Image:
+    assert filepath.endswith('.bti')
+
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        filename = os.path.basename(filepath)
+        tmp_filepath = os.path.join(tmp_dir, filename[:-len('.bti')] + '.png')
+
+        wimgt_name = 'wimgt.exe' if windows else 'wimgt-mac' if macos else 'wimgt'
+        wimgt_path = os.path.join(tools_dir, 'wimgt', wimgt_name)
+        command = (wimgt_path, 'decode', filepath, '-o', '-d', tmp_filepath)
+
+        try:
+            if 0 == run(command):
+                return Image.open(tmp_filepath).copy()
+        except Exception as e:
+            pass
+
+    try:
+        return bti.BTI(open(filepath, 'rb')).render()
+    except Exception:
+        return None
+
+
 def convert_bti_to_png(src_filepath: str, dst_filepath: str):
     assert src_filepath.endswith('.bti')
 
