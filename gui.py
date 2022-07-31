@@ -2,6 +2,7 @@
 Graphical user interface for the MKDD Extender.
 """
 import argparse
+import atexit
 import collections
 import concurrent.futures
 import configparser
@@ -12,16 +13,19 @@ import logging
 import os
 import queue
 import re
+import shutil
 import signal
 import sys
 import textwrap
+import tempfile
 import threading
 import traceback
 
 from typing import Any
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
+import ast_converter
 import mkdd_extender
 
 FONT_FAMILIES = 'Liberation Mono, FreeMono, Nimbus Mono, Consolas, Courier New'
@@ -334,6 +338,142 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
                     self.setItem(row, column, QtWidgets.QTableWidgetItem(str()))
 
 
+class ASTPlayer(QtWidgets.QWidget):
+
+    _play_icon = None
+    _pause_icon = None
+    _audio_tmp_dir = None
+
+    def __init__(self, filepath: str, parent: QtWidgets.QWidget = None):
+        super().__init__(parent=parent)
+
+        self._ast_filepath = filepath
+        self._wav_filepath = None
+
+        self._media_player = None
+        self._audio_output = None
+
+        if ASTPlayer._play_icon is None:
+            play_icon_path = os.path.join(data_dir, 'gui', 'play.svg')
+            ASTPlayer._play_icon = QtGui.QIcon(play_icon_path)
+
+        if ASTPlayer._pause_icon is None:
+            pause_icon_path = os.path.join(data_dir, 'gui', 'pause.svg')
+            ASTPlayer._pause_icon = QtGui.QIcon(pause_icon_path)
+
+        self._play_button = QtWidgets.QPushButton(ASTPlayer._play_icon, '')
+        self._play_button.setCheckable(True)
+        height = self._play_button.sizeHint().height()
+        self._play_button.setFixedSize(height, height)
+        self._play_button.clicked.connect(self._on_play_button_clicked)
+
+        self._timeline_slider = QtWidgets.QSlider()
+        self._timeline_slider.setOrientation(QtCore.Qt.Horizontal)
+        self._timeline_slider.setEnabled(False)
+        self._timeline_slider.setMaximum(0)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._play_button)
+        layout.addWidget(self._timeline_slider)
+
+    def _initialize_media_player(self):
+        if self._media_player is not None:
+            return
+
+        if not self._wav_filepath or not os.path.isfile(self._wav_filepath):
+            error_message = None
+            exception_info = None
+
+            try:
+                progress_dialog = ProgressDialog('Converting AST audio file...',
+                                                 self._convert_audio_file, self)
+                progress_dialog.execute_and_wait()
+
+            except mkdd_extender.MKDDExtenderError as e:
+                error_message = str(e)
+            except AssertionError as e:
+                error_message = str(e) or 'Assertion error.'
+                exception_info = traceback.format_exc()
+            except Exception as e:
+                error_message = str(e)
+                exception_info = traceback.format_exc()
+
+            if error_message is not None:
+                error_message = error_message or 'Unknown error.'
+
+                icon_name = 'error'
+                title = 'Error'
+                text = error_message
+                detailed_text = exception_info
+
+                show_message(icon_name, title, text, detailed_text, self)
+
+        if not self._wav_filepath or not os.path.isfile(self._wav_filepath):
+            return
+
+        self._media_player = QtMultimedia.QMediaPlayer()
+        self._audio_output = QtMultimedia.QAudioOutput()
+        self._audio_output.setVolume(0.5)
+        self._media_player.setAudioOutput(self._audio_output)
+        self._media_player.setSource(QtCore.QUrl.fromLocalFile(self._wav_filepath))
+        self._media_player.playbackStateChanged.connect(self._on_media_player_playbackStateChanged)
+        self._media_player.seekableChanged.connect(self._on_media_player_seekableChanged)
+        self._media_player.durationChanged.connect(self._on_media_player_durationChanged)
+        self._media_player.positionChanged.connect(self._on_media_player_positionChanged)
+
+        self._timeline_slider.valueChanged.connect(self._on_timeline_slider_valueChanged)
+
+    def _convert_audio_file(self):
+        if ASTPlayer._audio_tmp_dir is None:
+            ASTPlayer._audio_tmp_dir = tempfile.mkdtemp(prefix=mkdd_extender.TEMP_DIR_PREFIX)
+            atexit.register(shutil.rmtree, ASTPlayer._audio_tmp_dir, ignore_errors=True)
+
+        wav_filepath = os.path.join(ASTPlayer._audio_tmp_dir, f'{hash(self._ast_filepath)}.wav')
+
+        if not os.path.isfile(wav_filepath):
+            ast_converter.convert_to_wav(self._ast_filepath, wav_filepath)
+
+        self._wav_filepath = wav_filepath
+
+    def _on_play_button_clicked(self, checked: bool = False):
+        if checked:
+            self._initialize_media_player()
+
+            if self._media_player is not None:
+                self._media_player.play()
+        else:
+            if self._media_player is not None:
+                self._media_player.pause()
+
+    def _on_media_player_playbackStateChanged(self, state: QtMultimedia.QMediaPlayer.PlaybackState):
+        playing = state == QtMultimedia.QMediaPlayer.PlayingState
+
+        with blocked_signals(self._play_button):
+            self._play_button.setChecked(playing)
+
+        icon = ASTPlayer._pause_icon if playing else ASTPlayer._play_icon
+        self._play_button.setIcon(icon)
+
+    def _on_media_player_seekableChanged(self, seekable: bool):
+        if seekable:
+            self._timeline_slider.setEnabled(True)
+
+    def _on_media_player_durationChanged(self, duration: int):
+        with blocked_signals(self._timeline_slider):
+            self._timeline_slider.setMaximum(duration)
+            self._timeline_slider.setPageStep(round(duration / 10))
+            self._timeline_slider.setSingleStep(round(duration / 100))
+
+    def _on_media_player_positionChanged(self, position: int):
+        with blocked_signals(self._timeline_slider):
+            self._timeline_slider.setValue(position)
+
+    def _on_timeline_slider_valueChanged(self, value: int):
+        with blocked_signals(self._media_player):
+            self._media_player.setPosition(value)
+
+
 def shutdown_executor(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
     if sys.version_info >= (3, 9):
         thread_pool_executor.shutdown(wait=False, cancel_futures=True)
@@ -365,6 +505,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         palette.setBrush(self.backgroundRole(), palette.dark())
         self.setPalette(palette)
         self.setWidgetResizable(True)
+
+        self._ast_metadata_cache = {}
 
         self._pending_image_filepaths_by_language = None
         self._image_group_boxes = None
@@ -446,6 +588,12 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 image_filepaths.append(
                     os.path.join(dirpath, 'course_images', language, image_filename))
 
+        AUDIO_FILENAMES = ('lap_music_normal.ast', 'lap_music_fast.ast')
+        audio_filepaths = tuple(
+            os.path.join(dirpath, audio_filename) for audio_filename in AUDIO_FILENAMES)
+        audio_filepaths = tuple(audio_filepath for audio_filepath in audio_filepaths
+                                if os.path.isfile(audio_filepath))
+
         widget = QtWidgets.QWidget()
         widget.setPalette(self.palette())  # To inherit background color from parent.
         layout = QtWidgets.QVBoxLayout(widget)
@@ -468,6 +616,19 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         info_box.layout().addWidget(info_widget)
         layout.addWidget(info_box)
 
+        if audio_filepaths:
+            audio_box = QtWidgets.QGroupBox('Audio Tracks')
+            audio_box.setLayout(QtWidgets.QFormLayout())
+            for audio_filepath in audio_filepaths:
+                text = 'Normal' if 'normal' in audio_filepath else 'Fast'
+                label = QtWidgets.QLabel(f'<b>{text} Pace:</b>')
+                ast_player = ASTPlayer(audio_filepath)
+                tool_tip = self._generate_ast_file_tool_tip(audio_filepath)
+                label.setToolTip(tool_tip)
+                ast_player.setToolTip(tool_tip)
+                audio_box.layout().addRow(label, ast_player)
+            layout.addWidget(audio_box)
+
         self._image_group_boxes = QtWidgets.QWidget()
         self._image_group_boxes.setLayout(QtWidgets.QVBoxLayout())
         self._image_group_boxes.layout().setContentsMargins(0, 0, 0, 0)
@@ -478,6 +639,51 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         self.setWidget(widget)
         widget.show()
+
+    def _generate_ast_file_tool_tip(self, ast_filepath) -> str:
+        metadata = self._ast_metadata_cache.get(ast_filepath)
+        if metadata is None:
+            metadata = ast_converter.get_ast_info(ast_filepath)
+            self._ast_metadata_cache[ast_filepath] = metadata
+
+        sample_count = metadata['sample_count']
+        sample_rate = metadata['sample_rate']
+        bit_depth = metadata['bit_depth']
+        channel_count = metadata['channel_count']
+        volume = metadata['volume']
+        looped = metadata['looped']
+        loop_start = metadata['loop_start']
+        loop_end = metadata['loop_end']
+
+        def human_readable_duration(sample_count: int) -> str:
+            duration = round(sample_count / sample_rate * 1000)
+            minutes = duration // 1000 // 60
+            seconds = duration // 1000 - minutes * 60
+            milliseconds = duration - (minutes * 60 + seconds) * 1000
+            text = []
+            if minutes:
+                text.append(f'{minutes} min')
+            if seconds:
+                text.append(f'{seconds} s')
+            if milliseconds:
+                text.append(f'{milliseconds} ms')
+            if not text:
+                text.append('0 s')
+            text.append(f'&nbsp;&nbsp;<small><small>({sample_count} samples)</small></small>')
+            return ' '.join(text)
+
+        return textwrap.dedent(f"""\
+            <table>
+            <tr><td><b>Duration: </b> </td><td>{human_readable_duration(sample_count)}</td></tr>
+            <tr><td><b>Sample Rate: </b> </td><td>{sample_rate} Hz</td></tr>
+            <tr><td><b>Bit Depth: </b> </td><td>{bit_depth}</td></tr>
+            <tr><td><b>Channel Count: </b> </td><td>{channel_count}</td></tr>
+            <tr><td><b>Volume: </b> </td><td>{volume}</td></tr>
+            <tr><td><b>Looped: </b> </td><td>{'Yes' if looped else ''}</td></tr>
+            <tr><td><b>Loop Start: </b> </td><td>{human_readable_duration(loop_start) if looped else ''}</td></tr>
+            <tr><td><b>Loop End: </b> </td><td>{human_readable_duration(loop_end) if looped else ''}</td></tr>
+            </table>
+        """)
 
     def _verify_image_files_ready(self, image_filepaths_by_language: 'dict[str, list[str]]'):
         for image_filepaths in image_filepaths_by_language.values():
