@@ -210,11 +210,16 @@ def clean_stale_temp_dirs():
 
 
 def run(command: list, verbose: bool = False, cwd: str = None) -> int:
+    creationflags = 0
+    if windows:
+        creationflags |= subprocess.CREATE_NO_WINDOW
+
     with subprocess.Popen(command,
                           stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE,
                           cwd=cwd,
-                          text=True) as process:
+                          text=True,
+                          creationflags=creationflags) as process:
         output, errors = process.communicate()
         if output and (verbose or (process.returncode and not errors)):
             log.info(output)
