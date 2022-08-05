@@ -125,7 +125,7 @@ def show_message(icon_name: str,
                 f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
 
             # If a detailed message is present, make sure the width is sufficient to show a few
-            # words per line (e.g. astack traces).
+            # words per line (e.g. stack traces).
             text_edit.setMinimumWidth(char_width * 60)
 
         for button in message_box.buttons():

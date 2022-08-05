@@ -1200,8 +1200,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                     if not os.path.isfile(png_tmp_filepath):
                         failed = True
                     if failed:
-                        log.warning(f'Unable to downscale BTI image ("{filepath}"). This mage will '
-                                    'be discarded.')
+                        log.warning(f'Unable to downscale BTI image ("{filepath}"). This image '
+                                    'will be discarded.')
                         os.remove(filepath)
                         return
 
