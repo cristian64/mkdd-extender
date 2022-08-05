@@ -1778,8 +1778,15 @@ def extend_game(args: argparse.Namespace):
         for _filepath, files_done in gcm_file.export_disc_to_iso_with_changed_files(args.output):
             if files_done > 0:
                 files_written = files_done
-        iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
-        log.info(f'ISO image written ({files_written} files - {iso_size} MiB).')
+        iso_size = os.path.getsize(args.output)
+        human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
+        log.info(f'ISO image written ({files_written} files - {human_readable_iso_size} MiB).')
+
+        MAX_ISO_SIZE = 1459978240
+        if iso_size > MAX_ISO_SIZE:
+            log.warning(f'ISO file ({iso_size} bytes) is larger than the size that GameCube or Wii '
+                        f'support ({MAX_ISO_SIZE} bytes). The game will work on Dolphin, but will '
+                        'likely not work on real hardware.')
 
         elapsed_time = time.monotonic() - start_time
         log.info(f'Process completed in {elapsed_time:.2f} seconds.')
