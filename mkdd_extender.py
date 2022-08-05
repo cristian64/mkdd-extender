@@ -1206,7 +1206,6 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                         return
 
                     image = Image.open(png_tmp_filepath)
-                    image.convert('RGBA')
 
                     try:
                         resampling_filter = Image.Resampling.HAMMING
