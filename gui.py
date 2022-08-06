@@ -86,11 +86,7 @@ def blocked_signals(obj: QtCore.QObject):
             obj.blockSignals(False)
 
 
-def show_message(icon_name: str,
-                 title: str,
-                 text: str,
-                 detailed_text: str = None,
-                 parent: QtWidgets.QWidget = None):
+def style_message(text: str) -> str:
     # Since it seems impossible to set a style sheet that affects the <code> and <pre> tags, the
     # style attribute will be embedded in the text. Padding doesn't seem to work either; a space in
     # inserted instead. Also, border doesn't seem to work, hence that is has not been added.
@@ -103,6 +99,16 @@ def show_message(icon_name: str,
     # For convenience, also add nowrap to <b> tags here with another replace action.
     b_style_attr = 'style="white-space: nowrap;"'
     text = text.replace('<b>', f'<b {b_style_attr}>')
+
+    return text
+
+
+def show_message(icon_name: str,
+                 title: str,
+                 text: str,
+                 detailed_text: str = None,
+                 parent: QtWidgets.QWidget = None):
+    text = style_message(text)
 
     message_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.NoIcon, title, text,
                                         QtWidgets.QMessageBox.NoButton, parent)
@@ -146,6 +152,48 @@ def show_message(icon_name: str,
 
     message_box.addButton(QtWidgets.QPushButton('Close', message_box),
                           QtWidgets.QMessageBox.AcceptRole)
+
+    message_box.exec()
+
+
+def show_long_message(icon_name: str, title: str, text: str, parent: QtWidgets.QWidget = None):
+    text = style_message(text)
+
+    message_box = QtWidgets.QDialog(parent)
+    message_box.setWindowTitle(title)
+    message_box.setModal(True)
+
+    char_width = message_box.fontMetrics().averageCharWidth()
+    char_height = message_box.fontMetrics().height()
+
+    icon_path = os.path.join(data_dir, 'gui', f'{icon_name}.svg')
+    icon = QtGui.QIcon(icon_path)
+    icon_size = char_width * 6
+    icon_label = QtWidgets.QLabel()
+    icon_label.setPixmap(icon.pixmap(icon.actualSize(QtCore.QSize(icon_size, icon_size))))
+    icon_layout = QtWidgets.QVBoxLayout()
+    icon_layout.addWidget(icon_label)
+    icon_layout.addStretch()
+
+    text_browser = QtWidgets.QTextBrowser()
+    text_browser.setFrameShape(QtWidgets.QFrame.NoFrame)
+    text_browser.viewport().setAutoFillBackground(False)
+    text_browser.setText(text)
+    close_button = QtWidgets.QPushButton('Close')
+    close_button.clicked.connect(message_box.close)
+    close_button_layout = QtWidgets.QHBoxLayout()
+    close_button_layout.addStretch()
+    close_button_layout.addWidget(close_button)
+    main_layout = QtWidgets.QVBoxLayout()
+    main_layout.addWidget(text_browser)
+    main_layout.addLayout(close_button_layout)
+
+    outer_layout = QtWidgets.QHBoxLayout(message_box)
+    outer_layout.addLayout(icon_layout)
+    outer_layout.addLayout(main_layout)
+
+    message_box.setMinimumWidth(char_width * 60)
+    message_box.setMinimumHeight(char_height * 40)
 
     message_box.exec()
 
@@ -1465,7 +1513,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <b>SELECT CUP</b> screens to switch between the different course pages.
             </p>
         """)
-        show_message('info', 'Instructions', text, '', self)
+        show_long_message('info', 'Instructions', text, self)
 
     def _open_about_dialog(self):
         text = textwrap.dedent(f"""\
