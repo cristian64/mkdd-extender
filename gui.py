@@ -128,10 +128,21 @@ def show_message(icon_name: str,
             # words per line (e.g. stack traces).
             text_edit.setMinimumWidth(char_width * 60)
 
-        for button in message_box.buttons():
-            if message_box.buttonRole(button) == QtWidgets.QMessageBox.ActionRole:
-                button.click()
-                QtCore.QTimer.singleShot(0, button.hide)
+        buttons = message_box.buttons()
+        assert len(buttons) == 1, 'Expected a single button in the message box'
+        if len(buttons) == 1:
+            show_details_button = buttons[0]
+            show_details_button.click()
+            show_details_button.setFocusPolicy(QtCore.Qt.NoFocus)
+            show_details_button.hide()
+
+            # If seems something shows the button at a later time, so hide also in the next tick.
+            QtCore.QTimer.singleShot(0, show_details_button.hide)
+
+            # Also, when the message box is brought to the front after being in the background,
+            # something makes the button visible again; give a null size to ensure it doesn't come
+            # back.
+            show_details_button.setFixedSize(0, 0)
 
     message_box.addButton(QtWidgets.QPushButton('Close', message_box),
                           QtWidgets.QMessageBox.AcceptRole)
