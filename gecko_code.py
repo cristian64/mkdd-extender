@@ -69,14 +69,20 @@ the `r2` register (+ the offset seen in the assembly), should tell which is the 
 "variable" that we are after.
 """
 
-SPAM_FLAG_ADDRESS = 0x0000180E
+SPAM_FLAG_ADDRESSES = {
+    'GM4E01': 0x002ED5F8,
+    'GM4P01': 0x002F90EC,
+    'GM4J01': 0x00309B6C,
+    'GM4E01dbg': 0x0032B158,
+}
 """
 Memory address used to determine whether the button combination can be accepted. The intent is to
 force the player to release the D-pad before the page can be changed, avoiding potentially dangerous
 spam.
 
-This is, theoretically, the address of the Gecko register #10 (grA), so it should be safe to
-override it with our data. See "0x80001804" (gr0) in https://gamehacking.org/faqs/wiicodetypes.html.
+This is the address to the first "This is padding" string (starting at "padding") that can be found
+in memory, to ensure that it can be overridden safely. (In the past, Gecko registers were used, but,
+although things worked in Dolphin, the game would crash when running in real hardware.)
 """
 
 SPAM_FLAG_VALUE = 0xC00010FF
@@ -1150,7 +1156,7 @@ def write_code(game_id: str, dol_path: str, minimap_data: dict, audio_track_data
     lines_for_deactivator.append(redraw_courseselect_address_activator_line)
 
     # Memory address to set/reset to prevent spam, and to later allow page selection again.
-    encoded_spam_flag_address = encode_address('write32', SPAM_FLAG_ADDRESS)
+    encoded_spam_flag_address = encode_address('write32', SPAM_FLAG_ADDRESSES[game_id])
     spam_flag_address_activator_line = get_line(encoded_spam_flag_address, SPAM_FLAG_VALUE)
 
     # The flag needs to be set when activated or deactivated.
@@ -1189,7 +1195,7 @@ def write_code(game_id: str, dol_path: str, minimap_data: dict, audio_track_data
         f.write('\n')
 
         # To check if the spam flag has been reset before accepting another change.
-        f.write(get_line(encode_address('ifnot32', SPAM_FLAG_ADDRESS), SPAM_FLAG_VALUE))
+        f.write(get_line(encode_address('ifnot32', SPAM_FLAG_ADDRESSES[game_id]), SPAM_FLAG_VALUE))
         f.write('\n')
         f.write(get_line(encode_address('goto', 1), 0))  # Skips line below.
         f.write('\n')
