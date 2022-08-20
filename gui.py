@@ -1147,6 +1147,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._redo_history = []
         self._pending_undo_actions = 0
 
+        self._pending_sync_updates = 0
+
         menu = self.menuBar()
         file_menu = menu.addMenu('File')
         quit_action = file_menu.addAction('Quit')
@@ -1752,10 +1754,21 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._info_view.show_placeholder_message()
 
-    def _on_page_table_itemChanged(self, item: QtWidgets.QTableWidgetItem):
-        _ = item
+    def _sync_widgets(self):
+        if not self._pending_sync_updates:
+            return
+        self._pending_sync_updates = 0
+
         self._sync_emblems()
         self._update_info_view()
+
+    def _on_page_table_itemChanged(self, item: QtWidgets.QTableWidgetItem):
+        _ = item
+
+        # Drag and drop events may generate several of these events in bursts. To avoid wasting
+        # cycles, the update is deferred to the next event loop iteration.
+        self._pending_sync_updates += 1
+        QtCore.QTimer.singleShot(0, self._sync_widgets)
 
         # Drag and drop events may generate several of these events in bursts. They need to be
         # grouped together as a single undo action.
