@@ -459,6 +459,10 @@ def convert_to_ast(src_filepath: str,
 
 
 def main():
+    logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
+                        level=logging.INFO,
+                        datefmt='%Y-%m-%d %H:%M:%S')
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the AST/WAV file to converted.')
     parser.add_argument('output',
