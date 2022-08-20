@@ -616,42 +616,67 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
 
     filtered_text = ''
     for c in text:
-        if c.lower() in ' abcdefghijklmnopqrstuvwxyz0123456789$!?@':
+        if c.lower() in ' abcdefghijklmnopqrstuvwxyz0123456789$!?:#%@+-':
             filtered_text += c
 
     filtered_text = ' '.join(filtered_text.split())
 
     if not filtered_text:
         filtered_text = '?'
+    filtered_text = filtered_text.upper()
 
-    image = Image.new('RGBA', (width, height), background)
-    draw = ImageDraw.Draw(image)
+    text_image = Image.new('RGBA', (width, height))
+    draw = ImageDraw.Draw(text_image)
 
     font_filepath = os.path.join(data_dir, 'fonts', 'SuperMario256.ttf')
 
-    padded_text = f'{filtered_text}-'  # So it's not close to the edge
+    # Add some margin so that the text is not too close to the edges.
+    HORIZNOTAL_MARGIN = 1
+    VERTICAL_MARGIN = 1
 
     for size in range(2, 100):
         font = ImageFont.truetype(font_filepath, size)
-        w, h = font.getsize(padded_text)
-        if w >= width or h >= height:
-            font = ImageFont.truetype(font_filepath, size - 1)
+        stroke_width = max(3, size // 10)
+        left, top, right, bottom = draw.textbbox((width // 2, height // 2),
+                                                 filtered_text,
+                                                 font=font,
+                                                 anchor='mm',
+                                                 stroke_width=stroke_width)
+        w = right - left
+        h = bottom - top
+        if w + HORIZNOTAL_MARGIN >= width or h + VERTICAL_MARGIN >= height:
+            size -= 1
+            font = ImageFont.truetype(font_filepath, size)
+            stroke_width = max(3, size // 10)
             break
 
-    w, h = font.getsize(filtered_text)
-    x, y = (width - w) // 2, (height - h) // 2
+    # NOTE: Besides the efforts to draw the text in the middle of the image, it's still slightly
+    # misaligned. This could be Pillow's fault, or flaws in the font file. To ensure that it's
+    # centered, and that it's not cropped slightly in any edge, it will be drawn on a slightly
+    # larger canvas, then stripped, then pasted in the center of an empty canvas with the final
+    # size, and then composited with the final background color.
 
-    for offset, alpha in ((1, 255), (2, 250), (3, 245)):
-        draw.text((x - offset, y - 0), filtered_text, font=font, fill=(0, 0, 0, alpha))
-        draw.text((x + offset, y - 0), filtered_text, font=font, fill=(0, 0, 0, alpha))
-        draw.text((x - 0, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha))
-        draw.text((x + 0, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha))
-        draw.text((x - offset, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
-        draw.text((x - offset, y + offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
-        draw.text((x + offset, y + offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
-        draw.text((x + offset, y - offset), filtered_text, font=font, fill=(0, 0, 0, alpha - 20))
+    TEXT_IMAGE_MARGIN = 50
 
-    draw.text((x, y), filtered_text, font=font, fill=(255, 255, 255, 255))
+    text_image = Image.new('RGBA', (width + TEXT_IMAGE_MARGIN, height + TEXT_IMAGE_MARGIN))
+    draw = ImageDraw.Draw(text_image)
+    draw.text(((width + TEXT_IMAGE_MARGIN) // 2, (height + TEXT_IMAGE_MARGIN) // 2),
+              filtered_text,
+              font=font,
+              anchor='mm',
+              fill=(255, 255, 255, 255),
+              stroke_width=stroke_width,
+              stroke_fill=(0, 0, 0, 255))
+
+    text_image = text_image.crop(text_image.getbbox())
+    offset_x = (width - text_image.size[0]) // 2
+    offset_y = (height - text_image.size[1]) // 2
+
+    tmp_image = Image.new('RGBA', (width, height))
+    tmp_image.paste(text_image, (offset_x, offset_y), text_image)
+
+    image = Image.new('RGBA', (width, height), background)
+    image = Image.alpha_composite(image, tmp_image)
 
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         tmp_filepath = os.path.join(tmp_dir,
