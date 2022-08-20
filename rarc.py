@@ -259,6 +259,8 @@ def pack(src_dirpath: str, dst_filepath: str):
     if not os.path.isdir(src_dirpath):
         raise ValueError(f'"{src_dirpath}" is not a valid directory.')
 
+    src_dirpath = os.path.normpath(src_dirpath)  # Trailing slashes not wanted.
+
     nodes = []
     nodes_indices = {}
     entries = []
