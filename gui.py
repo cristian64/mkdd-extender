@@ -553,7 +553,7 @@ def cancel_futures(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
 
 class InfoViewWidget(QtWidgets.QScrollArea):
 
-    width_provided = QtCore.Signal()
+    shown = QtCore.Signal()
 
     _images_loaded = QtCore.Signal(object)
 
@@ -590,11 +590,10 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         self.show_placeholder_message()
 
-    def resizeEvent(self, event: QtGui.QResizeEvent):
-        super().resizeEvent(event)
+    def showEvent(self, event: QtGui.QShowEvent):
+        super().showEvent(event)
 
-        if not event.oldSize().width() and event.size().width():
-            self.width_provided.emit()
+        self.shown.emit()
 
     def show_placeholder_message(self):
         self._build_label('Select a custom track to view its details', QtGui.QColor(100, 100, 100))
@@ -964,6 +963,34 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         return result
 
 
+class SplitterChildHolder(QtWidgets.QWidget):
+    def __init__(self, widget: QtWidgets.QWidget, parent: QtWidgets.QWidget = None):
+        super().__init__(parent)
+
+        self.widget = widget
+
+        size_policy = widget.sizePolicy()
+        size_policy.setRetainSizeWhenHidden(True)
+        widget.setSizePolicy(size_policy)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(widget)
+
+        QtCore.QTimer.singleShot(0, self._update_visibility)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):
+        super().resizeEvent(event)
+
+        self._update_visibility(event.size())
+
+    def _update_visibility(self, size: QtCore.QSize = None):
+        if size is None:
+            size = self.size()
+        visible = size.width() > 0 and size.height() > 0
+        self.widget.setVisible(visible)
+
+
 class LogTable(QtWidgets.QTableWidget):
 
     log_message_received = QtCore.Signal(tuple)
@@ -1275,11 +1302,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
         self._info_view = InfoViewWidget()
-        self._info_view.width_provided.connect(self._update_info_view)
+        self._info_view.shown.connect(self._update_info_view)
         self._splitter = QtWidgets.QSplitter()
-        self._splitter.addWidget(custom_tracks_widget)
-        self._splitter.addWidget(pages_widget)
-        self._splitter.addWidget(self._info_view)
+        self._splitter.addWidget(SplitterChildHolder(custom_tracks_widget))
+        self._splitter.addWidget(SplitterChildHolder(pages_widget))
+        self._splitter.addWidget(SplitterChildHolder(self._info_view))
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 4)
         self._splitter.setStretchFactor(2, 2)
@@ -1326,8 +1353,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._log_splitter = QtWidgets.QSplitter()
         self._log_splitter.setOrientation(QtCore.Qt.Vertical)
-        self._log_splitter.addWidget(main_widget)
-        self._log_splitter.addWidget(log_table)
+        self._log_splitter.addWidget(SplitterChildHolder(main_widget))
+        self._log_splitter.addWidget(SplitterChildHolder(log_table))
         self._log_splitter.setCollapsible(0, False)
         self._log_splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                          QtWidgets.QSizePolicy.Expanding)
@@ -1734,7 +1761,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._update_info_view()
 
     def _update_info_view(self):
-        if not self._info_view.width():
+        if not self._info_view.isVisible():
             return
 
         for table in list(self._page_tables) + [self._custom_tracks_table]:
