@@ -1592,6 +1592,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._custom_tracks_table.hideRow(row)
 
     def _load_custom_tracks_directory(self, dirpath: str = ''):
+        selected_items_text = []
+        for item in self._custom_tracks_table.selectedItems():
+            selected_items_text.append(item.text())
+
         self._custom_tracks_table.setEnabled(False)
         self._custom_tracks_table.setRowCount(0)
 
@@ -1642,6 +1646,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._custom_tracks_table.setRowCount(len(names_to_track_name))
                 track_names = tuple(names_to_track_name.values())
 
+                item_text_to_item = {}
+
                 for i, (name, track_name) in enumerate(names_to_track_name.items()):
                     # If the track name is not unique (e.g. different versions of the same course),
                     # the entry name is added to the text).
@@ -1650,7 +1656,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     else:
                         text = track_name
                     self._item_text_to_name[text] = name
-                    self._custom_tracks_table.setItem(i, 0, QtWidgets.QTableWidgetItem(text))
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item_text_to_item[text] = item
+                    self._custom_tracks_table.setItem(i, 0, item)
+
+                # Restore selection if there was one. Note that the order matters, and that we only
+                # care about the last item selected signal.
+                items_to_select = []
+                for selected_item_text in selected_items_text:
+                    item = item_text_to_item.get(selected_item_text)
+                    if item is not None:
+                        items_to_select.append(item)
+                if items_to_select:
+                    with blocked_signals(self._custom_tracks_table):
+                        for item in items_to_select[:-1]:
+                            item.setSelected(True)
+                    items_to_select[-1].setSelected(True)
+
                 self._custom_tracks_table.setEnabled(True)
                 self._update_custom_tracks_filter()
 
