@@ -569,7 +569,6 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self._ast_metadata_cache = {}
 
         self._pending_image_filepaths_by_language = None
-        self._image_group_boxes = None
         self._images_loaded.connect(self._on_images_loaded)
 
         # Loading BTI files is somehow expensive. Once an image is loaded, it is cached using its
@@ -693,11 +692,12 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 audio_box.layout().addRow(label, ast_player)
             layout.addWidget(audio_box)
 
-        self._image_group_boxes = QtWidgets.QWidget()
-        self._image_group_boxes.setLayout(QtWidgets.QVBoxLayout())
-        self._image_group_boxes.layout().setContentsMargins(0, 0, 0, 0)
+        image_group_boxes = QtWidgets.QWidget(self)
+        image_group_boxes.setObjectName('image_group_boxes')
+        image_group_boxes.setLayout(QtWidgets.QVBoxLayout())
+        image_group_boxes.layout().setContentsMargins(0, 0, 0, 0)
         self._show_image_files(image_filepaths_by_language)  # May load images asynchronously.
-        layout.addWidget(self._image_group_boxes)
+        layout.addWidget(image_group_boxes)
 
         layout.addStretch()
 
@@ -824,7 +824,9 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
             language_box.layout().addStretch()
 
-            self._image_group_boxes.layout().addWidget(language_box)
+            image_group_boxes = self.findChild(QtWidgets.QWidget, 'image_group_boxes')
+            if image_group_boxes is not None:
+                image_group_boxes.layout().addWidget(language_box)
 
     def _load_images_async(self, image_filepaths_by_language: 'dict[str, list[str]]'):
         for _language, image_filepaths in image_filepaths_by_language.items():
