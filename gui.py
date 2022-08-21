@@ -8,6 +8,7 @@ import concurrent.futures
 import configparser
 import contextlib
 import datetime
+import gc
 import json
 import logging
 import os
@@ -594,6 +595,11 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         super().showEvent(event)
 
         self.shown.emit()
+
+    def purge_caches(self):
+        self._ast_metadata_cache.clear()
+        self._checksum_cache.clear()
+        self._pixmap_cache.clear()
 
     def show_placeholder_message(self):
         self._build_label('Select a custom track to view its details', QtGui.QColor(100, 100, 100))
@@ -1196,6 +1202,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         tools_menu = menu.addMenu('Tools')
         pack_generator_action = tools_menu.addAction('Pack Generator')
         pack_generator_action.triggered.connect(self._on_pack_generator_action_triggered)
+        view_menu = menu.addMenu('View')
+        purge_caches_action = view_menu.addAction('Purge Caches')
+        purge_caches_action.triggered.connect(self._on_purge_caches_action_triggered)
         help_menu = menu.addMenu('Help')
         instructions_action = help_menu.addAction('Instructions')
         instructions_action.triggered.connect(self._open_instructions_dialog)
@@ -2109,6 +2118,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         bottom_layout.addWidget(generate_button)
         layout.addLayout(bottom_layout)
         dialog.exec_()
+
+    def _on_purge_caches_action_triggered(self):
+        self._info_view.purge_caches()
+        gc.collect()  # Rather placebo, but at least intention is shown.
+        self._load_custom_tracks_directory()
 
     def _build(self):
         error_message = None
