@@ -15,6 +15,7 @@ directory, a packing operation will be assumed.
 """
 import argparse
 import os
+import platform
 import struct
 import logging
 
@@ -35,6 +36,8 @@ __DIR_TYPE = 0x0200
 
 __ALIGNMENT = 0x20
 
+windows = platform.system() == 'Windows'
+
 
 def __hash_string(text: bytes) -> int:
     h = 0
@@ -43,6 +46,19 @@ def __hash_string(text: bytes) -> int:
         h += c
     h = h & 0x0000FFFF
     return h
+
+
+if windows:
+
+    def __cleanup_name(name: bytes) -> bytes:
+        INVALID_CHARS = b'<>:"\\|?*'
+        for char in INVALID_CHARS:
+            name = name.replace(bytes((char, )), b'_')
+        return name
+else:
+
+    def __cleanup_name(name: bytes) -> bytes:
+        return name
 
 
 def extract(src_filepath: str, dst_dirpath: str):
@@ -145,6 +161,8 @@ def extract(src_filepath: str, dst_dirpath: str):
             log.warning(f'Hash for "{name.decode("ascii")}" is 0x{calculated_hash:02X}, but hash '
                         f'in header is 0x{string_hash:02X}.')
 
+        name = __cleanup_name(name)
+
         if i == 0:
             if identifier != b'ROOT':
                 str_identifier = bytes(identifier).decode("ascii")
@@ -194,6 +212,8 @@ def extract(src_filepath: str, dst_dirpath: str):
 
         name = get_string(string_offset)
         assert __hash_string(name) == string_hash
+
+        name = __cleanup_name(name)
 
         assert padding == 0x00000000
 
