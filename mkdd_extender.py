@@ -1319,36 +1319,42 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
     file_list = build_file_list(iso_tmp_dir)
 
     COURSE_STREAM_ORDER = {
-        'BabyLuigi': 'BABY',
-        'Peach': 'BEACH',
-        'Daisy': 'BEACH',  # Reused.
-        'Luigi': 'CIRCUIT',
-        'Mario': 'CIRCUIT',  # Reused.
-        'Yoshi': 'CIRCUIT',  # Reused.
-        'Nokonoko': 'HIWAY',
-        'Patapata': 'HIWAY',  # Reused.
-        'Waluigi': 'STADIUM',
-        'Wario': 'STADIUM',  # Reused.
-        'Diddy': 'JUNGLE',
-        'Donkey': 'JUNGLE',  # Reused.
-        'Koopa': 'CASTLE',
-        'Rainbow': 'RAINBOW',
-        'Desert': 'DESERT',
-        'Snow': 'SNOW',
+        'BabyLuigi': ('BABY', ),
+        'Peach': ('BEACH', ),
+        'Daisy': ('CRUISER', 'BEACH'),  # With fallback.
+        'Luigi': ('CIRCUIT', ),
+        'Mario': ('MCIRCUIT', 'CIRCUIT'),  # With fallback.
+        'Yoshi': ('YCIRCUIT', 'CIRCUIT'),  # With fallback.
+        'Nokonoko': ('HIWAY', ),
+        'Patapata': ('CITY', 'HIWAY'),  # With fallback.
+        'Waluigi': ('STADIUM', ),
+        'Wario': ('COLOSSEUM', 'STADIUM'),  # With fallback.
+        'Diddy': ('JUNGLE', ),
+        'Donkey': ('MOUNTAIN', 'JUNGLE'),  # With fallback.
+        'Koopa': ('CASTLE', ),
+        'Rainbow': ('RAINBOW', ),
+        'Desert': ('DESERT', ),
+        'Snow': ('SNOW', ),
     }
 
     SPEED_TYPES = ('COURSE', 'FINALLAP')
 
     stock_audio_track_indices = []
     for speed_type in SPEED_TYPES:
-        for _course, subname in COURSE_STREAM_ORDER.items():
-            filename = f'{speed_type}_{subname}'
-            for file_index, filepath in enumerate(file_list):
-                if filepath.endswith('.ast') and filename in filepath:
-                    stock_audio_track_indices.append(file_index)
+        for _course, subnames in COURSE_STREAM_ORDER.items():
+            filenames = tuple(f'{speed_type}_{subname}' for subname in subnames)
+            for filename in filenames:
+                appended = False
+                for file_index, filepath in enumerate(file_list):
+                    if filepath.endswith('.ast') and filename in filepath:
+                        stock_audio_track_indices.append(file_index)
+                        appended = True
+                        break
+                if appended:
                     break
             else:
-                raise MKDDExtenderError(f'Unable to locate audio track "{filename}" in file list.')
+                raise MKDDExtenderError('Unable to locate a valid audio track candidate in the '
+                                        f'file list: {filenames}.')
     stock_audio_track_indices = tuple(stock_audio_track_indices)
 
     FALLBACK_AUDIO_COURSE = 'Luigi'
@@ -1780,6 +1786,35 @@ def extend_game(args: argparse.Namespace):
                     continue
                 raise MKDDExtenderError(f'{message}. Re-run with --skip-filesize-check to '
                                         'circumvent this safety measure.')
+
+        # It is paramount that the file list is sorted in the same order that has been used to
+        # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
+        # the correct order, but modified ISO files may have AST files in a different order.
+        log.info('Sorting file list in asciibetical order...')
+        gcm_file.file_entries = sorted(gcm_file.file_entries, key=lambda e: e.file_path)
+        for file_entry in gcm_file.file_entries:
+            if hasattr(file_entry, 'children'):
+                file_entry.children = sorted(file_entry.children, key=lambda e: e.file_path)
+        gcm_file.files_by_path = {
+            k: gcm_file.files_by_path[k]
+            for k in sorted(gcm_file.files_by_path.keys())
+        }
+        gcm_file.files_by_path_lowercase = {
+            k: gcm_file.files_by_path_lowercase[k]
+            for k in sorted(gcm_file.files_by_path_lowercase.keys())
+        }
+        gcm_file.changed_files = {
+            k: gcm_file.changed_files[k]
+            for k in sorted(gcm_file.changed_files.keys())
+        }
+        gcm_file.dirs_by_path = {
+            k: gcm_file.dirs_by_path[k]
+            for k in sorted(gcm_file.dirs_by_path.keys())
+        }
+        gcm_file.dirs_by_path_lowercase = {
+            k: gcm_file.dirs_by_path_lowercase[k]
+            for k in sorted(gcm_file.dirs_by_path_lowercase.keys())
+        }
 
         # Cross-check which files have been added, and then import all files from disk. While it
         # could be more efficient to compare timestamps and import only the ones that have really
