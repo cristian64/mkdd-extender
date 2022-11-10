@@ -15,7 +15,8 @@ On Linux, in a Bash terminal:
     source venv/bin/activate
     export PYTHONNOUSERSITE=1
     python3 -m pip install -r requirements.txt
-    python3 -m pip install pyinstaller
+    python3 -m pip install pyinstaller==5.3
+    python3 -m pip install pyinstaller-hooks-contrib==2022.13
     pyinstaller mkdd_extender.spec
     cd dist
     python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'bztar', '.', d)"
@@ -33,7 +34,12 @@ On Windows, in a cmd console:
     call venv/Scripts/activate.bat
     set PYTHONNOUSERSITE=1
     python3 -m pip install -r requirements.txt
-    python3 -m pip install pyinstaller
+    python3 -m pip install altgraph==0.17.3
+    python3 -m pip install future==0.18.2
+    python3 -m pip install pefile==2022.5.30
+    python3 -m pip install pyinstaller==5.3
+    python3 -m pip install pyinstaller-hooks-contrib==2022.13
+    python3 -m pip install pywin32-ctypes==0.2.0
     pyinstaller mkdd_extender.spec
     cd dist
     python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'zip', '.', d)"
