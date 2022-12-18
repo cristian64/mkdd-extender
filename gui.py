@@ -972,6 +972,7 @@ class ProgressDialog(QtWidgets.QProgressDialog):
 
 
 class SplitterChildHolder(QtWidgets.QWidget):
+
     def __init__(self, widget: QtWidgets.QWidget, parent: QtWidgets.QWidget = None):
         super().__init__(parent)
 
