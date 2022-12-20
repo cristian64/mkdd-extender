@@ -24,6 +24,8 @@ import traceback
 
 from typing import Any
 
+from PIL import Image
+
 from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 import ast_converter
@@ -286,6 +288,47 @@ class IconWidget(QtWidgets.QLabel):
         painter = QtGui.QPainter(self)
         painter.drawPixmap(0, 0, size.width(), size.height(), pixmap)
         del painter
+
+
+class SpinnableSlider(QtWidgets.QWidget):
+
+    value_changed = QtCore.Signal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+        self.setContentsMargins(0, 0, 0, 0)
+
+        self.__slider = QtWidgets.QSlider()
+        self.__slider.setOrientation(QtCore.Qt.Horizontal)
+        self.__slider.valueChanged.connect(self._on_value_changed)
+        self.__spinbox = QtWidgets.QSpinBox()
+        self.__spinbox.valueChanged.connect(self._on_value_changed)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setSpacing(2)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.__slider)
+        layout.addWidget(self.__spinbox)
+
+    def set_range(self, min_value: int, max_value: int, value: int):
+        self.__slider.setMinimum(min_value)
+        self.__slider.setMaximum(max_value)
+        self.__spinbox.setMinimum(min_value)
+        self.__spinbox.setMaximum(max_value)
+        self.__slider.setValue(value)
+        self.__spinbox.setValue(value)
+
+    def set_value(self, value: int):
+        self.__slider.setValue(value)
+
+    def get_value(self) -> int:
+        return self.__slider.value()
+
+    def _on_value_changed(self, value: int):
+        self.__slider.setValue(value)
+        self.__spinbox.setValue(value)
+        self.value_changed.emit(value)
 
 
 class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
@@ -1205,6 +1248,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         tools_menu = menu.addMenu('Tools')
         pack_generator_action = tools_menu.addAction('Pack Generator')
         pack_generator_action.triggered.connect(self._on_pack_generator_action_triggered)
+        text_image_builder_action = tools_menu.addAction('Text Image Builder')
+        text_image_builder_action.triggered.connect(self._on_text_image_builder_action_triggered)
         view_menu = menu.addMenu('View')
         purge_caches_action = view_menu.addAction('Purge Caches')
         purge_caches_action.triggered.connect(self._on_purge_caches_action_triggered)
@@ -2143,6 +2188,260 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         bottom_layout.addWidget(generate_button)
         layout.addLayout(bottom_layout)
         dialog.exec_()
+
+    def _on_text_image_builder_action_triggered(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setMinimumWidth(dialog.fontMetrics().averageCharWidth() * 80)
+        dialog.setWindowTitle('Text Image Builder')
+
+        description_label = QtWidgets.QLabel()
+        description_label.setWordWrap(True)
+        description_label.setText(
+            'This is a helper tool to build text images using Mario Kart: Double Dash!!\'s '
+            'bitmap-based font.')
+
+        form_layout = QtWidgets.QFormLayout()
+        form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        resolution_combobox = QtWidgets.QComboBox()
+        resolution_combobox.addItem('Course Name (256x32)', QtCore.QSize(256, 32))
+        resolution_combobox.addItem('Character Name (152x32)', QtCore.QSize(152, 32))
+        resolution_combobox.addItem('Custom')
+        resolution_width_spinbox = QtWidgets.QSpinBox()
+        resolution_height_spinbox = QtWidgets.QSpinBox()
+        for spinbox in (resolution_width_spinbox, resolution_height_spinbox):
+            spinbox.setMinimum(1)
+            spinbox.setMaximum(4 * 1024)
+        resolution_width_spinbox.setValue(256)
+        resolution_height_spinbox.setValue(32)
+        resolution_times_label = QtWidgets.QLabel('\u00d7')
+        resolution_layout = QtWidgets.QHBoxLayout()
+        resolution_layout.addWidget(resolution_combobox, 2)
+        resolution_layout.addWidget(resolution_width_spinbox, 1)
+        resolution_layout.addWidget(resolution_times_label)
+        resolution_layout.addWidget(resolution_height_spinbox, 1)
+        form_layout.addRow('Resolution', resolution_layout)
+        text_edit = QtWidgets.QLineEdit()
+        font = text_edit.font()
+        font.setCapitalization(QtGui.QFont.AllUppercase)
+        text_edit.setFont(font)
+        form_layout.addRow('Text', text_edit)
+        character_spacing_slider = SpinnableSlider()
+        INITIAL_CHARACTER_SPACING = -9
+        character_spacing_slider.set_range(-30, 20, INITIAL_CHARACTER_SPACING)
+        form_layout.addRow('Character Spacing', character_spacing_slider)
+        word_spacing_slider = SpinnableSlider()
+        INITIAL_WORD_SPACING = 1
+        word_spacing_slider.set_range(-20, 30, INITIAL_WORD_SPACING)
+        form_layout.addRow('Word Spacing', word_spacing_slider)
+        horizontal_scaling_slider = SpinnableSlider()
+        horizontal_scaling_slider.set_range(1, 100, 100)
+        form_layout.addRow('Horizontal Scaling', horizontal_scaling_slider)
+        vertical_scaling_slider = SpinnableSlider()
+        vertical_scaling_slider.set_range(1, 100, 100)
+        form_layout.addRow('Vertical Scaling', vertical_scaling_slider)
+
+        menu = QtWidgets.QMenu()
+        save_as_png_action = menu.addAction('Save as PNG')
+        save_as_bti_action = menu.addAction('Save as BTI')
+        menu.addSeparator()
+        copy_action = menu.addAction('Copy to Clipboard')
+
+        image_placeholder = []
+
+        def save_as(as_bti: bool):
+            if not image_placeholder:
+                return
+
+            file_type = "bti" if as_bti else "png"
+
+            last_filepath_setting_name = f'text_image_builder/last_{file_type}_filepath'
+            filepath = self._settings.value(last_filepath_setting_name)
+            if filepath:
+                dirpath = os.path.dirname(filepath)
+            else:
+                dirpath = os.path.expanduser('~')
+                filepath = f'image.{file_type}'
+
+            file_dialog = QtWidgets.QFileDialog(self, f'Save text image as {file_type.upper()}',
+                                                dirpath)
+            file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
+            file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
+            file_dialog.setNameFilters((f'{file_type.upper()} (*.{file_type})', ))
+            file_dialog.selectFile(os.path.basename(filepath))
+
+            dialog_code = file_dialog.exec_()
+            if dialog_code == QtWidgets.QDialog.Accepted and file_dialog.selectedFiles():
+                image = image_placeholder[0]
+                filepath = file_dialog.selectedFiles()[0]
+
+                if not as_bti:
+                    image.save(filepath)
+                else:
+                    with tempfile.TemporaryDirectory(
+                            prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:
+                        tmp_filepath = os.path.join(tmp_dir, 'image.png')
+                        image.save(tmp_filepath)
+                        mkdd_extender.convert_png_to_bti(tmp_filepath, filepath, 'IA4')
+
+                self._settings.setValue(last_filepath_setting_name, filepath)
+
+        save_as_png_action.triggered.connect(lambda: save_as(False))
+        save_as_bti_action.triggered.connect(lambda: save_as(True))
+
+        def on_copy_action_triggered():
+            if not image_placeholder:
+                return
+
+            image = image_placeholder[0]
+            width = image.width
+            height = image.height
+            data = image.tobytes("raw", "RGBA")
+            QtWidgets.QApplication.instance().clipboard().setImage(
+                QtGui.QImage(data, width, height, QtGui.QImage.Format_RGBA8888))
+
+        copy_action.triggered.connect(on_copy_action_triggered)
+
+        image_widget = QtWidgets.QLabel()
+        image_widget.setAlignment(QtCore.Qt.AlignCenter)
+        image_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        image_widget.customContextMenuRequested.connect(
+            lambda pos: menu.exec_(image_widget.mapToGlobal(pos)))
+        palette = image_widget.palette()
+        palette.setColor(image_widget.foregroundRole(), QtGui.QColor(170, 20, 20))
+        image_widget.setPalette(palette)
+
+        image_frame = QtWidgets.QFrame()
+        image_frame.setAutoFillBackground(True)
+        image_frame.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+        MARGIN = dialog.fontMetrics().height() * 5
+        image_frame.setMinimumSize(MARGIN * 2, MARGIN * 2)
+        palette = image_frame.palette()
+        palette.setBrush(image_frame.backgroundRole(), palette.dark())
+        image_frame.setPalette(palette)
+        image_frame_layout = QtWidgets.QVBoxLayout(image_frame)
+        image_frame_layout.setAlignment(QtCore.Qt.AlignCenter)
+        image_frame_layout.addWidget(image_widget)
+
+        reset_button = QtWidgets.QPushButton('Reset')
+        reset_button.setAutoDefault(False)
+        save_button = QtWidgets.QPushButton('Save')
+        save_button.setAutoDefault(False)
+        save_button.setMenu(menu)
+        bottom_layout = QtWidgets.QHBoxLayout()
+        bottom_layout.addWidget(reset_button)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(save_button)
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.addWidget(description_label)
+        layout.addSpacing(dialog.fontMetrics().height())
+        layout.addLayout(form_layout)
+        layout.addSpacing(dialog.fontMetrics().height() // 2)
+        layout.addWidget(image_frame, 1)
+        layout.addSpacing(dialog.fontMetrics().height() // 2)
+        layout.addLayout(bottom_layout)
+
+        def update():
+            text = text_edit.text()
+            resolution = resolution_combobox.currentData()
+            if resolution is not None:
+                width = resolution.width()
+                height = resolution.height()
+            else:
+                width = resolution_width_spinbox.value()
+                height = resolution_height_spinbox.value()
+            character_spacing = character_spacing_slider.get_value()
+            word_spacing = word_spacing_slider.get_value()
+            horizontal_scaling = horizontal_scaling_slider.get_value() / 100
+            vertical_scaling = vertical_scaling_slider.get_value() / 100
+
+            image_placeholder.clear()
+            image, overflow = mkdd_extender.build_text_image_from_bitmap_font(
+                text, width, height, character_spacing, word_spacing, horizontal_scaling,
+                vertical_scaling)
+            image_placeholder.append(image)
+
+            background = (255, 40, 40) if overflow else (128, 128, 128)
+            image_with_background = Image.new('RGBA', (width, height), background)
+            image_with_background.alpha_composite(image)
+            data = image_with_background.tobytes("raw", "RGBA")
+            pixmap = QtGui.QPixmap.fromImage(
+                QtGui.QImage(data, width, height, QtGui.QImage.Format_RGBA8888))
+            image_widget.setPixmap(pixmap)
+
+            image_widget.setMinimumSize(width, height)
+            save_as_png_action.setEnabled(bool(image_placeholder))
+            save_as_bti_action.setEnabled(bool(image_placeholder))
+            copy_action.setEnabled(bool(image_placeholder))
+            resolution_width_spinbox.setVisible(resolution is None)
+            resolution_height_spinbox.setVisible(resolution is None)
+            resolution_times_label.setVisible(resolution is None)
+
+        def reset():
+            with blocked_signals(character_spacing_slider):
+                character_spacing_slider.set_value(INITIAL_CHARACTER_SPACING)
+            with blocked_signals(word_spacing_slider):
+                word_spacing_slider.set_value(INITIAL_WORD_SPACING)
+            with blocked_signals(horizontal_scaling_slider):
+                horizontal_scaling_slider.set_value(100)
+            with blocked_signals(vertical_scaling_slider):
+                vertical_scaling_slider.set_value(100)
+
+            update()
+
+        resolution = self._settings.value('text_image_builder/resolution')
+        for i in range(resolution_combobox.count()):
+            if resolution_combobox.itemText(i) == resolution:
+                resolution_combobox.setCurrentIndex(i)
+        resolution_width = self._settings.value('text_image_builder/resolution_width')
+        if resolution_width is not None:
+            resolution_width_spinbox.setValue(int(resolution_width))
+        resolution_height = self._settings.value('text_image_builder/resolution_height')
+        if resolution_height is not None:
+            resolution_height_spinbox.setValue(int(resolution_height))
+        text = self._settings.value('text_image_builder/text')
+        if text is not None:
+            text_edit.setText(text)
+        character_spacing = self._settings.value('text_image_builder/character_spacing')
+        if character_spacing is not None:
+            character_spacing_slider.set_value(int(character_spacing))
+        word_spacing = self._settings.value('text_image_builder/word_spacing')
+        if word_spacing is not None:
+            word_spacing_slider.set_value(int(word_spacing))
+        horizontal_scaling = self._settings.value('text_image_builder/horizontal_scaling')
+        if horizontal_scaling is not None:
+            horizontal_scaling_slider.set_value(int(horizontal_scaling))
+        vertical_scaling = self._settings.value('text_image_builder/vertical_scaling')
+        if vertical_scaling is not None:
+            vertical_scaling_slider.set_value(int(vertical_scaling))
+
+        resolution_combobox.currentIndexChanged.connect(lambda _index: update())
+        resolution_width_spinbox.valueChanged.connect(lambda _value: update())
+        resolution_height_spinbox.valueChanged.connect(lambda _value: update())
+        text_edit.textChanged.connect(lambda _text: update())
+        character_spacing_slider.value_changed.connect(lambda _value: update())
+        word_spacing_slider.value_changed.connect(lambda _value: update())
+        horizontal_scaling_slider.value_changed.connect(lambda _value: update())
+        vertical_scaling_slider.value_changed.connect(lambda _value: update())
+        reset_button.clicked.connect(reset)
+
+        update()
+
+        dialog.exec_()
+
+        self._settings.setValue('text_image_builder/resolution', resolution_combobox.currentText())
+        self._settings.setValue('text_image_builder/resolution_width',
+                                resolution_width_spinbox.value())
+        self._settings.setValue('text_image_builder/resolution_height',
+                                resolution_height_spinbox.value())
+        self._settings.setValue('text_image_builder/text', text_edit.text())
+        self._settings.setValue('text_image_builder/character_spacing',
+                                character_spacing_slider.get_value())
+        self._settings.setValue('text_image_builder/word_spacing', word_spacing_slider.get_value())
+        self._settings.setValue('text_image_builder/horizontal_scaling',
+                                horizontal_scaling_slider.get_value())
+        self._settings.setValue('text_image_builder/vertical_scaling',
+                                vertical_scaling_slider.get_value())
 
     def _on_purge_caches_action_triggered(self):
         self._info_view.purge_caches()
