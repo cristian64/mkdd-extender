@@ -619,7 +619,9 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
 
 CHARACTERS = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', ':', '!', '.', '?', '/',
               'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
-              'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', "'", '"')
+              'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', "'", '"', '&', 'Ä', 'Ë', 'Ï', 'Ö', 'Ü',
+              'Á', 'É', 'Í', 'Ó', 'Ú', 'À', 'È', 'Ì', 'Ò', 'Ù', 'Â', 'Ê', 'Î', 'Ô', 'Û', 'Ç', 'ẞ',
+              'Ñ', '¡', '¿')
 CHARACTER_SET = set(CHARACTERS)
 CHARACTER_INDEX = {c: i for i, c in enumerate(CHARACTERS)}
 CHARACTER_IMAGE_MAP = {}
@@ -627,11 +629,16 @@ CHARACTER_DEFAULT_PADDING = 8
 CHARACTER_PADDING_REMOVAL = {
     ':': (3, 3),
     '!': (3, 3),
+    '¡': (3, 3),
     '.': (3, 3),
     '/': (2, 2),
     'A': (2, 0),
+    'Á': (2, 0),
+    'À': (1, 0),
     'F': (0, 1),
     'I': (4, 4),
+    'Í': (4, 2),
+    'Ì': (2, 4),
     'J': (1, 0),
     'L': (0, 2),
     'P': (0, 1),
