@@ -749,6 +749,51 @@ def build_text_image_from_bitmap_font(text: str, width: int, height: int, charac
     return image, overflow
 
 
+def generate_bti_image_from_bitmap_font(text: str, width: int, height: int, image_format: str,
+                                        background: 'tuple[int, int, int, int]', filepath: str):
+    assert filepath.endswith('.bti')
+
+    text = ' '.join(text.split())
+
+    margin = 0
+
+    # Some heuristics that seem to provide good results for a wide variety of lengths.
+    if len(text) < 10:
+        spacing = -12, 2
+        margin = 10
+    if len(text) < 14:
+        spacing = -12, 2
+        margin = 5
+    elif len(text) < 20:
+        spacing = -5, 5
+    else:
+        spacing = 1, 9
+
+    # Iteratively find a scale that makes the text fit in the image of the requested dimensions.
+    for scale in range(100, 50, -1):
+        image, overflow = build_text_image_from_bitmap_font(text, width - margin * 2, height,
+                                                            *spacing, scale / 100, 0.95)
+        if overflow:
+            continue
+
+        image_with_background = Image.new('RGBA', (width, height), background)
+        image_with_background.alpha_composite(image, dest=(margin, 0))
+
+        with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+            tmp_filepath = os.path.join(tmp_dir,
+                                        f'{os.path.splitext(os.path.basename(filepath))[0]}.png')
+            image_with_background.save(tmp_filepath)
+
+            remove_file(filepath)  # It may be a hard link; unlink early.
+
+            convert_png_to_bti(tmp_filepath, filepath, image_format)
+
+        return
+
+    # Fallback to implementation based on the TrueType font.
+    generate_bti_image(text, width, height, image_format, background, filepath)
+
+
 def generate_bti_image(text: str, width: int, height: int, image_format: str,
                        background: 'tuple[int, int, int, int]', filepath: str):
     assert filepath.endswith('.bti')
@@ -1319,7 +1364,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                             'An auto-generated image will be provided.')
 
                 filepath = os.path.join(course_images_dirpath, language, filename)
-                generate_bti_image(trackname, width, height, image_format, background, filepath)
+                generate_bti_image_from_bitmap_font(trackname, width, height, image_format,
+                                                    background, filepath)
                 return filepath
 
             # Copy course logo.
