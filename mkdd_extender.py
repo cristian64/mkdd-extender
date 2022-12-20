@@ -546,7 +546,7 @@ def add_controls_to_title_image(filepath: str, language: str):
 
         image = Image.new('RGBA', (canvas_width, canvas_height))
         for word, box in reversed(ops):
-            image.paste(word, box, word)
+            image.alpha_composite(word, dest=box)
         image.save(tmp_filepath)
 
         remove_file(filepath)  # It may be a hard link; unlink early.
@@ -599,9 +599,9 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
             offset += spacing + word.width
 
         image = Image.new('RGBA', (canvas_width + dpad_image.width, canvas_height))
-        image.paste(dpad_image, (0, 0), dpad_image)
+        image.paste(dpad_image)
         for word, box in reversed(ops):
-            image.paste(word, box, word)
+            image.alpha_composite(word, dest=box)
         image = image.convert(original_mode)
         image.save(tmp_filepath)
 
@@ -673,7 +673,7 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
     offset_y = (height - text_image.size[1]) // 2
 
     tmp_image = Image.new('RGBA', (width, height))
-    tmp_image.paste(text_image, (offset_x, offset_y), text_image)
+    tmp_image.paste(text_image, (offset_x, offset_y))
 
     image = Image.new('RGBA', (width, height), background)
     image = Image.alpha_composite(image, tmp_image)
