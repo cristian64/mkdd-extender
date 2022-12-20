@@ -170,6 +170,13 @@ data_dir = os.path.join(script_dir, 'data')
 
 TEMP_DIR_PREFIX = 'mkddext'
 
+try:
+    RESAMPLING_FILTER = Image.Resampling.LANCZOS
+except AttributeError:
+    # If the Pillow version is old, the enum class won't be available. Fall back to the deprecated
+    # value for now.
+    RESAMPLING_FILTER = Image.LANCZOS
+
 
 class MKDDExtenderError(Exception):
     pass
@@ -608,6 +615,131 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
         remove_file(filepath)  # It may be a hard link; unlink early.
 
         convert_png_to_bti(tmp_filepath, filepath, 'IA4')
+
+
+CHARACTERS = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', ':', '!', '.', '?', '/',
+              'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
+              'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', "'", '"')
+CHARACTER_SET = set(CHARACTERS)
+CHARACTER_INDEX = {c: i for i, c in enumerate(CHARACTERS)}
+CHARACTER_IMAGE_MAP = {}
+CHARACTER_DEFAULT_PADDING = 8
+CHARACTER_PADDING_REMOVAL = {
+    ':': (3, 3),
+    '!': (3, 3),
+    '.': (3, 3),
+    '/': (2, 2),
+    'A': (2, 0),
+    'F': (0, 1),
+    'I': (4, 4),
+    'J': (1, 0),
+    'L': (0, 2),
+    'P': (0, 1),
+    'T': (0, 3),
+    'V': (1, 1),
+    "'": (8, 8),
+    '"': (3, 3),
+}
+"""
+Some characters, due to their shape, can benefit from a smaller padding. It makes some letter
+combination such as "TA" less awkward, as otherwise the gap between the lower part in "T", and the
+upper part in "A" is too great; it would almost look like as a word separation.
+"""
+
+FOREGROUND_CHARACTERS = set(("'", ))
+"""
+Set of characters that will be drawn on top of the rest. This idea is seen in the stock Bowser's
+Castle text image, where the apostrophe doesn't respect the depth of its position in the list of
+letters from right to left.
+"""
+
+
+def pad_image_sides(image: Image.Image, left_padding: int, right_padding: int):
+    result = Image.new(image.mode, (image.width + left_padding + right_padding, image.height))
+    result.paste(image, (left_padding, 0))
+    return result
+
+
+def build_text_image_from_bitmap_font(text: str, width: int, height: int, character_spacing: int,
+                                      word_spacing: int, horizontal_scaling: float,
+                                      vertical_scaling: float) -> (Image.Image, bool):
+    text = text.upper()
+    character_spacing -= CHARACTER_DEFAULT_PADDING * 2
+    word_spacing -= CHARACTER_DEFAULT_PADDING * 2
+    if horizontal_scaling <= 0.0 or 1.0 < horizontal_scaling:
+        horizontal_scaling = 1.0
+    if vertical_scaling <= 0.0 or 1.0 < vertical_scaling:
+        vertical_scaling = 1.0
+
+    image_groups = []
+    for word in text.split():
+        word_images = []
+
+        for c in word.strip():
+            if c not in CHARACTER_SET:
+                continue
+
+            if c not in CHARACTER_IMAGE_MAP:
+                index = CHARACTER_INDEX[c]
+                character_filepath = os.path.join(data_dir, 'fonts', 'mkdd', f'{index:0>4}.png')
+                character_image = Image.open(character_filepath).convert('RGBA')
+                temp = crop_image_sides(character_image)
+                padding_removal = CHARACTER_PADDING_REMOVAL.get(c, (0, 0))
+                left_padding = CHARACTER_DEFAULT_PADDING - padding_removal[0]
+                right_padding = CHARACTER_DEFAULT_PADDING - padding_removal[1]
+                character_image = pad_image_sides(character_image, left_padding, right_padding)
+                CHARACTER_IMAGE_MAP[c] = character_image
+            else:
+                character_image = CHARACTER_IMAGE_MAP[c]
+
+            if (horizontal_scaling, vertical_scaling) != (1.0, 1.0):
+                new_width = max(1, round(character_image.width * horizontal_scaling))
+                new_height = max(1, round(character_image.height * vertical_scaling))
+                character_image = character_image.resize((new_width, new_height),
+                                                         resample=RESAMPLING_FILTER,
+                                                         reducing_gap=3.0)
+
+            character_image.character = c
+
+            word_images.append(character_image)
+
+        if word_images:
+            image_groups.append(word_images)
+
+    required_width = 0
+    if word_spacing > 0 and image_groups:
+        required_width += word_spacing * (len(image_groups) - 1)
+    for word_images in image_groups:
+        for image in word_images:
+            required_width += image.width
+        if character_spacing > 0 and word_images:
+            required_width += character_spacing * (len(word_images) - 1)
+    required_height = (image_groups[0][0].height if image_groups[0] else 0) if image_groups else 0
+    if required_width < 1 or required_height < 1:
+        return Image.new('RGBA', (width, height)), False
+
+    offset = 0
+    ops = []
+    for i, word_images in enumerate(image_groups):
+        offset += word_spacing if i else 0
+        for j, character_image in enumerate(word_images):
+            offset += character_spacing if j else 0
+            ops.append((character_image, (offset, 0)))
+            offset += character_image.width
+
+    placeholder = Image.new('RGBA', (required_width, required_height))
+    for character_image, box in reversed(ops):
+        if character_image.character not in FOREGROUND_CHARACTERS:
+            placeholder.alpha_composite(character_image, source=(0, 0), dest=box)
+    for character_image, box in reversed(ops):
+        if character_image.character in FOREGROUND_CHARACTERS:
+            placeholder.alpha_composite(character_image, source=(0, 0), dest=box)
+    placeholder = placeholder.crop(placeholder.getbbox())
+
+    image = Image.new('RGBA', (width, height))
+    image.paste(placeholder, ((width - placeholder.width) // 2, (height - placeholder.height) // 2))
+    overflow = placeholder.width > width or placeholder.height > height
+    return image, overflow
 
 
 def generate_bti_image(text: str, width: int, height: int, image_format: str,
@@ -1231,16 +1363,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                         return
 
                     image = Image.open(png_tmp_filepath)
-
-                    try:
-                        resampling_filter = Image.Resampling.LANCZOS
-                    except AttributeError:
-                        # If the Pillow version is old, the enum class won't be available. Fall back
-                        # to the deprecated value for now.
-                        resampling_filter = Image.LANCZOS
-
                     image = image.resize(PREVIEW_IMAGE_SIZE,
-                                         resample=resampling_filter,
+                                         resample=RESAMPLING_FILTER,
                                          reducing_gap=3.0)
                     image.save(png_tmp_filepath)
 
