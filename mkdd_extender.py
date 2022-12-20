@@ -1233,11 +1233,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                     image = Image.open(png_tmp_filepath)
 
                     try:
-                        resampling_filter = Image.Resampling.HAMMING
+                        resampling_filter = Image.Resampling.LANCZOS
                     except AttributeError:
                         # If the Pillow version is old, the enum class won't be available. Fall back
                         # to the deprecated value for now.
-                        resampling_filter = Image.HAMMING
+                        resampling_filter = Image.LANCZOS
 
                     image = image.resize(PREVIEW_IMAGE_SIZE,
                                          resample=resampling_filter,
