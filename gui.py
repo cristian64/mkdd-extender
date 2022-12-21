@@ -1559,7 +1559,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <h1>Instructions</h1>
             <p><h3>1. Input ISO file</h3>
             Select the path to the retail ISO file of Mario Kart: Double Dash!!.
-            <br/>
+
             <br/>
             All regions are supported.
             </p>
@@ -2515,6 +2515,24 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             title = 'Success!!'
             text = 'ISO file has been generated successfully.'
             detailed_text = ''
+
+            iso_size = os.path.getsize(output_path)
+            if iso_size > mkdd_extender.MAX_ISO_SIZE:
+                icon_name = 'successwarning'
+                text += (
+                    '<br/><br/><hr><br/>'
+                    f'The generated ISO file (<code>{iso_size} bytes</code>) is larger than the '
+                    f'size that GameCube or Wii support (<code>{mkdd_extender.MAX_ISO_SIZE} '
+                    'bytes</code>). The game will work on Dolphin, but will likely <em>not</em> '
+                    'work on real hardware.<br/><br/>'
+                    'Suggested actions that can be taken to reduce the ISO file size:'
+                    '<ul style="white-space: nowrap;">'
+                    '<li>Lower the sample rate in the <b>Sample Rate</b> option (e.g. to '
+                    '<code>24000 Hz</code>)</li>'
+                    '<li>Mark the <b>Use Auxiliary Audio Track</b> option to reuse stock audio '
+                    'tracks for custom tracks<br/>that define the '
+                    '<code>auxiliary_audio_track</code> field.</li>'
+                    '</ul>')
 
         show_message(icon_name, title, text, detailed_text, self)
 

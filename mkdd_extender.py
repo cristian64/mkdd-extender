@@ -119,6 +119,11 @@ A list of the "prefixes" that are used when naming the track archives. First let
 and the next two digits indicate the track index in the page (from `01` to `16`).
 """
 
+MAX_ISO_SIZE = 1459978240
+"""
+The maximum size of the GameCube ISO files that GameCube or Wii can support.
+"""
+
 linux = platform.system() == 'Linux'
 windows = platform.system() == 'Windows'
 macos = platform.system() == 'Darwin'
@@ -2018,7 +2023,6 @@ def extend_game(args: argparse.Namespace):
         human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
         log.info(f'ISO image written ({files_written} files - {human_readable_iso_size} MiB).')
 
-        MAX_ISO_SIZE = 1459978240
         if iso_size > MAX_ISO_SIZE:
             log.warning(f'ISO file ({iso_size} bytes) is larger than the size that GameCube or Wii '
                         f'support ({MAX_ISO_SIZE} bytes). The game will work on Dolphin, but will '
