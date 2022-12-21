@@ -53,7 +53,7 @@ def set_dark_theme(app: QtWidgets.QApplication):
     role_colors.append((QtGui.QPalette.Text, QtGui.QColor(200, 200, 200)))
     role_colors.append((QtGui.QPalette.Button, QtGui.QColor(55, 55, 55)))
     role_colors.append((QtGui.QPalette.ButtonText, QtGui.QColor(200, 200, 200)))
-    role_colors.append((QtGui.QPalette.BrightText, QtCore.Qt.red))
+    role_colors.append((QtGui.QPalette.BrightText, QtCore.Qt.white))
     role_colors.append((QtGui.QPalette.Light, QtGui.QColor(65, 65, 65)))
     role_colors.append((QtGui.QPalette.Midlight, QtGui.QColor(60, 60, 60)))
     role_colors.append((QtGui.QPalette.Dark, QtGui.QColor(45, 45, 45)))
