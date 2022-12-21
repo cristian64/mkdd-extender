@@ -40,7 +40,17 @@ data_dir = os.path.join(script_dir, 'data')
 
 
 def set_dark_theme(app: QtWidgets.QApplication):
-    app.setStyle(QtWidgets.QStyleFactory.create('Fusion'))
+
+    class CustomStyle(QtWidgets.QProxyStyle):
+
+        def styleHint(self, hint, option, widget, return_data) -> int:
+            if hint == QtWidgets.QStyle.SH_ToolTip_WakeUpDelay:
+                if QtWidgets.QApplication.instance().property('insta_tool_tips') is not None:
+                    return 0
+
+            return super().styleHint(hint, option, widget, return_data)
+
+    app.setStyle(CustomStyle("Fusion"))
 
     role_colors = []
     role_colors.append((QtGui.QPalette.Window, QtGui.QColor(60, 60, 60)))
@@ -1970,6 +1980,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     def _on_options_action_triggered(self):
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle('Options')
+
+        dialog.deleteLater()
+        dialog.destroyed.connect(
+            lambda _obj: QtWidgets.QApplication.instance().setProperty('insta_tool_tips', None))
+        QtWidgets.QApplication.instance().setProperty('insta_tool_tips', True)
+
         layout = QtWidgets.QVBoxLayout(dialog)
 
         def markdown_to_html(title: str, text: str) -> str:
