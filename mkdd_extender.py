@@ -421,7 +421,7 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
         rarc.pack(new_dirpath, archive_filepath)
 
 
-def convert_bti_to_image(filepath: str) -> Image:
+def convert_bti_to_image(filepath: str) -> Image.Image:
     assert filepath.endswith('.bti')
 
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
