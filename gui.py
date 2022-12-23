@@ -37,6 +37,7 @@ script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
 tools_dir = os.path.join(script_dir, 'tools')
 data_dir = os.path.join(script_dir, 'data')
+placeholder_course_dir = os.path.join(data_dir, 'courses', 'dstestcircle')
 
 
 def set_dark_theme(app: QtWidgets.QApplication):
@@ -1595,7 +1596,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             (<b>Up Page</b>, <b>Down Page</b>, or <b>Left Page</b>) on the right-hand side.
             <br/>
             <br/>
-            All the 48 slots must be filled in.
+            If any of the 48 slots is not filled in, a placeholder will be provided.
             </p>
             <p><h3>5. Build ISO file</h3>
             When ready, press the <b>{self._build_button.text()}</b> button to generate the extended
@@ -2481,22 +2482,25 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             if input_path == output_path:
                 raise mkdd_extender.MKDDExtenderError('Input and output paths cannot be identical.')
 
-            names = []
-            for item in self._get_page_items():
-                name = self._item_text_to_name.get(item.text())
-                if name:
-                    names.append(name)
-            if len(names) != 48:
-                raise mkdd_extender.MKDDExtenderError(
-                    'Please make sure that all slots have been assigned to a valid custom track.')
-
             args = argparse.Namespace()
             args.input = input_path
             args.output = output_path
             args.tracks = []
             tracks_dirpath = self._custom_tracks_directory_edit.get_path()
-            for name in names:
-                args.tracks.append(os.path.join(tracks_dirpath, name))
+
+            slots_assigned = 0
+            for item in self._get_page_items():
+                name = self._item_text_to_name.get(item.text())
+                if name:
+                    args.tracks.append(os.path.join(tracks_dirpath, name))
+                    slots_assigned += 1
+                else:
+                    args.tracks.append(placeholder_course_dir)
+            assert len(args.tracks) == 48
+
+            if slots_assigned < 48:
+                mkdd_extender.log.warning(f'Only {slots_assigned} slots have been assigned. Empty '
+                                          'slots will be provided with a placeholder.')
 
             for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
                 for option_label, _option_type, _option_help in group_options:
