@@ -412,10 +412,6 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
                 filepath = os.path.join(new_dirpath, filename)
                 if os.path.isfile(filepath):
                     parts = filename.split('_', maxsplit=1)
-                    if len(parts) > 2:
-                        raise MKDDExtenderError(
-                            f'Unable to rename entries in "{archive_filepath}". Unrecognized '
-                            f'filename with multiple "_" characters ("{filename}").')
                     new_filename = f'{course_name}_{parts[1]}'
                     new_filepath = os.path.join(new_dirpath, new_filename)
                     os.rename(filepath, new_filepath)
