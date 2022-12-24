@@ -1117,6 +1117,7 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
 def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
     minimap_data = {}
     auxiliary_audio_data = {}
+    matching_audio_override_data = {}
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
 
@@ -1175,6 +1176,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             log.info(f'{processed} custom tracks have been processed.')
         else:
             log.warning(f'No archive has been processed.')
+
+        # Populate dictionary with checksums from all the stock AST files.
+        audio_tracks_checksums = {}
+        for filename in os.listdir(stream_dirpath):
+            ast_filepath = os.path.join(stream_dirpath, filename)
+            checksum = md5sum(ast_filepath)
+            audio_tracks_checksums[checksum] = filename
 
         # Copy files into the ISO temporariy directory.
         log.info(f'Melding directories...')
@@ -1303,6 +1311,26 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             # has the field defined.
             use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
 
+            def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args):
+                # Before copying a AST file to destination, check whether its checksum already
+                # exists, and, if so, insert an entry in the override table instead of copying the
+                # file over.
+
+                checksum = md5sum(src_ast_filepath)
+                dst_ast_filename = os.path.basename(dst_ast_filepath)
+
+                if checksum in audio_tracks_checksums:
+                    cached_filename = audio_tracks_checksums[checksum]
+                    matching_audio_override_data[dst_ast_filename] = cached_filename
+                    log.info(f'Reusing "{dst_ast_filename}" in place of "{cached_filename}" '
+                             f'(shared checksum: "{checksum})."')
+                    return
+
+                audio_tracks_checksums[checksum] = dst_ast_filename
+
+                make_link(src_ast_filepath, dst_ast_filepath)
+                conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
+
             if not use_auxiliary_audio_track:
                 # Copy audio files. Unlike with the previous files, audio files are stored in the
                 # stock directory. The names of the audio files strategically start with a "X_"
@@ -1314,14 +1342,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                     lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
                 if os.path.isfile(lap_music_normal_filepath):
                     dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
-                    make_link(lap_music_normal_filepath, dst_ast_filepath)
-                    conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
+                    conform_and_copy_if_not_cached(lap_music_normal_filepath, dst_ast_filepath,
+                                                   args)
 
                     lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
                     if os.path.isfile(lap_music_fast_filepath):
                         dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
-                        make_link(lap_music_fast_filepath, dst_ast_filepath)
-                        conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
+                        conform_and_copy_if_not_cached(lap_music_fast_filepath, dst_ast_filepath,
+                                                       args)
                     else:
                         log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
                                     '`lap_music_normal.ast` will be used.')
@@ -1487,10 +1515,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         else:
             log.warning(f'No directory has been melded.')
 
-    return minimap_data, auxiliary_audio_data
+    return minimap_data, auxiliary_audio_data, matching_audio_override_data
 
 
-def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str, str]') -> tuple:
+def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str, str]',
+                              matching_audio_override_data: 'dict[str, str]') -> tuple:
     # The Gecko code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
 
@@ -1566,7 +1595,11 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
 
         for i, speed_type in enumerate(SPEED_TYPES):
             speed_type = f'X_{speed_type}'
-            filename = f'{speed_type}_{prefix}'
+            filename = f'{speed_type}_{prefix}.ast'
+
+            if filename in matching_audio_override_data:
+                filename = matching_audio_override_data[filename]
+
             for file_index, filepath in enumerate(file_list):
                 if filepath.endswith('.ast') and filename in filepath:
                     mapped_offset = course_stream_order.index(COURSES[track_index])
@@ -1579,7 +1612,8 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
 
 
 def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
-                   auxiliary_audio_data: 'dict[str, str]', iso_tmp_dir: str):
+                   auxiliary_audio_data: 'dict[str, str]',
+                   matching_audio_override_data: 'dict[str, str]', iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
     bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
@@ -1724,7 +1758,8 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             f.seek(functions_offset)
             f.write(NEW_FUNCTIONS_INSTRUCTIONS)
 
-    audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data)
+    audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data,
+                                                 matching_audio_override_data)
 
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
@@ -1927,8 +1962,10 @@ def extend_game(args: argparse.Namespace):
         if not args.skip_menu_titles:
             patch_title_lines(iso_tmp_dir)
         patch_cup_names(args.skip_cup_names, iso_tmp_dir)
-        minimap_data, auxiliary_audio_data = meld_courses(args, iso_tmp_dir)
-        patch_dol_file(args, minimap_data, auxiliary_audio_data, iso_tmp_dir)
+        minimap_data, auxiliary_audio_data, matching_audio_override_data = meld_courses(
+            args, iso_tmp_dir)
+        patch_dol_file(args, minimap_data, auxiliary_audio_data, matching_audio_override_data,
+                       iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info(f'Packing RARC files...')
