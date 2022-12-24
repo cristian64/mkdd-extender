@@ -1083,7 +1083,12 @@ class LogTable(QtWidgets.QTableWidget):
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
         clear_log_action = QtGui.QAction('Clear Log', self)
         clear_log_action.triggered.connect(lambda: self.setRowCount(0))
+        self._clear_log_before_each_run_action = QtGui.QAction('Clear Log Before Each Run', self)
+        self._clear_log_before_each_run_action.setCheckable(True)
+        self._clear_log_before_each_run_action.setChecked(True)
+        self._clear_log_before_each_run_action.triggered.connect(lambda: self.setRowCount(0))
         self.addAction(clear_log_action)
+        self.addAction(self._clear_log_before_each_run_action)
 
         self.log_message_received.connect(self._on_log_handler_log_message_received,
                                           QtCore.Qt.QueuedConnection)
@@ -1100,6 +1105,12 @@ class LogTable(QtWidgets.QTableWidget):
 
         self._log_handler = LogHandler()
         mkdd_extender.log.addHandler(self._log_handler)
+
+    def get_clear_log_before_each_run(self) -> bool:
+        return self._clear_log_before_each_run_action.isChecked()
+
+    def set_clear_log_before_each_run(self, clear_log_before_each_run: bool):
+        return self._clear_log_before_each_run_action.setChecked(clear_log_before_each_run)
 
     def _on_log_handler_log_message_received(self, log_message: 'tuple[str, int, str, str, str]'):
         MAX_ROW_COUNT = 20000
@@ -1417,12 +1428,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         layout.addLayout(options_layout)
         layout.addLayout(bottom_layout)
 
-        log_table = LogTable()
+        self._log_table = LogTable()
 
         self._log_splitter = QtWidgets.QSplitter()
         self._log_splitter.setOrientation(QtCore.Qt.Vertical)
         self._log_splitter.addWidget(SplitterChildHolder(main_widget))
-        self._log_splitter.addWidget(SplitterChildHolder(log_table))
+        self._log_splitter.addWidget(SplitterChildHolder(self._log_table))
         self._log_splitter.setCollapsible(0, False)
         self._log_splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                          QtWidgets.QSizePolicy.Expanding)
@@ -1498,6 +1509,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     options.append((option_variable_name, option_value))
         self._settings.setValue('miscellaneous/options', json.dumps(options))
 
+        self._settings.setValue('miscellaneous/clear_log_before_each_run',
+                                self._log_table.get_clear_log_before_each_run())
+
     def _restore_settings(self):
         geometry = self._settings.value('window/geometry')
         if geometry:
@@ -1564,6 +1578,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 for option_variable_name, option_value in options:
                     option_member_name = f'_{option_variable_name}'
                     setattr(self, option_member_name, option_value)
+
+        self._log_table.set_clear_log_before_each_run(
+            self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true')
 
     def _open_instructions_dialog(self):
         text = textwrap.dedent(f"""\
@@ -2466,6 +2483,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._load_custom_tracks_directory()
 
     def _build(self):
+        if self._log_table.get_clear_log_before_each_run():
+            self._log_table.setRowCount(0)
+
         error_message = None
         exception_info = None
         try:
