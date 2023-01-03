@@ -106,7 +106,7 @@ def style_message(text: str) -> str:
     # inserted instead. Also, border doesn't seem to work, hence that is has not been added.
     code_style_attr = 'style="background: #555; color: #CCC"'
     text = text.replace('<code>', f'<code {code_style_attr}>&nbsp;')
-    text = text.replace('</code>', f'&nbsp;</code>')
+    text = text.replace('</code>', '&nbsp;</code>')
     pre_style_attr = 'style="background: #555; color: #CCC"'
     text = text.replace('<pre>', f'<pre {pre_style_attr}>')
 
@@ -351,7 +351,8 @@ class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
         if selected:
             option.backgroundBrush = option.palette.highlight().color().darker()
             option.showDecorationSelected = True
-            option.state = option.state & ~QtWidgets.QStyle.State_Selected & ~QtWidgets.QStyle.State_HasFocus
+            option.state = (option.state & ~QtWidgets.QStyle.State_Selected
+                            & ~QtWidgets.QStyle.State_HasFocus)
 
 
 class DragDropTableWidget(QtWidgets.QTableWidget):
@@ -399,8 +400,8 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
                         assert dropping_model_indexes is None
                         dropping_model_indexes = indexes
                 if dropping_model_indexes:
-                    min_row = min([mi.row() for mi in dropping_model_indexes])
-                    min_column = min([mi.column() for mi in dropping_model_indexes])
+                    min_row = min(mi.row() for mi in dropping_model_indexes)
+                    min_column = min(mi.column() for mi in dropping_model_indexes)
                     for mi in dropping_model_indexes:
                         row = mi.row() - min_row + target_model_index.row()
                         column = mi.column() - min_column + target_model_index.column()
@@ -599,7 +600,9 @@ def shutdown_executor(thread_pool_executor: concurrent.futures.ThreadPoolExecuto
 def cancel_futures(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
     while True:
         try:
+            # pylint: disable=protected-access
             work_item = thread_pool_executor._work_queue.get_nowait()
+            # pylint: enable=protected-access
         except queue.Empty:
             break
         if work_item is not None:
@@ -699,7 +702,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         image_filepaths_by_language = {}
         for language in mkdd_extender.LANGUAGES:
-            image_filepaths = list()
+            image_filepaths = []
             image_filepaths_by_language[language] = image_filepaths
             for image_filename in IMAGE_FILENAMES:
                 image_filepaths.append(
@@ -1020,7 +1023,9 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         thread.join()
 
         if exc_info is not None:
+            # pylint: disable=unsubscriptable-object
             raise exc_info[1].with_traceback(exc_info[2])
+            # pylint: enable=unsubscriptable-object
 
         return result
 
@@ -2014,9 +2019,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
                                    paragraph)
                 paragraph = re.sub(
-                    r'`([^`]+)`',
-                    r'<code style="background: #1B1B1B; white-space: nowrap;">&nbsp;\1&nbsp;</code>',
-                    paragraph)
+                    r'`([^`]+)`', r'<code style="background: #1B1B1B; white-space: nowrap;">'
+                    r'&nbsp;\1&nbsp;</code>', paragraph)
                 html += f'<p>{paragraph}</p>\n'
             return html
 

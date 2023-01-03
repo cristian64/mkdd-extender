@@ -358,11 +358,12 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
     # If the start of the BOL file can be located [once] in the archive, the BOL file can be edited
     # directly without having to extract the archive first, which would be slower.
     bol_offset = data.find(BOL_MAGIC)
-    if bol_offset > 0 and data.find(BOL_MAGIC, bol_offset + len(BOL_MAGIC)) < 0:
-        with open(course_filepath, 'r+b') as f:
-            f.seek(bol_offset + MUSIC_ID_OFFSET)
-            f.write(bytes([music_id]))
-        return
+    if bol_offset > 0:
+        if data.find(BOL_MAGIC, bol_offset + len(BOL_MAGIC)) < 0:
+            with open(course_filepath, 'r+b') as f:
+                f.seek(bol_offset + MUSIC_ID_OFFSET)
+                f.write(bytes([music_id]))
+            return
 
     # Otherwise, extract the RARC file, locate the BOL file in the directory, patch the BOL file,
     # and re-pack the RARC archive.
@@ -435,7 +436,7 @@ def convert_bti_to_image(filepath: str) -> Image.Image:
         try:
             if 0 == run(command):
                 return Image.open(tmp_filepath).copy()
-        except Exception as e:
+        except Exception:
             pass
 
     try:
@@ -455,7 +456,8 @@ def convert_bti_to_png(src_filepath: str, dst_filepath: str):
 
     if 0 != run(command) or not os.path.isfile(dst_filepath):
         # Fall back to the `bti` module if `wimgt` fails.
-        bti.BTI(open(src_filepath, 'rb')).render().save(dst_filepath)
+        with open(src_filepath, 'rb') as f:
+            bti.BTI(f).render().save(dst_filepath)
         if not os.path.isfile(dst_filepath):
             raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
 
@@ -691,7 +693,6 @@ def build_text_image_from_bitmap_font(text: str, width: int, height: int, charac
                 index = CHARACTER_INDEX[c]
                 character_filepath = os.path.join(data_dir, 'fonts', 'mkdd', f'{index:0>4}.png')
                 character_image = Image.open(character_filepath).convert('RGBA')
-                temp = crop_image_sides(character_image)
                 padding_removal = CHARACTER_PADDING_REMOVAL.get(c, (0, 0))
                 left_padding = CHARACTER_DEFAULT_PADDING - padding_removal[0]
                 right_padding = CHARACTER_DEFAULT_PADDING - padding_removal[1]
@@ -970,12 +971,15 @@ def patch_bnr_file(iso_tmp_dir: str):
     log.info(f'Replacing banner image in BNR file ("{bnr_filepath}")...')
 
     raw_filepath = os.path.join(data_dir, 'banner', 'banner.raw')
+    with open(raw_filepath, 'rb') as f:
+        raw_data = f.read()
+
     IMAGE_OFFSET = 0x0020
     IMAGE_LENGTH = 0x1800
 
     with open(bnr_filepath, 'r+b') as f:
         f.seek(IMAGE_OFFSET)
-        f.write(open(raw_filepath, 'rb').read())
+        f.write(raw_data)
         assert f.tell() == IMAGE_OFFSET + IMAGE_LENGTH
 
     log.info('Banner image replaced.')
@@ -1014,14 +1018,14 @@ def patch_bnr_file(iso_tmp_dir: str):
     with open(bnr_filepath, 'wb') as f:
         f.write(data)
 
-    log.info(f'Game title tweaked.')
+    log.info('Game title tweaked.')
 
 
 def patch_title_lines(iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
-    log.info(f'Patching title lines...')
+    log.info('Patching title lines...')
 
     for language in LANGUAGES:
         language_dirpath = os.path.join(scenedata_dirpath, language)
@@ -1053,7 +1057,7 @@ def patch_title_lines(iso_tmp_dir: str):
                 f.seek(0x22C8)
                 f.write(struct.pack('>ff', 512.0, 32.0))
             else:
-                log.warning(f'Unexpected dimensions in BLO file. Titles\' dimensions will not be '
+                log.warning('Unexpected dimensions in BLO file. Titles\' dimensions will not be '
                             'updated.')
 
             # Each corner has its own color, although only the two at the top (the first
@@ -1065,7 +1069,7 @@ def patch_title_lines(iso_tmp_dir: str):
                 f.seek(0x2310)
                 f.write(struct.pack('>LLLL', 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF))
             else:
-                log.warning(f'Unexpected colors in BLO file. Titles\' color gradient will not be '
+                log.warning('Unexpected colors in BLO file. Titles\' color gradient will not be '
                             'desaturated.')
 
     log.info('Title lines patched.')
@@ -1075,7 +1079,7 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
-    log.info(f'Patching cup names...')
+    log.info('Patching cup names...')
 
     for language in LANGUAGES:
         language_dirpath = os.path.join(scenedata_dirpath, language)
@@ -1096,6 +1100,7 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
             for page_index in range(3):
 
                 def with_page_index_suffix(path: str) -> str:
+                    # pylint: disable=cell-var-from-loop
                     stem, ext = os.path.splitext(path)
                     stem = stem[:-len(str(page_index))] + str(page_index)
                     return stem + ext
@@ -1140,7 +1145,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         # Unpack ZIP archives (or copy directory is pre-unpacked) to their respective directories.
         prefix_to_nodename = {}
         processed = 0
-        log.info(f'Preparing custom tracks...')
+        log.info('Preparing custom tracks...')
         if tracks_is_dir:
             for prefix in PREFIXES:
                 for path in paths:
@@ -1175,7 +1180,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         if processed > 0:
             log.info(f'{processed} custom tracks have been processed.')
         else:
-            log.warning(f'No archive has been processed.')
+            log.warning('No archive has been processed.')
 
         # Populate dictionary with checksums from all the stock AST files.
         audio_tracks_checksums = {}
@@ -1185,7 +1190,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             audio_tracks_checksums[checksum] = filename
 
         # Copy files into the ISO temporariy directory.
-        log.info(f'Melding directories...')
+        log.info('Melding directories...')
         melded = 0
         for prefix in PREFIXES:
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
@@ -1200,6 +1205,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             melded += 1
 
             def with_page_index_suffix(path: str) -> str:
+                # pylint: disable=cell-var-from-loop
                 stem, ext = os.path.splitext(path)
                 stem = stem[:-len(str(page_index))] + str(page_index)
                 return stem + ext
@@ -1372,6 +1378,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             def find_or_generate_image_path(language: str, filename: str, width: int, height: int,
                                             image_format: str,
                                             background: 'tuple[int, int, int, int]') -> str:
+                # pylint: disable=cell-var-from-loop
+
                 filepath = os.path.join(course_images_dirpath, language, filename)
                 if os.path.isfile(filepath):
                     return filepath
@@ -1422,6 +1430,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 PREVIEW_IMAGE_SIZE = 256 // 2, 184 // 2
 
             def resize_preview_image(filepath: str):
+                # pylint: disable=cell-var-from-loop
+
                 with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
                     png_tmp_filepath = os.path.join(
                         tmp_dir,
@@ -1457,8 +1467,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
-                raise MKDDExtenderError(f'Unable to locate `SceneData/language` directories in '
-                                        '"{nodename}".')
+                raise MKDDExtenderError('Unable to locate `SceneData/language` directories in '
+                                        f'"{nodename}".')
 
             # Downscale preview images in all available languages.
             if not args.extended_memory:
@@ -1508,12 +1518,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                     int(minimap_json['Orientation']),
                 )
             except Exception as e:
-                raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": {str(e)}.')
+                raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": '
+                                        f'{str(e)}.') from e
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
         else:
-            log.warning(f'No directory has been melded.')
+            log.warning('No directory has been melded.')
 
     return minimap_data, auxiliary_audio_data, matching_audio_override_data
 
@@ -1773,7 +1784,9 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         cli = GeckoLoader.GeckoLoaderCli('GeckoLoader')
         args = cli.parse_args(
             (dol_path, tmp_gecko_code_filepath, '--dest', dol_path, '--hooktype', 'GX', '--quiet'))
+        # pylint: disable=protected-access
         cli._exec(args, tmp_dir)
+        # pylint: enable=protected-access
 
 
 OPTIONAL_ARGUMENTS = {
@@ -1862,8 +1875,8 @@ OPTIONAL_ARGUMENTS = {
             'Skip Filesize Check',
             bool,
             'If specified, no filesize check will be performed. It is known that certain files '
-            'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected crashes '
-            'can occur when the limits are exceeded.',
+            'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected '
+            'crashes can occur when the limits are exceeded.',
         ),
     ),
 }
@@ -1920,7 +1933,7 @@ def extend_game(args: argparse.Namespace):
         raise MKDDExtenderError('Path to the output ISO file cannot be empty.')
 
     if args.input == args.output:
-        raise MKDDExtenderError(f'Paths to the input and output ISO files must be different.')
+        raise MKDDExtenderError('Paths to the input and output ISO files must be different.')
 
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as iso_tmp_dir:
         # Extract the ISO file entirely for now. In the future, only extracting the files that need
@@ -1930,7 +1943,7 @@ def extend_game(args: argparse.Namespace):
         try:
             gcm_file.read_entire_disc()
         except Exception as e:
-            raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}')
+            raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}') from e
         files_extracted = 0
         for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):
             if files_done > 0:
@@ -1943,7 +1956,7 @@ def extend_game(args: argparse.Namespace):
         log.info(f'File list built ({len(initial_file_list)} entries).')
 
         # Extract the relevant RARC files that will be modified.
-        log.info(f'Extracting RARC files...')
+        log.info('Extracting RARC files...')
         RARC_FILENAMES = ('courseselect.arc', 'LANPlay.arc', 'titleline.arc')
         scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData')
         scenedata_filenames = os.listdir(scenedata_dirpath)
@@ -1968,7 +1981,7 @@ def extend_game(args: argparse.Namespace):
                        iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
-        log.info(f'Packing RARC files...')
+        log.info('Packing RARC files...')
         rarc_packed = 0
         for language in LANGUAGES:
             if language not in scenedata_filenames:
@@ -2077,7 +2090,7 @@ def main():
 
     if gui_mode:
         try:
-            import gui
+            import gui  # pylint: disable=import-outside-toplevel
             sys.exit(gui.run())
         except ImportError as e:
             log.warning(f'Unable to launch GUI ("{str(e)}"). Switching to command-line mode...')

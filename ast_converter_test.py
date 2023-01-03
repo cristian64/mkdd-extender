@@ -2,6 +2,8 @@
 """
 Unit tests for the `ast_converter` module.
 """
+# pylint: disable=protected-access
+
 import filecmp
 import os
 import sys
@@ -94,7 +96,7 @@ def test_stock_data_set_naive_numpy():
         ast_converter._NUMPY_AVAILABLE = previous_value
 
 
-def test_stock_data_set_naive_numpy():
+def test_stock_data_set_numpy_naive():
     previous_value = ast_converter._NUMPY_AVAILABLE
     try:
         _test_stock_data_set(False, True)
