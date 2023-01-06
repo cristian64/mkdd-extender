@@ -1643,6 +1643,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             </a></small>
             <br/><br/>
             {mkdd_extender.__doc__}
+            <br/>
+            <br/>
+            <small>
+            MKDD Extender is free software.
+            <br/>
+            Licensed under the GNU General Public License.</small>
         """)
         show_message('logo', 'About MKDD Extender', text, '', self)
 
