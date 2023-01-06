@@ -356,6 +356,52 @@ class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
                             & ~QtWidgets.QStyle.State_HasFocus)
 
 
+class DropWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+        self._source_ids = tuple()
+        self._overlay_widget = None
+
+        self.setAcceptDrops(True)
+
+    def set_sources(self, sources: 'list[QtCore.QObject]'):
+        self._source_ids = tuple(id(src) for src in sources)
+
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent):
+        if id(event.source()) in self._source_ids:
+            event.accept()
+
+            self._overlay_widget = QtWidgets.QWidget(self)
+            self._overlay_widget.setAutoFillBackground(True)
+            palette = self._overlay_widget.palette()
+            palette.setColor(QtGui.QPalette.Window, QtCore.Qt.white)
+            self._overlay_widget.setPalette(palette)
+            self._overlay_widget.setVisible(True)
+            rect = self.rect()
+            rect.setWidth(rect.width() - 1)
+            rect.setHeight(rect.height() - 1)
+            self._overlay_widget.setGeometry(rect)
+            if rect.width() > 2 and rect.height() > 2:
+                inner_rect = QtCore.QRect(1, 1, rect.width() - 2, rect.height() - 2)
+                region = QtGui.QRegion(rect).xored(QtGui.QRegion(inner_rect))
+                self._overlay_widget.setMask(region)
+            self.update()
+
+    def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent):
+        _ = event
+
+        self._overlay_widget.deleteLater()
+        self._overlay_widget = None
+
+    def dropEvent(self, event: QtGui.QDropEvent):
+        event.accept()
+
+        self._overlay_widget.deleteLater()
+        self._overlay_widget = None
+
+
 class DragDropTableWidget(QtWidgets.QTableWidget):
 
     def __init__(self, rows: int, columns: int, parent: QtWidgets.QWidget = None):
@@ -1335,12 +1381,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_table.setWordWrap(False)
         self._custom_tracks_table_label = 'Custom Tracks'
         self._custom_tracks_table.setHorizontalHeaderLabels([self._custom_tracks_table_label])
+        custom_tracks_drop_widget = DropWidget()
+        custom_tracks_drop_widget_layout = QtWidgets.QVBoxLayout(custom_tracks_drop_widget)
+        custom_tracks_drop_widget_layout.addWidget(self._custom_tracks_table)
+        custom_tracks_drop_widget_layout.setContentsMargins(0, 0, 0, 0)
         custom_tracks_widget = QtWidgets.QWidget()
         custom_tracks_layout = QtWidgets.QVBoxLayout(custom_tracks_widget)
         custom_tracks_layout.setContentsMargins(0, 0, 0, 0)
         custom_tracks_layout.setSpacing(2)
         custom_tracks_layout.addWidget(self._custom_tracks_filter_edit)
-        custom_tracks_layout.addWidget(self._custom_tracks_table)
+        custom_tracks_layout.addWidget(custom_tracks_drop_widget)
         pages_widget = QtWidgets.QWidget()
         pages_layout = QtWidgets.QVBoxLayout(pages_widget)
         pages_layout.setContentsMargins(0, 0, 0, 0)
@@ -1386,6 +1436,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if page_table != other_page_table:
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
+        custom_tracks_drop_widget.set_sources(self._page_tables)
+
         self._info_view = InfoViewWidget()
         self._info_view.shown.connect(self._update_info_view)
         self._splitter = QtWidgets.QSplitter()
