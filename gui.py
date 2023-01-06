@@ -387,7 +387,6 @@ class DropWidget(QtWidgets.QWidget):
                 inner_rect = QtCore.QRect(1, 1, rect.width() - 2, rect.height() - 2)
                 region = QtGui.QRegion(rect).xored(QtGui.QRegion(inner_rect))
                 self._overlay_widget.setMask(region)
-            self.update()
 
     def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent):
         _ = event
