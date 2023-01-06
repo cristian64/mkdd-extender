@@ -190,6 +190,7 @@ def show_long_message(icon_name: str, title: str, text: str, parent: QtWidgets.Q
     icon_layout.addStretch()
 
     text_browser = QtWidgets.QTextBrowser()
+    text_browser.setOpenExternalLinks(True)
     text_browser.setFrameShape(QtWidgets.QFrame.NoFrame)
     text_browser.viewport().setAutoFillBackground(False)
     text_browser.setText(text)
