@@ -1688,6 +1688,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         show_long_message('info', 'Instructions', text, self)
 
     def _open_about_dialog(self):
+        forward_slashes_script_dir = '/'.join(script_dir.split('\\'))
+        if not forward_slashes_script_dir.startswith('/'):
+            forward_slashes_script_dir = f'/{forward_slashes_script_dir}'
+        copying_url = f'file://{forward_slashes_script_dir}/COPYING'
+
         text = textwrap.dedent(f"""\
             <h1 style="white-space: nowrap">MKDD Extender {mkdd_extender.__version__}</h1>
             <br/>
@@ -1701,7 +1706,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <small>
             MKDD Extender is free software.
             <br/>
-            Licensed under the GNU General Public License.</small>
+            Licensed under the <a href="{copying_url}">GNU General Public License</a>.
+            </small>
         """)
         show_message('logo', 'About MKDD Extender', text, '', self)
 
