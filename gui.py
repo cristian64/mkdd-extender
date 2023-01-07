@@ -1701,7 +1701,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <small>
             MKDD Extender is free software.
             <br/>
-            Licensed under the GNU General Public License.</small>
+            Licensed under the GNU General Public License version 3.</small>
         """)
         show_message('logo', 'About MKDD Extender', text, '', self)
 
