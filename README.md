@@ -30,9 +30,9 @@ command-line mode.
 Stand-alone precompiled bundles for Linux and Windows can be found in the
 [**Releases**](https://github.com/cristian64/mkdd-extender/releases) section.
 
-### Development Version
+### Compiling From Source
 
-Check out the Git repository along with its submodules:
+Clone the Git repository along with its submodules:
 
 ```shell
 git clone https://github.com/cristian64/mkdd-extender.git
@@ -41,13 +41,13 @@ git submodule update --init
 ```
 
 There are a number of Python dependencies (see [`requirements.txt`](requirements.txt)) that need to
-be installed:
+be installed first:
 
 ```shell
 python3 -m pip install --user -r requirements.txt
 ```
 
-Launch MKDD Extender by executing the `mkdd_extender.py` file:
+Then you can launch MKDD Extender by executing the `mkdd_extender.py` file:
 
 ```shell
 python3 mkdd_extender.py
