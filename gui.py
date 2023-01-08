@@ -1325,8 +1325,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         text_image_builder_action = tools_menu.addAction('Text Image Builder')
         text_image_builder_action.triggered.connect(self._on_text_image_builder_action_triggered)
         view_menu = menu.addMenu('View')
-        purge_caches_action = view_menu.addAction('Purge Caches')
-        purge_caches_action.triggered.connect(self._on_purge_caches_action_triggered)
+        purge_preview_caches_action = view_menu.addAction('Purge Preview Caches')
+        purge_preview_caches_action.triggered.connect(
+            self._on_purge_preview_caches_action_triggered)
         help_menu = menu.addMenu('Help')
         instructions_action = help_menu.addAction('Instructions')
         instructions_action.triggered.connect(self._open_instructions_dialog)
@@ -2546,7 +2547,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('text_image_builder/vertical_scaling',
                                 vertical_scaling_slider.get_value())
 
-    def _on_purge_caches_action_triggered(self):
+    def _on_purge_preview_caches_action_triggered(self):
         self._info_view.purge_caches()
         gc.collect()  # Rather placebo, but at least intention is shown.
         self._load_custom_tracks_directory()
