@@ -1551,9 +1551,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 self._custom_tracks_filter_edit.text())
 
         custom_tracks_table_header = self._custom_tracks_table.horizontalHeader()
+        sort_indicator_order = (0 if custom_tracks_table_header.sortIndicatorOrder()
+                                == QtCore.Qt.AscendingOrder else 1)
         self._settings.setValue('miscellaneous/tracks_order',
                                 (f'{custom_tracks_table_header.sortIndicatorSection()} '
-                                 f'{int(custom_tracks_table_header.sortIndicatorOrder())}'))
+                                 f'{sort_indicator_order}'))
 
         page_item_values = self._get_page_item_values()
         self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
