@@ -43,19 +43,19 @@ git submodule update --init
 Create a Python virtual environment via `venv`:
 
 ```shell
-python3 -m venv mkdd-extender-env
+python3 -m venv venv
 ```
 
 Enable the virtual environment:
 
 ```batch
 REM Windows
-mkdd-extender-env\Scripts\activate.bat
+venv\Scripts\activate.bat
 ```
 
 ```bash
 # Unix of macOS
-source mkdd-extender-env/bin/activate
+source venv/bin/activate
 ```
 
 Install the required dependencies (see [`requirements.txt`](requirements.txt)):
