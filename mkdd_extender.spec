@@ -19,7 +19,7 @@ On Linux, in a Bash terminal:
     python3 -m pip install pyinstaller-hooks-contrib==2022.13
     pyinstaller mkdd_extender.spec
     cd dist
-    python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'bztar', '.', d)"
+    python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'xztar', '.', d)"
 
 On Windows, in a cmd console:
 
