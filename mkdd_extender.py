@@ -602,16 +602,20 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
 
         margin_width = max(0, available_width - spacing_width)
         offset = max(0, margin_width // 2)
+        if not spacing:
+            offset += min(dpad_image.width, cupname_image.width - effective_width)
+        else:
+            offset += dpad_image.width
 
         ops = []
         for word in words:
-            ops.append((word, (offset + dpad_image.width, 0)))
+            ops.append((word, (offset, 0)))
             offset += spacing + word.width
 
         image = Image.new('RGBA', (canvas_width + dpad_image.width, canvas_height))
-        image.paste(dpad_image)
         for word, box in reversed(ops):
             image.alpha_composite(word, dest=box)
+        image.alpha_composite(dpad_image)
         image = image.convert(original_mode)
         image.save(tmp_filepath)
 
