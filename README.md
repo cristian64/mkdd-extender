@@ -33,22 +33,34 @@ Stand-alone precompiled bundles for Linux and Windows can be found in the
 ### Compiling From Source
 
 Clone the Git repository along with its submodules:
-
 ```shell
 git clone https://github.com/cristian64/mkdd-extender.git
 cd mkdd-extender
 git submodule update --init
 ```
 
-There are a number of Python dependencies (see [`requirements.txt`](requirements.txt)) that need to
-be installed first:
-
+Create a Python virtual environment via `venv`:
 ```shell
-python3 -m pip install --user -r requirements.txt
+python3 -m venv venv
 ```
 
-Then you can launch MKDD Extender by executing the `mkdd_extender.py` file:
+Enable the virtual environment:
+**Windows**
+```batch
+venv\Scripts\activate.bat
+```
 
+**Unix or macOS**
+```bash
+source venv/bin/activate
+```
+
+Install the required dependencies (see [`requirements.txt`](requirements.txt)):
 ```shell
-python3 mkdd_extender.py
+python -m pip install -r requirements.txt
+```
+
+Launch the application by executing the `mkdd_extender.py` file:
+```shell
+python mkdd_extender.py
 ```

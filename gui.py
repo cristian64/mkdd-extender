@@ -376,7 +376,8 @@ class DropWidget(QtWidgets.QWidget):
             self._overlay_widget = QtWidgets.QWidget(self)
             self._overlay_widget.setAutoFillBackground(True)
             palette = self._overlay_widget.palette()
-            palette.setColor(QtGui.QPalette.Window, QtCore.Qt.white)
+            color = palette.color(QtGui.QPalette.Text)
+            palette.setColor(QtGui.QPalette.Window, color)
             self._overlay_widget.setPalette(palette)
             self._overlay_widget.setVisible(True)
             rect = self.rect()
@@ -387,7 +388,6 @@ class DropWidget(QtWidgets.QWidget):
                 inner_rect = QtCore.QRect(1, 1, rect.width() - 2, rect.height() - 2)
                 region = QtGui.QRegion(rect).xored(QtGui.QRegion(inner_rect))
                 self._overlay_widget.setMask(region)
-            self.update()
 
     def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent):
         _ = event
@@ -1325,8 +1325,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         text_image_builder_action = tools_menu.addAction('Text Image Builder')
         text_image_builder_action.triggered.connect(self._on_text_image_builder_action_triggered)
         view_menu = menu.addMenu('View')
-        purge_caches_action = view_menu.addAction('Purge Caches')
-        purge_caches_action.triggered.connect(self._on_purge_caches_action_triggered)
+        purge_preview_caches_action = view_menu.addAction('Purge Preview Caches')
+        purge_preview_caches_action.triggered.connect(
+            self._on_purge_preview_caches_action_triggered)
         help_menu = menu.addMenu('Help')
         instructions_action = help_menu.addAction('Instructions')
         instructions_action.triggered.connect(self._open_instructions_dialog)
@@ -1550,9 +1551,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 self._custom_tracks_filter_edit.text())
 
         custom_tracks_table_header = self._custom_tracks_table.horizontalHeader()
+        sort_indicator_order = (0 if custom_tracks_table_header.sortIndicatorOrder()
+                                == QtCore.Qt.AscendingOrder else 1)
         self._settings.setValue('miscellaneous/tracks_order',
                                 (f'{custom_tracks_table_header.sortIndicatorSection()} '
-                                 f'{int(custom_tracks_table_header.sortIndicatorOrder())}'))
+                                 f'{sort_indicator_order}'))
 
         page_item_values = self._get_page_item_values()
         self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
@@ -1688,6 +1691,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         show_long_message('info', 'Instructions', text, self)
 
     def _open_about_dialog(self):
+        forward_slashes_script_dir = '/'.join(script_dir.split('\\'))
+        if not forward_slashes_script_dir.startswith('/'):
+            forward_slashes_script_dir = f'/{forward_slashes_script_dir}'
+        copying_url = f'file://{forward_slashes_script_dir}/COPYING'
+
         text = textwrap.dedent(f"""\
             <h1 style="white-space: nowrap">MKDD Extender {mkdd_extender.__version__}</h1>
             <br/>
@@ -1701,7 +1709,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <small>
             MKDD Extender is free software.
             <br/>
-            Licensed under the GNU General Public License.</small>
+            Licensed under the <a href="{copying_url}">GNU General Public License</a>.
+            </small>
         """)
         show_message('logo', 'About MKDD Extender', text, '', self)
 
@@ -2540,7 +2549,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('text_image_builder/vertical_scaling',
                                 vertical_scaling_slider.get_value())
 
-    def _on_purge_caches_action_triggered(self):
+    def _on_purge_preview_caches_action_triggered(self):
         self._info_view.purge_caches()
         gc.collect()  # Rather placebo, but at least intention is shown.
         self._load_custom_tracks_directory()
