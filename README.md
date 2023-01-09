@@ -54,7 +54,7 @@ venv\Scripts\activate.bat
 ```
 
 ```bash
-# Unix of macOS
+# Unix or macOS
 source venv/bin/activate
 ```
 
