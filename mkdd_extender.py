@@ -1125,7 +1125,7 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
 
 def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
     minimap_data = {}
-    auxiliary_audio_data = {}
+    alternative_audio_data = {}
     matching_audio_override_data = {}
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
@@ -1238,6 +1238,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 trackinfo.read(trackinfo_filepath)
                 trackname = trackinfo['Config']['trackname']
                 main_language = trackinfo['Config']['main_language']
+                replaces = trackinfo['Config'].get('replaces')
                 auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
             except Exception:
                 log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
@@ -1245,10 +1246,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 trackinfo = None
                 trackname = prefix
                 main_language = None
+                replaces = None
                 auxiliary_audio_track = None
 
             if auxiliary_audio_track:
-                auxiliary_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
+                alternative_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
+            elif replaces:
+                alternative_audio_data[prefix] = course_name_to_course(replaces)
 
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
@@ -1320,6 +1324,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             # Force use of auxiliary audio track if argument has been provided and the custo track
             # has the field defined.
             use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
+            use_replacee_audio_track = replaces and args.use_replacee_audio_track
+            use_alternative_audio_track = use_auxiliary_audio_track or use_replacee_audio_track
 
             def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args):
                 # Before copying a AST file to destination, check whether its checksum already
@@ -1341,7 +1347,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 make_link(src_ast_filepath, dst_ast_filepath)
                 conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
 
-            if not use_auxiliary_audio_track:
+            if not use_alternative_audio_track:
                 # Copy audio files. Unlike with the previous files, audio files are stored in the
                 # stock directory. The names of the audio files strategically start with a "X_"
                 # prefix to ensure they are inserted after the stock audio files.
@@ -1369,13 +1375,22 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                         log.info(
                             f'Unable to locate `lap_music_normal.ast` in "{nodename}". Auxiliary '
                             f'audio track ("{course_name}") will be used.')
+                    elif replaces:
+                        course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
+                        log.info(
+                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Replacee\'s '
+                            f'audio track ("{course_name}") will be used.')
                     else:
                         log.warning(
                             f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
                             'Circuit\'s sound track will be used.')
             else:
-                course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
-                log.info(f'Auxiliary audio track ("{course_name}") will be used.')
+                if auxiliary_audio_track:
+                    course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
+                    log.info(f'Auxiliary audio track ("{course_name}") will be used.')
+                else:
+                    course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
+                    log.info(f'Replacee\'s audio track ("{course_name}") will be used.')
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
@@ -1530,10 +1545,10 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         else:
             log.warning('No directory has been melded.')
 
-    return minimap_data, auxiliary_audio_data, matching_audio_override_data
+    return minimap_data, alternative_audio_data, matching_audio_override_data
 
 
-def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str, str]',
+def gather_audio_file_indices(iso_tmp_dir: str, alternative_audio_data: 'dict[str, str]',
                               matching_audio_override_data: 'dict[str, str]') -> tuple:
     # The Gecko code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
@@ -1592,7 +1607,7 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
         stock_audio_track_indices,
     )
 
-    for prefix, auxiliary_audio_track in auxiliary_audio_data.items():
+    for prefix, auxiliary_audio_track in alternative_audio_data.items():
         page_index = ord(prefix[0]) - ord('A')
         track_index = int(prefix[1:3]) - 1
         auxiliary_audio_index = course_stream_order.index(auxiliary_audio_track)
@@ -1627,7 +1642,7 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
 
 
 def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
-                   auxiliary_audio_data: 'dict[str, str]',
+                   alternative_audio_data: 'dict[str, str]',
                    matching_audio_override_data: 'dict[str, str]', iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
@@ -1773,7 +1788,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             f.seek(functions_offset)
             f.write(NEW_FUNCTIONS_INSTRUCTIONS)
 
-    audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data,
+    audio_track_data = gather_audio_file_indices(iso_tmp_dir, alternative_audio_data,
                                                  matching_audio_override_data)
 
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
@@ -1842,6 +1857,14 @@ OPTIONAL_ARGUMENTS = {
             '`auxiliary_audio_track` field in their `trackinfo.ini` file will be excluded from the '
             'ISO image. Instead, the audio track of the defined retail course will be used. This '
             'can be used to reduce the size of the ISO image.',
+        ),
+        (
+            'Use Replacee Audio Track',
+            bool,
+            'If specified, all custom audio tracks will be disregarded from the ISO image. '
+            'Instead, the audio track of the retail course defined by the `replaces` field in the '
+            '`trackinfo.ini` file will be used. If the `auxiliary_audio_track` field is defined, '
+            'its value will be used instead. This can be used to reduce the size of the ISO image.',
         ),
         (
             'Mix to Mono',
@@ -1979,9 +2002,9 @@ def extend_game(args: argparse.Namespace):
         if not args.skip_menu_titles:
             patch_title_lines(iso_tmp_dir)
         patch_cup_names(args.skip_cup_names, iso_tmp_dir)
-        minimap_data, auxiliary_audio_data, matching_audio_override_data = meld_courses(
+        minimap_data, alternative_audio_data, matching_audio_override_data = meld_courses(
             args, iso_tmp_dir)
-        patch_dol_file(args, minimap_data, auxiliary_audio_data, matching_audio_override_data,
+        patch_dol_file(args, minimap_data, alternative_audio_data, matching_audio_override_data,
                        iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
