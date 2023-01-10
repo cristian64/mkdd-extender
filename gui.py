@@ -16,6 +16,7 @@ import queue
 import re
 import shutil
 import signal
+import subprocess
 import sys
 import textwrap
 import tempfile
@@ -211,6 +212,13 @@ def show_long_message(icon_name: str, title: str, text: str, parent: QtWidgets.Q
     message_box.setMinimumHeight(char_height * 40)
 
     message_box.exec()
+
+
+def open_directory(dirpath: str):
+    if mkdd_extender.windows:
+        os.startfile(dirpath)  # pylint: disable=no-member
+    else:
+        subprocess.check_call(('open' if mkdd_extender.macos else 'xdg-open', dirpath))
 
 
 class PathEdit(QtWidgets.QWidget):
@@ -1304,6 +1312,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         menu = self.menuBar()
         file_menu = menu.addMenu('File')
+        open_configuration_directory_action = file_menu.addAction('Open Configuration Directory...')
+        open_configuration_directory_action.triggered.connect(
+            self._on_open_configuration_directory_action_triggered)
+        file_menu.addSeparator()
         quit_action = file_menu.addAction('Quit')
         quit_action.triggered.connect(self.close)
         edit_menu = menu.addMenu('Edit')
@@ -2067,6 +2079,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             # Reinsert the items back to the table.
             for row, item in enumerate(item_text_to_item.values()):
                 self._custom_tracks_table.setItem(row, 0, item)
+
+    def _on_open_configuration_directory_action_triggered(self):
+        open_directory(os.path.dirname(os.path.abspath(self._settings.fileName())))
 
     def _on_options_action_triggered(self):
         dialog = QtWidgets.QDialog(self)
