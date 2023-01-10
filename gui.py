@@ -1696,6 +1696,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             forward_slashes_script_dir = f'/{forward_slashes_script_dir}'
         copying_url = f'file://{forward_slashes_script_dir}/COPYING'
 
+        updates_url = 'https://github.com/cristian64/mkdd-extender/releases'
+
         text = textwrap.dedent(f"""\
             <h1 style="white-space: nowrap">MKDD Extender {mkdd_extender.__version__}</h1>
             <br/>
@@ -1707,9 +1709,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <br/>
             <br/>
             <small>
-            MKDD Extender is free software.
-            <br/>
-            Licensed under the <a href="{copying_url}">GNU General Public License (GPLv3)</a>.
+            <a href="{copying_url}">License</a> | <a href="{updates_url}">Updates</a>
             </small>
         """)
         show_message('logo', 'About MKDD Extender', text, '', self)
