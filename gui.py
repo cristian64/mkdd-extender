@@ -21,6 +21,7 @@ import sys
 import textwrap
 import tempfile
 import threading
+import time
 import traceback
 
 from typing import Any
@@ -1340,6 +1341,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         purge_preview_caches_action = view_menu.addAction('Purge Preview Caches')
         purge_preview_caches_action.triggered.connect(
             self._on_purge_preview_caches_action_triggered)
+        shelf_menu = menu.addMenu('Shelf')
+        shelf_menu.aboutToShow.connect(self._on_shelf_menu_about_to_show)
         help_menu = menu.addMenu('Help')
         instructions_action = help_menu.addAction('Instructions')
         instructions_action.triggered.connect(self._open_instructions_dialog)
@@ -1654,6 +1657,90 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._log_table.set_clear_log_before_each_run(
             self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true')
+
+    def _get_shelf_items(self) -> 'tuple[tuple[str, list[tuple[int, int, int, str, bool]]]]':
+        return tuple(self._settings.value('shelf/items', tuple()))
+
+    def _create_shelf_item(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.deleteLater()
+        dialog.setMinimumWidth(dialog.fontMetrics().averageCharWidth() * 60)
+        dialog.setWindowTitle('Create Shelf Item')
+        layout = QtWidgets.QVBoxLayout(dialog)
+        description_label = QtWidgets.QLabel()
+        description_label.setWordWrap(True)
+        description_label.setText('This tool is used to create a backup of the current mapping, '
+                                  'and store it on the shelf to be checked out in the future.')
+        layout.addWidget(description_label)
+        layout.addSpacing(dialog.fontMetrics().height())
+        name_layout = QtWidgets.QFormLayout()
+        name_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        name_edit = QtWidgets.QLineEdit()
+        name_edit.setText(time.strftime('%Y-%m-%d %H:%M:%S'))
+        QtCore.QTimer.singleShot(0, name_edit.selectAll)
+        name_layout.addRow('Shelf Item Name', name_edit)
+        layout.addLayout(name_layout)
+        layout.addStretch()
+        layout.addSpacing(dialog.fontMetrics().height() * 2)
+
+        def on_create_button_clicked():
+            name = name_edit.text()
+            shelf_items = list(self._get_shelf_items())
+            course_names = tuple(item[3] for item in self._get_page_item_values())
+            shelf_items.append((name, course_names))
+            self._settings.setValue('shelf/items', shelf_items)
+            dialog.close()
+
+        create_button = QtWidgets.QPushButton('Create')
+        create_button.clicked.connect(on_create_button_clicked)
+
+        def on_name_edit_textChanged(text: str):
+            create_button.setEnabled(bool(text))
+
+        name_edit.textChanged.connect(on_name_edit_textChanged)
+
+        bottom_layout = QtWidgets.QHBoxLayout()
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(create_button)
+        layout.addLayout(bottom_layout)
+        dialog.exec_()
+
+    def _delete_shelf_item(self, index: int):
+        shelf_items = list(self._get_shelf_items())
+        if 0 <= index < len(shelf_items):
+            messageBox = QtWidgets.QMessageBox(self)
+            messageBox.setIcon(QtWidgets.QMessageBox.Question)
+            messageBox.setWindowTitle('Delete Shelf Item')
+            messageBox.setText(f'Delete "{shelf_items[index][0]}" item?')
+            keepButton = messageBox.addButton('&Keep', QtWidgets.QMessageBox.RejectRole)
+            messageBox.setEscapeButton(keepButton)
+            deleteButton = messageBox.addButton('&Delete', QtWidgets.QMessageBox.DestructiveRole)
+            messageBox.setDefaultButton(deleteButton)
+            messageBox.exec_()
+            clickedButton = messageBox.clickedButton()
+            if clickedButton == deleteButton:
+                del shelf_items[index]
+                if shelf_items:
+                    self._settings.setValue('shelf/items', shelf_items)
+                else:
+                    self._settings.remove('shelf/items')
+
+    def _load_shelf_item(self, index: int):
+        shelf_items = self._get_shelf_items()
+        if 0 <= index < len(shelf_items):
+            items = self._get_page_item_values()
+            course_names = shelf_items[index][1]
+            for i, course_name in enumerate(course_names):
+                items[i] = list(items[i])
+                items[i][3] = course_name
+                items[i][4] = False
+            self._set_page_item_values(items)
+
+            self._sync_emblems()
+            self._update_info_view()
+
+            self._pending_undo_actions += 1
+            self._process_undo_action()
 
     def _open_instructions_dialog(self):
         text = textwrap.dedent(f"""\
@@ -2568,6 +2655,68 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._info_view.purge_caches()
         gc.collect()  # Rather placebo, but at least intention is shown.
         self._load_custom_tracks_directory()
+
+    def _on_shelf_menu_about_to_show(self):
+        shelf_menu = self.sender()
+        shelf_menu.clear()
+
+        font_height = self.fontMetrics().height()
+        header_font_size = int(font_height * 0.85)
+        font_size = int(font_height * 0.75)
+
+        def generate_html(course_names):
+            PAGE_NAMES = ('Up Page', 'Down Page', 'Left Page')
+            html = '<table style="white-space: nowrap;">'
+            pages = len(course_names) // 16
+            for page in range(pages):
+                margin = 0.0 if page == 0 else 0.8
+                html += ('<tr>'
+                         f'<td colspan="4" style="text-align: center; padding-top: {margin}em; '
+                         f'font-size: {header_font_size}px;">'
+                         f'<b>{PAGE_NAMES[page]}</b></td>'
+                         '</tr>')
+                for col in range(4):
+                    html += '<tr>'
+                    for row in range(4):
+                        course_name = course_names[page * 16 + row * 4 + col] or '-'
+                        html += (f'<td style="padding: 0.3em; font-size: {font_size}px;">'
+                                 f'{course_name}</td>')
+                    html += '</tr>'
+            html += '</table>'
+
+            return html
+
+        items = self._get_shelf_items()
+
+        for i, (name, course_names) in enumerate(items):
+            assert len(course_names) == 48
+
+            shelf_item_widget = QtWidgets.QWidget()
+            shelf_item_layout = QtWidgets.QVBoxLayout(shelf_item_widget)
+            shelf_item_layout.addWidget(QtWidgets.QLabel(generate_html(course_names)))
+
+            delete_button = QtWidgets.QPushButton('Delete')
+            delete_button.clicked.connect(lambda _checked=False, i=i: self._delete_shelf_item(i))
+            load_button = QtWidgets.QPushButton('Load')
+            load_button.clicked.connect(lambda _checked=False, i=i: self._load_shelf_item(i))
+            load_button.clicked.connect(shelf_menu.close)
+            buttons_layout = QtWidgets.QHBoxLayout()
+            buttons_layout.addStretch()
+            buttons_layout.addWidget(delete_button)
+            buttons_layout.addWidget(load_button)
+
+            shelf_item_layout.addLayout(buttons_layout)
+
+            shelf_item_menu = shelf_menu.addMenu(name)
+            shelf_item_widget_action = QtWidgets.QWidgetAction(shelf_item_menu)
+            shelf_item_widget_action.setDefaultWidget(shelf_item_widget)
+            shelf_item_menu.addAction(shelf_item_widget_action)
+
+        if items:
+            shelf_menu.addSeparator()
+
+        create_action = shelf_menu.addAction('Create Shelf Item...')
+        create_action.triggered.connect(self._create_shelf_item)
 
     def _build(self):
         if self._log_table.get_clear_log_before_each_run():
