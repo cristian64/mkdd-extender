@@ -119,6 +119,11 @@ A list of the "prefixes" that are used when naming the track archives. First let
 and the next two digits indicate the track index in the page (from `01` to `16`).
 """
 
+CUP_NAMES = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
+"""
+English names of the four cups.
+"""
+
 MAX_ISO_SIZE = 1459978240
 """
 The maximum size of the GameCube ISO files that GameCube or Wii can support.
@@ -1123,10 +1128,11 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
     log.info('Cup names patched.')
 
 
-def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
+def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | list]':
     minimap_data = {}
     alternative_audio_data = {}
     matching_audio_override_data = {}
+    added_course_names = []
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
 
@@ -1236,7 +1242,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 trackinfo_filepath = os.path.join(track_dirpath, 'trackinfo.ini')
                 trackinfo = configparser.ConfigParser()
                 trackinfo.read(trackinfo_filepath)
-                trackname = trackinfo['Config']['trackname']
+                trackname = trackinfo['Config']['trackname'] or 'Unnamed'
                 main_language = trackinfo['Config']['main_language']
                 replaces = trackinfo['Config'].get('replaces')
                 auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
@@ -1248,6 +1254,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 main_language = None
                 replaces = None
                 auxiliary_audio_track = None
+
+            added_course_names.append(trackname)
 
             if auxiliary_audio_track:
                 alternative_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
@@ -1545,7 +1553,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         else:
             log.warning('No directory has been melded.')
 
-    return minimap_data, alternative_audio_data, matching_audio_override_data
+    return minimap_data, alternative_audio_data, matching_audio_override_data, added_course_names
 
 
 def gather_audio_file_indices(iso_tmp_dir: str, alternative_audio_data: 'dict[str, str]',
@@ -1808,6 +1816,57 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         # pylint: enable=protected-access
 
 
+def write_description_file(args: argparse.Namespace, added_course_names: 'list[str]',
+                           iso_tmp_dir: str):
+    lines = []
+
+    lines.append('# MKDD Extender - Description File')
+    lines.append('')
+    lines.append('```')
+    lines.append(f'Application version:  {__version__}')
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    lines.append(f'Creation time:        {timestamp}')
+    lines.append('```')
+    lines.append('')
+
+    lines.append('## Options')
+    lines.append('')
+    option_lines = []
+    for _group_name, group_options in OPTIONAL_ARGUMENTS.items():
+        for option_label, option_type, _option_help in group_options:
+            option_member_name = f'{option_label.lower().replace(" ", "_")}'
+            option_value = getattr(args, option_member_name)
+            option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
+            if option_type is bool and option_value:
+                option_lines.append(f'- `{option_as_argument}`')
+            if option_type is int and option_value:
+                option_lines.append(f'-  `{option_as_argument}={option_value}`')
+    if option_lines:
+        lines.extend(option_lines)
+    else:
+        lines.append('Default options.')
+    lines.append('')
+
+    lines.append('## Custom Tracks')
+    lines.append('')
+    page_count = len(added_course_names) // 16
+    for page in range(page_count):
+        if page != 0:
+            lines.append('')
+        lines.append(f'### Page {page + 1}')
+        for i in range(16):
+            if i % 4 == 0:
+                lines.append('')
+                lines.append(f'#### {CUP_NAMES[i // 4]}')
+                lines.append('')
+            lines.append(f'- {added_course_names[page * 16 + i]}')
+
+    description_filepath = os.path.join(iso_tmp_dir, 'files', 'DESCRIPTION.md')
+    with open(description_filepath, 'w', encoding='utf-8') as f:
+        for line in lines:
+            f.write(f'{line}\n')
+
+
 OPTIONAL_ARGUMENTS = {
     'General options': (
         (
@@ -1840,6 +1899,14 @@ OPTIONAL_ARGUMENTS = {
             'the minimaps in the stock courses look larger and better aligned. However, custom '
             'tracks will rarely benefit from these specialized transforms; preserving these '
             'transforms will likely make some minimaps in custom tracks be cut off screen.',
+        ),
+        (
+            'Add Description File',
+            bool,
+            'If specified, a plain text file (`DESCRIPTION.md`) containing the description of the '
+            'extended game will be written to the `files` directory in the ISO image.\n\n'
+            'The description file includes the application version, the creation time, the options '
+            'that were used to generate the ISO image, and the name of added custom tracks.',
         ),
     ),
     'Audio options': (
@@ -2002,8 +2069,12 @@ def extend_game(args: argparse.Namespace):
         if not args.skip_menu_titles:
             patch_title_lines(iso_tmp_dir)
         patch_cup_names(args.skip_cup_names, iso_tmp_dir)
-        minimap_data, alternative_audio_data, matching_audio_override_data = meld_courses(
-            args, iso_tmp_dir)
+        (
+            minimap_data,
+            alternative_audio_data,
+            matching_audio_override_data,
+            added_course_names,
+        ) = meld_courses(args, iso_tmp_dir)
         patch_dol_file(args, minimap_data, alternative_audio_data, matching_audio_override_data,
                        iso_tmp_dir)
 
@@ -2041,6 +2112,10 @@ def extend_game(args: argparse.Namespace):
                     continue
                 raise MKDDExtenderError(f'{message}. Re-run with --skip-filesize-check to '
                                         'circumvent this safety measure.')
+
+        # Generate description file.
+        if args.add_description_file:
+            write_description_file(args, added_course_names, iso_tmp_dir)
 
         # It is paramount that the file list is sorted in the same order that has been used to
         # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
