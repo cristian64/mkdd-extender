@@ -1650,6 +1650,27 @@ def gather_audio_file_indices(iso_tmp_dir: str, alternative_audio_data: 'dict[st
     return tuple(tuple(l) for l in audio_track_data)
 
 
+def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
+    sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
+    dol_path = os.path.join(sys_dirpath, 'main.dol')
+
+    assert os.path.isfile(dol_path)
+
+    checksum = md5sum(dol_path)
+    if checksum not in (
+            'edb478baec557381d10137035a72bdcc',  # GM4E01
+            '3a8e73b977368d1e53293d36f634e3c7',  # GM4P01
+            '81f1b05c6650d65326f757bb25bad604',  # GM4J01
+            'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
+    ):
+        message = (f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}.')
+        if args.skip_dol_checksum_check:
+            log.warning(message)
+        else:
+            raise MKDDExtenderError(f'{message} Re-run with --skip-dol-checksum-check to '
+                                    'circumvent this safety measure.')
+
+
 def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
                    alternative_audio_data: 'dict[str, str]',
                    matching_audio_override_data: 'dict[str, str]', iso_tmp_dir: str):
@@ -1659,20 +1680,6 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
 
     assert os.path.isfile(dol_path)
     assert os.path.isfile(bi2_path)
-
-    checksum = md5sum(dol_path)
-    if checksum not in (
-            'edb478baec557381d10137035a72bdcc',  # GM4E01
-            '3a8e73b977368d1e53293d36f634e3c7',  # GM4P01
-            '81f1b05c6650d65326f757bb25bad604',  # GM4J01
-            'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
-    ):
-        message = (f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}')
-        if args.skip_dol_checksum_check:
-            log.warning(message)
-        else:
-            raise MKDDExtenderError(f'{message} Re-run with --skip-dol-checksum-check to '
-                                    'circumvent this safety measure.')
 
     with open(dol_path, 'rb') as f:
         data = f.read()
@@ -2046,6 +2053,9 @@ def extend_game(args: argparse.Namespace):
             if files_done > 0:
                 files_extracted = files_done
         log.info(f'Image extracted ({files_extracted} files).')
+
+        # Verify whether the DOL file is authentic or has been externally modified already.
+        verify_dol_checksum(args, iso_tmp_dir)
 
         # To determine which have been added, build the initial list now.
         log.info('Building initial file list...')
