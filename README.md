@@ -48,13 +48,13 @@ python3 -m venv venv
 
 Enable the virtual environment:
 
+_**Windows**_
 ```batch
-REM Windows
 venv\Scripts\activate.bat
 ```
 
+_**Unix or macOS**_
 ```bash
-# Unix or macOS
 source venv/bin/activate
 ```
 
