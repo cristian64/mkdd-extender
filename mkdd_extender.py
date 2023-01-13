@@ -930,6 +930,7 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
             sample_rate = downsample_sample_rate
 
         with wave.open(wav_filepath, 'wb') as f:
+            f: wave.Wave_write
             f.setsampwidth(bit_depth // 8)
             f.setnchannels(channel_count)
             f.setframerate(sample_rate)

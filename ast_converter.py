@@ -300,6 +300,7 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
         os.makedirs(os.path.dirname(dst_filepath), exist_ok=True)
 
     with wave.open(dst_filepath, 'wb') as f:
+        f: wave.Wave_write
         f.setsampwidth(bit_depth // 8)
         f.setnchannels(channel_count)
         f.setframerate(sample_rate)
