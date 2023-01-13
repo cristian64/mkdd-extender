@@ -1269,20 +1269,20 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 raise MKDDExtenderError(f'Unable to locate `track.arc` file in "{nodename}".')
             track_mp_filepath = os.path.join(track_dirpath, 'track_mp.arc')
             if not os.path.isfile(track_mp_filepath):
-                log.warning(f'Unable to locate `track_mp.arc` file in "{nodename}". '
-                            '`track.arc` will be used.')
                 track_mp_filepath = track_filepath
+            else:
+                log.info(f'Located `track_mp.arc` file in "{nodename}".')
             if track_index == 0:
                 track_50cc_filepath = os.path.join(track_dirpath, 'track_50cc.arc')
                 if not os.path.isfile(track_50cc_filepath):
-                    log.warning(f'Unable to locate `track_50cc.arc` file in "{nodename}". '
-                                '`track.arc` will be used.')
                     track_50cc_filepath = track_filepath
+                else:
+                    log.info(f'Located `track_50cc.arc` file in "{nodename}".')
                 track_mp_50cc_filepath = os.path.join(track_dirpath, 'track_mp_50cc.arc')
                 if not os.path.isfile(track_mp_50cc_filepath):
-                    log.warning(f'Unable to locate `track_mp_50cc.arc` file in "{nodename}". '
-                                '`track_mp.arc` will be used.')
                     track_mp_50cc_filepath = track_mp_filepath
+                else:
+                    log.info(f'Located `track_mp_50cc.arc` file in "{nodename}".')
             if track_index == 0:
                 page_track_filepath = os.path.join(page_course_dirpath,
                                                    f'{COURSES[track_index]}2.arc')
