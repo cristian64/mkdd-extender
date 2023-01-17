@@ -4,10 +4,10 @@ from itertools import chain
 from dolreader import DolFile, SectionCountFull
 from doltools import branchlink, branch, apply_gecko
 
-GCCPATH = "C:\\devkitPro\\devkitPPC\\bin\\powerpc-eabi-gcc.exe"
-LDPATH = "C:\\devkitPro\\devkitPPC\\bin\\powerpc-eabi-ld.exe"
-OBJDUMPPATH = "C:\\devkitPro\\devkitPPC\\bin\\powerpc-eabi-objdump.exe"
-OBJCOPYPATH = "C:\\devkitPro\\devkitPPC\\bin\\powerpc-eabi-objcopy.exe"
+GCCPATH = os.environ.get("GCCKIT_GCCPATH")
+LDPATH = os.environ.get("GCCKIT_LDPATH")
+OBJDUMPPATH = os.environ.get("GCCKIT_OBJDUMPPATH")
+OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 
 def compile(inpath, outpath, mode, optimize="-O1", std="c99", warning="-w"):
