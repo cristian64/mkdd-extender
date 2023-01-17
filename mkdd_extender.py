@@ -2130,6 +2130,21 @@ def extend_game(args: argparse.Namespace):
         if args.add_description_file:
             write_description_file(args, added_course_names, iso_tmp_dir)
 
+        # Cross-check which files have been added, and then import all files from disk. While it
+        # could be more efficient to compare timestamps and import only the ones that have really
+        # changed, the truth is that the ISO image is going to be written straight away, and every
+        # file will have to be read regardless.
+        log.info('Preparing ISO image...')
+        final_file_list = build_file_list(iso_tmp_dir)
+        for path in final_file_list:
+            if path not in initial_file_list:
+                if os.path.isfile(os.path.join(iso_tmp_dir, path)):
+                    gcm_file.add_new_file(path)
+                else:
+                    gcm_file.add_new_directory(path)
+        gcm_file.import_all_files_from_disk(iso_tmp_dir)
+        log.info('ISO image prepared.')
+
         # It is paramount that the file list is sorted in the same order that has been used to
         # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
         # the correct order, but modified ISO files may have AST files in a different order.
@@ -2158,21 +2173,6 @@ def extend_game(args: argparse.Namespace):
             k: gcm_file.dirs_by_path_lowercase[k]
             for k in sorted(gcm_file.dirs_by_path_lowercase.keys())
         }
-
-        # Cross-check which files have been added, and then import all files from disk. While it
-        # could be more efficient to compare timestamps and import only the ones that have really
-        # changed, the truth is that the ISO image is going to be written straight away, and every
-        # file will have to be read regardless.
-        log.info('Preparing ISO image...')
-        final_file_list = build_file_list(iso_tmp_dir)
-        for path in final_file_list:
-            if path not in initial_file_list:
-                if os.path.isfile(os.path.join(iso_tmp_dir, path)):
-                    gcm_file.add_new_file(path)
-                else:
-                    gcm_file.add_new_directory(path)
-        gcm_file.import_all_files_from_disk(iso_tmp_dir)
-        log.info('ISO image prepared.')
 
         # Write the extended ISO file to the final location.
         log.info(f'Writing extended ISO image to "{args.output}"...')
