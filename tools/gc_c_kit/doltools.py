@@ -2,7 +2,7 @@ from struct import pack
 from math import ceil 
 from binascii import unhexlify
 
-from dolreader import write_uint32
+from .dolreader import write_uint32
 
 def range_check(val, bits):
     if not (val <= 2**bits - 1):

@@ -1,8 +1,9 @@
 import subprocess 
 import os 
 from itertools import chain
-from dolreader import DolFile, SectionCountFull
-from doltools import branchlink, branch, apply_gecko
+
+from .dolreader import DolFile, SectionCountFull
+from .doltools import branchlink, branch, apply_gecko
 
 GCCPATH = os.environ.get("GCCKIT_GCCPATH")
 LDPATH = os.environ.get("GCCKIT_LDPATH")
