@@ -15,7 +15,7 @@ def compile(inpath, outpath, mode, optimize="-O1", std="c99", warning="-w"):
     #args = [GCCPATH, inpath, mode, "-o", outpath, optimize, "-std="+std, warning]
     args = [GCCPATH, inpath, mode, "-o", outpath, optimize, warning]
     print(args)
-    subprocess.call(args)
+    subprocess.check_call(args)
     
     
 def link(infiles, outfile, outmap, linker_files):
@@ -32,14 +32,14 @@ def link(infiles, outfile, outmap, linker_files):
     
     arg.extend(("-Map", outmap))
     print(arg)
-    subprocess.call(arg)
+    subprocess.check_call(arg)
     
     
 def objdump(*args):
     arg = [OBJDUMPPATH]
     arg.extend(args)
     print(arg)
-    subprocess.call(arg)
+    subprocess.check_call(arg)
 
 
 def objcopy(*args, attrs = []):
@@ -48,7 +48,7 @@ def objcopy(*args, attrs = []):
     for attr in attrs:
         arg.extend(("-R", attr))
     print(arg)
-    subprocess.call(arg)
+    subprocess.check_call(arg)
     
     
 def read_map(mappath):
@@ -62,6 +62,33 @@ def read_map(mappath):
         next2 = f.readline()
         assert next.startswith(" *(.text)")
         assert next2.startswith(" .text")
+        next = f.readline()
+        
+        while next.strip() != "":
+            vals = next.strip().split(" ")
+
+            for i in range(vals.count("")):
+                vals.remove("")
+            
+            addr = vals[0]
+            func = vals[1]
+            
+            result[func] = int(addr, 16) 
+            next = f.readline()
+    
+    return result 
+
+def read_data(mappath):
+    result = {}
+    with open(mappath, "r") as f:
+        for line in f:
+            if line.startswith(".data"):
+                break 
+        
+        next = f.readline()
+        next2 = f.readline()
+        assert next.startswith(" *(.data)")
+        assert next2.startswith(" .data")
         next = f.readline()
         
         while next.strip() != "":
@@ -111,7 +138,7 @@ class Project(object):
         self.branches = []
         
         self.osarena_patcher = None 
-        
+        self.functions = None
         
     def add_file(self, filepath):
         self.c_files.append(filepath)
@@ -134,6 +161,24 @@ class Project(object):
     def apply_gecko(self, geckopath):
         with open(geckopath, "r") as f:
             apply_gecko(self.dol, f)
+    
+    def append_to_symbol_map(self, symbols, map, newmap):
+        addresses = []
+        for k, v in symbols.items():
+            addresses.append((k,v))
+        addresses.sort(key=lambda x: x[1])
+        
+        with open(map, "r") as f:
+            data = f.read()
+        
+        with open(newmap, "w") as f:
+            f.write(data)
+            for i, v in enumerate(addresses):
+                if i+1 < len(addresses):
+                    f.write("\n")
+                    size = addresses[i+1][1]-v[1]
+                    f.write("{0:x} {1:08x} {0:x} 0 {2}".format(v[1], size, v[0]))
+            
     
     def build(self, newdolpath, address=None, offset=None):
         os.makedirs("tmp", exist_ok=True)
