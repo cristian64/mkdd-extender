@@ -2136,6 +2136,16 @@ def extend_game(args: argparse.Namespace):
         # file will have to be read regardless.
         log.info('Preparing ISO image...')
         final_file_list = build_file_list(iso_tmp_dir)
+        # Also drop from the list those directories and files that no longer exist in the image.
+        for path in initial_file_list:
+            if path not in final_file_list:
+                dir_entry = gcm_file.dirs_by_path_lowercase.get(path.lower())
+                if dir_entry is not None:
+                    gcm_file.delete_directory(dir_entry)
+                    continue
+                file_entry = gcm_file.files_by_path_lowercase.get(path.lower())
+                if file_entry is not None:
+                    gcm_file.delete_file(file_entry)
         for path in final_file_list:
             if path not in initial_file_list:
                 if os.path.isfile(os.path.join(iso_tmp_dir, path)):
