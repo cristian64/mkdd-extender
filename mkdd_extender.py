@@ -2149,13 +2149,13 @@ def extend_game(args: argparse.Namespace):
         # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
         # the correct order, but modified ISO files may have AST files in a different order.
         log.info('Sorting file list in asciibetical order...')
-        gcm_file.file_entries = sorted(gcm_file.file_entries, key=lambda e: e.file_path)
+        gcm_file.file_entries = sorted(gcm_file.file_entries, key=lambda e: e.file_path.lower())
         for file_entry in gcm_file.file_entries:
             if hasattr(file_entry, 'children'):
-                file_entry.children = sorted(file_entry.children, key=lambda e: e.file_path)
+                file_entry.children = sorted(file_entry.children, key=lambda e: e.file_path.lower())
         gcm_file.files_by_path = {
             k: gcm_file.files_by_path[k]
-            for k in sorted(gcm_file.files_by_path.keys())
+            for k in sorted(gcm_file.files_by_path.keys(), key=str.lower)
         }
         gcm_file.files_by_path_lowercase = {
             k: gcm_file.files_by_path_lowercase[k]
@@ -2163,11 +2163,11 @@ def extend_game(args: argparse.Namespace):
         }
         gcm_file.changed_files = {
             k: gcm_file.changed_files[k]
-            for k in sorted(gcm_file.changed_files.keys())
+            for k in sorted(gcm_file.changed_files.keys(), key=str.lower)
         }
         gcm_file.dirs_by_path = {
             k: gcm_file.dirs_by_path[k]
-            for k in sorted(gcm_file.dirs_by_path.keys())
+            for k in sorted(gcm_file.dirs_by_path.keys(), key=str.lower)
         }
         gcm_file.dirs_by_path_lowercase = {
             k: gcm_file.dirs_by_path_lowercase[k]
