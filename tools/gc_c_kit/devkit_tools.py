@@ -12,7 +12,7 @@ OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 
 def compile(inpath, outpath, mode, optimize="-O1", std="c99", warning="-w"):
-    assert mode in ("-S", "-c") # turn into asm or compile
+    assert mode in ("-S", "-c")  # turn into asm or compile
     #args = [GCCPATH, inpath, mode, "-o", outpath, optimize, "-std="+std, warning]
     args = [GCCPATH, inpath, mode, "-o", outpath, optimize, warning]
     print(args)
@@ -43,7 +43,7 @@ def objdump(*args):
     subprocess.check_call(arg)
 
 
-def objcopy(*args, attrs = []):
+def objcopy(*args, attrs=[]):
     arg = [OBJCOPYPATH]
     arg.extend(args)
     for attr in attrs:
@@ -79,6 +79,7 @@ def read_map(mappath):
 
     return result
 
+
 def read_data(mappath):
     result = {}
     with open(mappath, "r") as f:
@@ -108,8 +109,9 @@ def read_data(mappath):
 
 
 class Project(object):
+
     def __init__(self, dolpath, address=None, offset=None):
-        with open(dolpath,"rb") as f:
+        with open(dolpath, "rb") as f:
             tmp = DolFile(f)
 
         try:
@@ -127,7 +129,7 @@ class Project(object):
         if offset is not None:
             self._address += offset
         del tmp
-        with open(dolpath,"rb") as f:
+        with open(dolpath, "rb") as f:
             self.dol = DolFile(f)
 
         self.c_files = []
@@ -166,7 +168,7 @@ class Project(object):
     def append_to_symbol_map(self, symbols, map, newmap):
         addresses = []
         for k, v in symbols.items():
-            addresses.append((k,v))
+            addresses.append((k, v))
         addresses.sort(key=lambda x: x[1])
 
         with open(map, "r") as f:
@@ -175,23 +177,22 @@ class Project(object):
         with open(newmap, "w") as f:
             f.write(data)
             for i, v in enumerate(addresses):
-                if i+1 < len(addresses):
+                if i + 1 < len(addresses):
                     f.write("\n")
-                    size = addresses[i+1][1]-v[1]
+                    size = addresses[i + 1][1] - v[1]
                     f.write("{0:x} {1:08x} {0:x} 0 {2}".format(v[1], size, v[0]))
-
 
     def build(self, newdolpath, address=None, offset=None):
         os.makedirs("tmp", exist_ok=True)
 
         for fpath in self.c_files:
-            compile(fpath, fpath+".s", mode="-S")
-            compile(fpath, fpath+".o", mode="-c")
+            compile(fpath, fpath + ".s", mode="-S")
+            compile(fpath, fpath + ".o", mode="-c")
 
         for fpath in self.asm_files:
-            compile(fpath, fpath+".o", mode="-c")
+            compile(fpath, fpath + ".o", mode="-c")
 
-        inputobjects = [fpath+".o" for fpath in chain(self.c_files, self.asm_files)]
+        inputobjects = [fpath + ".o" for fpath in chain(self.c_files, self.asm_files)]
         with open("tmplink", "w") as f:
             f.write("""SECTIONS
 {{
@@ -217,12 +218,18 @@ class Project(object):
         linker_files = ["tmplink"]
         for fpath in self.linker_files:
             linker_files.append(fpath)
-        link(   [fpath+".o" for fpath in chain(self.c_files, self.asm_files)],
-                "project.o", "project.map", linker_files)
+        link([fpath + ".o" for fpath in chain(self.c_files, self.asm_files)], "project.o",
+             "project.map", linker_files)
 
         objdump("project.o", "--full-content")
 
-        objcopy("project.o", "project.bin", "-O", "binary", "-g", "-S", attrs=[".eh_frame", ".comment", ".gnu.attributes"])
+        objcopy("project.o",
+                "project.bin",
+                "-O",
+                "binary",
+                "-g",
+                "-S",
+                attrs=[".eh_frame", ".comment", ".gnu.attributes"])
 
         with open("project.bin", "rb") as f:
             data = f.read()
@@ -252,10 +259,11 @@ class Project(object):
             branchlink(self.dol, addr, functions[func])
 
         if self.osarena_patcher is not None:
-            self.osarena_patcher(self.dol, sectionaddr+size)
+            self.osarena_patcher(self.dol, sectionaddr + size)
 
         with open(newdolpath, "wb") as f:
             self.dol.save(f)
+
 
 if __name__ == "__main__":
     compile("main.c", "main.s", mode="-S")

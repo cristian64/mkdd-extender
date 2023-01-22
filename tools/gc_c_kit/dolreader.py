@@ -5,19 +5,25 @@ from io import BytesIO, RawIOBase
 def read_ubyte(f):
     return struct.unpack("B", f.read(1))[0]
 
+
 def read_uint32(f):
     return struct.unpack(">I", f.read(4))[0]
+
 
 def write_uint32(f, val):
     f.write(struct.pack(">I", val))
 
+
 class UnmappedAddress(Exception):
     pass
+
 
 class SectionCountFull(Exception):
     pass
 
+
 class DolFile(object):
+
     def __init__(self, f):
         self._rawdata = BytesIO(f.read())
         f.seek(0)
@@ -35,11 +41,11 @@ class DolFile(object):
 
         # Read text and data section addresses and sizes
         for i in range(18):
-            f.seek(fileoffset+i*4)
+            f.seek(fileoffset + i * 4)
             offset = read_uint32(f)
-            f.seek(addressoffset+i*4)
+            f.seek(addressoffset + i * 4)
             address = read_uint32(f)
-            f.seek(sizeoffset+i*4)
+            f.seek(sizeoffset + i * 4)
             size = read_uint32(f)
 
             if i <= 6:
@@ -73,7 +79,7 @@ class DolFile(object):
     # Internal function for resolving a gc address
     def _resolve_address(self, gc_addr):
         for offset, address, size in self.sections:
-            if address <= gc_addr < address+size:
+            if address <= gc_addr < address + size:
                 return offset, address, size
         """for offset, address, size in self._text:
             if address <= gc_addr < address+size:
@@ -93,21 +99,21 @@ class DolFile(object):
 
         i = 0
         for offset, address, size in self._text:
-            f.seek(fileoffset+i*4)
+            f.seek(fileoffset + i * 4)
             write_uint32(f, offset)
-            f.seek(addressoffset+i*4)
+            f.seek(addressoffset + i * 4)
             write_uint32(f, address)
-            f.seek(sizeoffset+i*4)
+            f.seek(sizeoffset + i * 4)
             write_uint32(f, size)
             i += 1
 
         i = 7
         for offset, address, size in self._data:
-            f.seek(fileoffset+i*4)
+            f.seek(fileoffset + i * 4)
             write_uint32(f, offset)
-            f.seek(addressoffset+i*4)
+            f.seek(addressoffset + i * 4)
             write_uint32(f, address)
-            f.seek(sizeoffset+i*4)
+            f.seek(sizeoffset + i * 4)
             write_uint32(f, size)
             i += 1
 
@@ -136,7 +142,7 @@ class DolFile(object):
 
     def seek(self, addr):
         offset, gc_start, gc_size = self._resolve_address(addr)
-        self._rawdata.seek(offset + (addr-gc_start))
+        self._rawdata.seek(offset + (addr - gc_start))
 
         self._curraddr = addr
         self._current_end = gc_start + gc_size
@@ -149,18 +155,18 @@ class DolFile(object):
         last_offset = 0
 
         for offset, address, size in self.sections:
-            if last_addr < address+size:
-                last_addr = address+size
+            if last_addr < address + size:
+                last_addr = address + size
             if last_offset < offset + size:
-                last_offset = offset+size
+                last_offset = offset + size
 
-        if last_addr < self.bssaddr+self.bsssize:
-            last_addr = self.bssaddr+self.bsssize
+        if last_addr < self.bssaddr + self.bsssize:
+            last_addr = self.bssaddr + self.bsssize
 
         section.append((last_offset, last_addr, newsize))
         curr = self._rawdata.tell()
         self._rawdata.seek(last_offset)
-        self._rawdata.write(b" "*newsize)
+        self._rawdata.write(b" " * newsize)
         self._rawdata.seek(curr)
 
         return (last_offset, last_addr, newsize)
@@ -179,14 +185,12 @@ class DolFile(object):
 
         return self._add_section(size, self._data, addr=None)
 
-
     def tell(self):
         return self._curraddr
 
     def save(self, f):
         self._adjust_header()
         f.write(self._rawdata.getbuffer())
-
 
     def print_info(self):
         print("Dol Info:")
@@ -200,8 +204,9 @@ class DolFile(object):
             print("data{0}: fileoffset {1:x}, addr {2:x}, size {3:x}".format(i, offset, addr, size))
             i += 1
 
-        print("bss addr: {0:x}, bss size: {1:x}, bss end: {2:x}".format(self.bssaddr, self.bsssize,
-                                                                            self.bssaddr+ self.bsssize))
+        print("bss addr: {0:x}, bss size: {1:x}, bss end: {2:x}".format(
+            self.bssaddr, self.bsssize, self.bssaddr + self.bsssize))
+
 
 if __name__ == "__main__":
     with open("pikmin.dol", "rb") as f:
@@ -210,4 +215,3 @@ if __name__ == "__main__":
     dol.print_info()
     dol.allocate_text_section(4)
     dol.print_info()
-
