@@ -11,10 +11,10 @@ OBJDUMPPATH = os.environ.get("GCCKIT_OBJDUMPPATH")
 OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 
-def compile(inpath, outpath, mode, optimize="-O1", std="c99", warning="-w"):
-    assert mode in ("-S", "-c")  # turn into asm or compile
-    #args = [GCCPATH, inpath, mode, "-o", outpath, optimize, "-std="+std, warning]
-    args = [GCCPATH, inpath, mode, "-o", outpath, optimize, warning]
+def compile(inpath, outpath, mode, optimize="-O1", warnings=('-W', '-Wall', '-Wextra')):
+    assert mode in ("-S", "-c")
+    args = [GCCPATH, inpath, mode, "-o", outpath, optimize]
+    args += warnings
     subprocess.check_call(args)
 
 
