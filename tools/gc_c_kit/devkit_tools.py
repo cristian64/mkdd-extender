@@ -11,7 +11,7 @@ OBJDUMPPATH = os.environ.get("GCCKIT_OBJDUMPPATH")
 OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 
-def compile(inpath, outpath, mode, optimize="-O1", warnings=('-W', '-Wall', '-Wextra')):
+def compile_(inpath, outpath, mode, optimize="-O1", warnings=('-W', '-Wall', '-Wextra')):
     assert mode in ("-S", "-c")
     args = [GCCPATH, inpath, mode, "-o", outpath, optimize]
     args += warnings
@@ -40,7 +40,7 @@ def objdump(*args):
     subprocess.check_call(arg)
 
 
-def objcopy(*args, attrs=[]):
+def objcopy(*args, attrs=tuple()):
     arg = [OBJCOPYPATH]
     arg.extend(args)
     for attr in attrs:
@@ -50,71 +50,71 @@ def objcopy(*args, attrs=[]):
 
 def read_map(mappath):
     result = {}
-    with open(mappath, "r") as f:
+    with open(mappath, "r", encoding='ascii') as f:
         for line in f:
             if line.startswith(".text"):
                 break
 
-        next = f.readline()
+        next1 = f.readline()
         next2 = f.readline()
-        assert next.startswith(" *(.text)")
+        assert next1.startswith(" *(.text)")
         assert next2.startswith(" .text")
-        next = f.readline()
+        next1 = f.readline()
 
-        while next.strip() != "":
-            vals = next.strip().split(" ")
+        while next1.strip() != "":
+            vals = next1.strip().split(" ")
 
-            for i in range(vals.count("")):
+            for _ in range(vals.count("")):
                 vals.remove("")
 
             addr = vals[0]
             func = vals[1]
 
             result[func] = int(addr, 16)
-            next = f.readline()
+            next1 = f.readline()
 
     return result
 
 
 def read_data(mappath):
     result = {}
-    with open(mappath, "r") as f:
+    with open(mappath, "r", encoding='ascii') as f:
         for line in f:
             if line.startswith(".data"):
                 break
 
-        next = f.readline()
+        next1 = f.readline()
         next2 = f.readline()
-        assert next.startswith(" *(.data)")
+        assert next1.startswith(" *(.data)")
         assert next2.startswith(" .data")
-        next = f.readline()
+        next1 = f.readline()
 
-        while next.strip() != "":
-            vals = next.strip().split(" ")
+        while next1.strip() != "":
+            vals = next1.strip().split(" ")
 
-            for i in range(vals.count("")):
+            for _ in range(vals.count("")):
                 vals.remove("")
 
             addr = vals[0]
             func = vals[1]
 
             result[func] = int(addr, 16)
-            next = f.readline()
+            next1 = f.readline()
 
     return result
 
 
-class Project(object):
+class Project:
 
     def __init__(self, dolpath, address=None, offset=None):
         with open(dolpath, "rb") as f:
             tmp = DolFile(f)
 
         try:
-            _offset, addr, size = tmp.allocate_text_section(4, address)
+            _offset, addr, _size = tmp.allocate_text_section(4, address)
         except SectionCountFull as e:
             try:
-                _offset, addr, size = tmp.allocate_data_section(4, address)
+                _offset, addr, _size = tmp.allocate_data_section(4, address)
             except SectionCountFull as e:
                 raise RuntimeError("Dol is full! Cannot allocate any new sections") from e
 
@@ -156,19 +156,19 @@ class Project(object):
         self.osarena_patcher = function
 
     def apply_gecko(self, geckopath):
-        with open(geckopath, "r") as f:
+        with open(geckopath, "r", encoding='ascii') as f:
             apply_gecko(self.dol, f)
 
-    def append_to_symbol_map(self, symbols, map, newmap):
+    def append_to_symbol_map(self, symbols, map_, newmap):
         addresses = []
         for k, v in symbols.items():
             addresses.append((k, v))
         addresses.sort(key=lambda x: x[1])
 
-        with open(map, "r") as f:
+        with open(map_, "r", encoding='ascii') as f:
             data = f.read()
 
-        with open(newmap, "w") as f:
+        with open(newmap, "w", encoding='ascii') as f:
             f.write(data)
             for i, v in enumerate(addresses):
                 if i + 1 < len(addresses):
@@ -176,18 +176,17 @@ class Project(object):
                     size = addresses[i + 1][1] - v[1]
                     f.write("{0:x} {1:08x} {0:x} 0 {2}".format(v[1], size, v[0]))
 
-    def build(self, newdolpath, address=None, offset=None):
+    def build(self, newdolpath):
         os.makedirs("tmp", exist_ok=True)
 
         for fpath in self.c_files:
-            compile(fpath, fpath + ".s", mode="-S")
-            compile(fpath, fpath + ".o", mode="-c")
+            compile_(fpath, fpath + ".s", mode="-S")
+            compile_(fpath, fpath + ".o", mode="-c")
 
         for fpath in self.asm_files:
-            compile(fpath, fpath + ".o", mode="-c")
+            compile_(fpath, fpath + ".o", mode="-c")
 
-        inputobjects = [fpath + ".o" for fpath in chain(self.c_files, self.asm_files)]
-        with open("tmplink", "w") as f:
+        with open("tmplink", "w", encoding='ascii') as f:
             f.write("""SECTIONS
 {{
     . = 0x{0:x};
@@ -228,7 +227,7 @@ class Project(object):
 
         functions = read_map("project.map")
 
-        offset, sectionaddr, size = self.dol.allocate_text_section(len(data), addr=self._address)
+        _offset, sectionaddr, size = self.dol.allocate_text_section(len(data), addr=self._address)
 
         self.dol.seek(sectionaddr)
         self.dol.write(data)
@@ -254,5 +253,5 @@ class Project(object):
 
 
 if __name__ == "__main__":
-    compile("main.c", "main.s", mode="-S")
-    compile("main.c", "main.o", mode="-c")
+    compile_("main.c", "main.s", mode="-S")
+    compile_("main.c", "main.o", mode="-c")

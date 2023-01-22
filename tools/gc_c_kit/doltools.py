@@ -6,7 +6,7 @@ from .dolreader import write_uint32
 
 
 def range_check(val, bits):
-    if not (val <= 2**bits - 1):
+    if not val <= 2**bits - 1:
         raise RuntimeError("Value {0} exceeds size ({1} bits)".format(val, bits))
 
 
@@ -35,14 +35,6 @@ def _branch(dol, from_addr, to_addr, link, absolute=False):
     assert delta % 4 == 0
     delta = delta // 4
     res = calc_signed(delta, 24)
-    """if delta < 0:
-        res = 2**24 + delta
-        if res <= 2**23 - 1:
-            raise RuntimeError("Branch out of range: from {0} to {1}".format(from_addr, to_addr))
-    else:
-        res = delta
-        if res > 2**23 - 1:
-            raise RuntimeError("Branch out of range: from {0} to {1}".format(from_addr, to_addr))"""
     #res = res & (2**24 - 1)
 
     out |= (res << 2)  # immediate value for branching
@@ -129,7 +121,7 @@ def write_nop(dol):
 def _read_line(line):
     line = line.strip()
     vals = line.split(" ")
-    for i in range(vals.count("")):
+    for _ in range(vals.count("")):
         vals.remove("")
 
     val1 = int(vals[0], 16)
@@ -160,7 +152,7 @@ def apply_gecko(dol, f):
             value = val2 & 0xFF
 
             dol.seek(addr)
-            for i in range(amount):
+            for _ in range(amount):
                 dol.write(pack("B", value))
 
         elif codetype == 0x02:
@@ -168,7 +160,7 @@ def apply_gecko(dol, f):
             value = val2 & 0xFFFF
 
             dol.seek(addr)
-            for i in range(amount):
+            for _ in range(amount):
                 dol.write(pack(">H", value))
 
         elif codetype == 0x04:
@@ -178,12 +170,12 @@ def apply_gecko(dol, f):
         elif codetype == 0x06:
             bytecount = val2
             dol.seek(addr)
-            for i in range(int(ceil(bytecount / 8.0))):
+            for _ in range(int(ceil(bytecount / 8.0))):
                 datalen = bytecount % 8
                 line = f.readline().strip()
                 assert line != ""
                 vals = line.split(" ")
-                for j in range(vals.count("")):
+                for _ in range(vals.count("")):
                     vals.remove("")
                 data = "".join(vals)
 

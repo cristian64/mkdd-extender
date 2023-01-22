@@ -1,5 +1,5 @@
 import struct
-from io import BytesIO, RawIOBase
+from io import BytesIO
 
 
 def read_ubyte(f):
@@ -22,7 +22,7 @@ class SectionCountFull(Exception):
     pass
 
 
-class DolFile(object):
+class DolFile:
 
     def __init__(self, f):
         self._rawdata = BytesIO(f.read())
@@ -33,9 +33,6 @@ class DolFile(object):
 
         self._text = []
         self._data = []
-
-        nomoretext = False
-        nomoredata = False
 
         self._current_end = None
 
@@ -53,7 +50,6 @@ class DolFile(object):
                     self._text.append((offset, address, size))
                     # print("text{0}".format(i), hex(offset), hex(address), hex(size))
             else:
-                datanum = i - 7
                 if offset != 0:
                     self._data.append((offset, address, size))
                     # print("data{0}".format(datanum), hex(offset), hex(address), hex(size))
@@ -74,19 +70,11 @@ class DolFile(object):
         for i in self._data:
             yield i
 
-        return
-
     # Internal function for resolving a gc address
     def _resolve_address(self, gc_addr):
         for offset, address, size in self.sections:
             if address <= gc_addr < address + size:
                 return offset, address, size
-        """for offset, address, size in self._text:
-            if address <= gc_addr < address+size:
-                return offset, address, size
-        for offset, address, size in self._data:
-            if address <= gc_addr < address+size:
-                return offset, address, size """
 
         raise UnmappedAddress("Unmapped address: {0}".format(hex(gc_addr)))
 
@@ -130,7 +118,6 @@ class DolFile(object):
             raise RuntimeError("Read goes over current section")
 
         return self._rawdata.read(size)
-        self._curraddr += size
 
     # Assumption: A write should not go beyond the current section
     def write(self, data):
@@ -183,7 +170,7 @@ class DolFile(object):
         if len(self._data) >= 11:
             raise SectionCountFull("Maximum amount of data sections reached!")
 
-        return self._add_section(size, self._data, addr=None)
+        return self._add_section(size, self._data, addr=addr)
 
     def tell(self):
         return self._curraddr
