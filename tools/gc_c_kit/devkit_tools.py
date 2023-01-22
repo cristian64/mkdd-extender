@@ -3,7 +3,7 @@ import os
 from itertools import chain
 
 from .dolreader import DolFile, SectionCountFull
-from .doltools import branchlink, branch, apply_gecko
+from .doltools import branchlink, branch
 
 GCCPATH = os.environ.get("GCCKIT_GCCPATH")
 LDPATH = os.environ.get("GCCKIT_LDPATH")
@@ -155,10 +155,6 @@ class Project:
     def set_osarena_patcher(self, function):
         self.osarena_patcher = function
 
-    def apply_gecko(self, geckopath):
-        with open(geckopath, "r", encoding='ascii') as f:
-            apply_gecko(self.dol, f)
-
     def append_to_symbol_map(self, symbols, map_, newmap):
         addresses = []
         for k, v in symbols.items():
@@ -232,7 +228,6 @@ class Project:
         self.dol.seek(sectionaddr)
         self.dol.write(data)
 
-        #print(("{0}: 0x{1:x}".format(funct
         for addr, func in self.branches:
             if func not in functions:
                 raise RuntimeError("Function not found in symbol map: {0}".format(func))
@@ -250,8 +245,3 @@ class Project:
 
         with open(newdolpath, "wb") as f:
             self.dol.save(f)
-
-
-if __name__ == "__main__":
-    compile_("main.c", "main.s", mode="-S")
-    compile_("main.c", "main.o", mode="-c")

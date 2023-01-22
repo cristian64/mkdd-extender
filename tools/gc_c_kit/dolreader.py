@@ -48,17 +48,13 @@ class DolFile:
             if i <= 6:
                 if offset != 0:
                     self._text.append((offset, address, size))
-                    # print("text{0}".format(i), hex(offset), hex(address), hex(size))
             else:
                 if offset != 0:
                     self._data.append((offset, address, size))
-                    # print("data{0}".format(datanum), hex(offset), hex(address), hex(size))
 
         f.seek(0xD8)
         self.bssaddr = read_uint32(f)
         self.bsssize = read_uint32(f)
-
-        #self.bss = BytesIO(self._rawdata.getbuffer()[self._bssaddr:self._bssaddr+self.bsssize])
 
         self._curraddr = self._text[0][1]
         self.seek(self._curraddr)
@@ -193,12 +189,3 @@ class DolFile:
 
         print("bss addr: {0:x}, bss size: {1:x}, bss end: {2:x}".format(
             self.bssaddr, self.bsssize, self.bssaddr + self.bsssize))
-
-
-if __name__ == "__main__":
-    with open("pikmin.dol", "rb") as f:
-        dol = DolFile(f)
-
-    dol.print_info()
-    dol.allocate_text_section(4)
-    dol.print_info()

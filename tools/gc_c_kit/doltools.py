@@ -1,7 +1,3 @@
-from struct import pack
-from math import ceil
-from binascii import unhexlify
-
 from .dolreader import write_uint32
 
 
@@ -35,7 +31,6 @@ def _branch(dol, from_addr, to_addr, link, absolute=False):
     assert delta % 4 == 0
     delta = delta // 4
     res = calc_signed(delta, 24)
-    #res = res & (2**24 - 1)
 
     out |= (res << 2)  # immediate value for branching
     out |= 18 << (2 + 24)  # Opcode for branch
@@ -128,59 +123,3 @@ def _read_line(line):
     val2 = int(vals[1], 16)
 
     return val1, val2
-
-
-def apply_gecko(dol, f):
-    while True:
-        line = f.readline()
-        if line == "":
-            break
-        if line.strip() == "" or line.startswith("$") or line.startswith("*"):
-            continue
-
-        val1, val2 = _read_line(line)
-
-        codetype = val1 >> 24
-        addr = 0x80000000 + (val1 & 0xFFFFFF)
-
-        hi = codetype & 0b1
-        if hi:
-            addr += 0x01000000
-
-        if codetype == 0x00:
-            amount = (val2 >> 16) + 1
-            value = val2 & 0xFF
-
-            dol.seek(addr)
-            for _ in range(amount):
-                dol.write(pack("B", value))
-
-        elif codetype == 0x02:
-            amount = (val2 >> 8) + 1
-            value = val2 & 0xFFFF
-
-            dol.seek(addr)
-            for _ in range(amount):
-                dol.write(pack(">H", value))
-
-        elif codetype == 0x04:
-            dol.seek(addr)
-            dol.write(pack(">I", val2))
-
-        elif codetype == 0x06:
-            bytecount = val2
-            dol.seek(addr)
-            for _ in range(int(ceil(bytecount / 8.0))):
-                datalen = bytecount % 8
-                line = f.readline().strip()
-                assert line != ""
-                vals = line.split(" ")
-                for _ in range(vals.count("")):
-                    vals.remove("")
-                data = "".join(vals)
-
-                dol.write(unhexlify(data)[:datalen])
-                bytecount -= 8
-
-        elif codetype == 0xC6:
-            branch(dol, addr, val2)
