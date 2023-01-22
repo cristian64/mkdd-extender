@@ -15,7 +15,6 @@ def compile(inpath, outpath, mode, optimize="-O1", std="c99", warning="-w"):
     assert mode in ("-S", "-c")  # turn into asm or compile
     #args = [GCCPATH, inpath, mode, "-o", outpath, optimize, "-std="+std, warning]
     args = [GCCPATH, inpath, mode, "-o", outpath, optimize, warning]
-    print(args)
     subprocess.check_call(args)
 
 
@@ -32,14 +31,12 @@ def link(infiles, outfile, outmap, linker_files):
         arg.append(file)
 
     arg.extend(("-Map", outmap))
-    print(arg)
     subprocess.check_call(arg)
 
 
 def objdump(*args):
     arg = [OBJDUMPPATH]
     arg.extend(args)
-    print(arg)
     subprocess.check_call(arg)
 
 
@@ -48,7 +45,6 @@ def objcopy(*args, attrs=[]):
     arg.extend(args)
     for attr in attrs:
         arg.extend(("-R", attr))
-    print(arg)
     subprocess.check_call(arg)
 
 
@@ -117,12 +113,10 @@ class Project(object):
         try:
             _offset, addr, size = tmp.allocate_text_section(4, address)
         except SectionCountFull as e:
-            print(e)
             try:
                 _offset, addr, size = tmp.allocate_data_section(4, address)
             except SectionCountFull as e:
-                print(e)
-                raise RuntimeError("Dol is full! Cannot allocate any new sections")
+                raise RuntimeError("Dol is full! Cannot allocate any new sections") from e
 
         self._address = addr
 
@@ -221,8 +215,6 @@ class Project(object):
         link([fpath + ".o" for fpath in chain(self.c_files, self.asm_files)], "project.o",
              "project.map", linker_files)
 
-        objdump("project.o", "--full-content")
-
         objcopy("project.o",
                 "project.bin",
                 "-O",
@@ -244,17 +236,13 @@ class Project(object):
         #print(("{0}: 0x{1:x}".format(funct
         for addr, func in self.branches:
             if func not in functions:
-                print("Function not found in symbol map: {0}. Skipping...".format(func))
-                continue
-                #raise RuntimeError("Function not found in symbol map: {0}".format(func))
+                raise RuntimeError("Function not found in symbol map: {0}".format(func))
 
             branch(self.dol, addr, functions[func])
 
         for addr, func in self.branchlinks:
             if func not in functions:
-                print("Function not found in symbol map: {0}. Skipping...".format(func))
-                continue
-                #raise RuntimeError("Function not found in symbol map: {0}".format(func))
+                raise RuntimeError("Function not found in symbol map: {0}".format(func))
 
             branchlink(self.dol, addr, functions[func])
 

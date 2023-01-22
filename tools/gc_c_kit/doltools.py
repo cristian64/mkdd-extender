@@ -32,8 +32,6 @@ def _branch(dol, from_addr, to_addr, link, absolute=False):
         out |= 0b10  # do an absolute branch. Doesn't work on the Gamecube
 
     delta = to_addr - from_addr
-    print("Making branch: from {0:x} to {1:x}".format(from_addr, to_addr))
-    print("delta:", hex(delta))
     assert delta % 4 == 0
     delta = delta // 4
     res = calc_signed(delta, 24)
