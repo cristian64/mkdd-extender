@@ -7,6 +7,7 @@ input DOL file.
 import contextlib
 import logging
 import os
+import platform
 import shutil
 import struct
 import subprocess
@@ -21,6 +22,17 @@ script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
 data_dir = os.path.join(script_dir, 'data')
 code_dir = os.path.join(data_dir, 'code')
+tools_dir = os.path.join(script_dir, 'tools')
+
+# Set up the GC-C-Kit module with the paths to the compiler.
+if (not devkit_tools.GCCPATH and not devkit_tools.LDPATH and not devkit_tools.OBJDUMPPATH
+        and not devkit_tools.OBJCOPYPATH):
+    devkitppc_dir = os.path.join(tools_dir, 'devkitPPC', platform.system().lower(), 'bin')
+    exe_extension = '.exe' if platform.system() == 'Windows' else ''
+    devkit_tools.GCCPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-gcc{exe_extension}')
+    devkit_tools.LDPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-ld{exe_extension}')
+    devkit_tools.OBJDUMPPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-objdump{exe_extension}')
+    devkit_tools.OBJCOPYPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-objcopy{exe_extension}')
 
 BUTTONS_STATE_ADDRESSES = {
     'GM4E01': 0x803A4D6C,
