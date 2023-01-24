@@ -99,6 +99,10 @@ for wimgt_filename in wimgt_filenames:
     datas.append((f'tools/wimgt/{wimgt_filename}', 'tools/wimgt/'))
 datas.append(('tools/wimgt/gpl-2.0.txt', 'tools/wimgt/'))
 datas.append(('tools/wimgt/README.txt', 'tools/wimgt/'))
+datas.append((f'tools/devkitPPC/{platform.system().lower()}',
+              f'tools/devkitPPC/{platform.system().lower()}'))
+datas.append(('tools/devkitPPC/buildscripts-devkitPPC_r41.tar.gz', 'tools/devkitPPC/'))
+datas.append(('tools/devkitPPC/README.txt', 'tools/devkitPPC/'))
 
 block_cipher = None
 
