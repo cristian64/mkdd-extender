@@ -1,5 +1,6 @@
 import subprocess
 import os
+import platform
 from itertools import chain
 
 from .dolreader import DolFile, SectionCountFull
@@ -11,11 +12,18 @@ OBJDUMPPATH = os.environ.get("GCCKIT_OBJDUMPPATH")
 OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 
+def get_creation_flags():
+    creationflags = 0
+    if platform.system() == "Windows":
+        creationflags |= subprocess.CREATE_NO_WINDOW
+    return creationflags
+
+
 def compile_(inpath, outpath, mode, optimize="-O1", warnings=('-W', '-Wall', '-Wextra')):
     assert mode in ("-S", "-c")
     args = [GCCPATH, inpath, mode, "-o", outpath, optimize]
     args += warnings
-    subprocess.check_call(args)
+    subprocess.check_call(args, creationflags=get_creation_flags())
 
 
 def link(infiles, outfile, outmap, linker_files):
@@ -31,13 +39,13 @@ def link(infiles, outfile, outmap, linker_files):
         arg.append(file)
 
     arg.extend(("-Map", outmap))
-    subprocess.check_call(arg)
+    subprocess.check_call(arg, creationflags=get_creation_flags())
 
 
 def objdump(*args):
     arg = [OBJDUMPPATH]
     arg.extend(args)
-    subprocess.check_call(arg)
+    subprocess.check_call(arg, creationflags=get_creation_flags())
 
 
 def objcopy(*args, attrs=tuple()):
@@ -45,7 +53,7 @@ def objcopy(*args, attrs=tuple()):
     arg.extend(args)
     for attr in attrs:
         arg.extend(("-R", attr))
-    subprocess.check_call(arg)
+    subprocess.check_call(arg, creationflags=get_creation_flags())
 
 
 def read_map(mappath):
