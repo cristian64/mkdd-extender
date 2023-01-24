@@ -97,6 +97,8 @@ elif macos:
     wimgt_filenames = ['wimgt-mac']
 for wimgt_filename in wimgt_filenames:
     datas.append((f'tools/wimgt/{wimgt_filename}', 'tools/wimgt/'))
+datas.append(('tools/wimgt/gpl-2.0.txt', 'tools/wimgt/'))
+datas.append(('tools/wimgt/README.txt', 'tools/wimgt/'))
 
 block_cipher = None
 
