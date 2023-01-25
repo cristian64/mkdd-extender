@@ -1411,21 +1411,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         pages_layout = QtWidgets.QVBoxLayout(pages_widget)
         pages_layout.setContentsMargins(0, 0, 0, 0)
 
-        PAGE_NAMES = ('Up Page', 'Down Page', 'Left Page')
-        PAGE_ICON_ROTATION_ANGLES = (-90, 90, 180)
+        PAGE_LABELS = ('Page 2/4', 'Page 3/4', 'Page 4/4')
         HEADER_LABELS = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
 
         self._page_tables = []
-        for i, page_name in enumerate(PAGE_NAMES):
-            dpad_icon_path = os.path.join(data_dir, 'gui', 'dpad.svg')
-            dpad_icon = QtGui.QIcon(dpad_icon_path)
-            page_icon = IconWidget(dpad_icon, PAGE_ICON_ROTATION_ANGLES[i])
-            page_label = QtWidgets.QLabel(page_name)
+        for i, page_label in enumerate(PAGE_LABELS):
+            page_label = QtWidgets.QLabel(page_label)
             page_label.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
             page_label.setAlignment(QtCore.Qt.AlignCenter)
             page_label_layout = QtWidgets.QHBoxLayout()
             page_label_layout.addStretch()
-            page_label_layout.addWidget(page_icon)
             page_label_layout.addWidget(page_label)
             page_label_layout.addStretch()
             page_table = DragDropTableWidget(4, 4)
@@ -1769,8 +1764,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <p><h3>4. Assign custom tracks</h3>
             Once the custom tracks directory has been selected, the
             <b>{self._custom_tracks_table_label}</b> list on the left-hand side will be populated.
-            Drag & drop the custom tracks onto the slots on each of the course pages
-            (<b>Up Page</b>, <b>Down Page</b>, or <b>Left Page</b>) on the right-hand side.
+            Drag & drop the custom tracks onto the slots on each of the course pages on the
+            right-hand side.
             <br/>
             <br/>
             If any of the 48 slots is not filled in, a placeholder will be provided.
@@ -2665,7 +2660,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         font_size = int(font_height * 0.75)
 
         def generate_html(course_names):
-            PAGE_NAMES = ('Up Page', 'Down Page', 'Left Page')
             html = '<table style="white-space: nowrap;">'
             pages = len(course_names) // 16
             for page in range(pages):
@@ -2673,7 +2667,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 html += ('<tr>'
                          f'<td colspan="4" style="text-align: center; padding-top: {margin}em; '
                          f'font-size: {header_font_size}px;">'
-                         f'<b>{PAGE_NAMES[page]}</b></td>'
+                         f'<b>Page {page + 2}/{pages + 1}</b></td>'
                          '</tr>')
                 for col in range(4):
                     html += '<tr>'
