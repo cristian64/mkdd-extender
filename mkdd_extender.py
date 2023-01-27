@@ -26,12 +26,13 @@ import zipfile
 from PIL import Image, ImageDraw, ImageFont
 
 import ast_converter
+import code_patcher
 import gecko_code
 import rarc
 from tools import bti, gcm
 from tools.GeckoLoader import GeckoLoader
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
@@ -117,6 +118,11 @@ PREFIXES = tuple(f'{c}{i + 1:02}' for c, i in itertools.product(('A', 'B', 'C'),
 """
 A list of the "prefixes" that are used when naming the track archives. First letter states the page,
 and the next two digits indicate the track index in the page (from `01` to `16`).
+"""
+
+CUP_NAMES = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
+"""
+English names of the four cups.
 """
 
 MAX_ISO_SIZE = 1459978240
@@ -512,14 +518,15 @@ def split_image(image: Image.Image) -> 'list[Image.Image]':
     return [image]
 
 
-def add_controls_to_title_image(filepath: str, language: str):
+def add_controls_to_title_image(args: argparse.Namespace, filepath: str, language: str):
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         title_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, title_filename[:-len('.bti')] + '.png')
 
         convert_bti_to_png(filepath, tmp_filepath)
 
-        controls_filepath = os.path.join(data_dir, 'controls', 'controls.png')
+        controls_filename = 'controls.png' if args.legacy_gecko_codes else 'dpad_up_down.png'
+        controls_filepath = os.path.join(data_dir, 'controls', controls_filename)
         controls_image = Image.open(controls_filepath)
         slash_filepath = os.path.join(data_dir, 'controls', 'slash.png')
         slash_image = Image.open(slash_filepath)
@@ -616,6 +623,44 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
         for word, box in reversed(ops):
             image.alpha_composite(word, dest=box)
         image.alpha_composite(dpad_image)
+        image = image.convert(original_mode)
+        image.save(tmp_filepath)
+
+        remove_file(filepath)  # It may be a hard link; unlink early.
+
+        convert_png_to_bti(tmp_filepath, filepath, 'IA4')
+
+
+def build_page_numbers_image(page_number: int, page_count: int) -> Image.Image:
+    image, _overflow = build_text_image_from_bitmap_font(f'{page_number}/{page_count}', 48, 16, 2,
+                                                         0, 0.6, 0.5)
+    image = crop_image_sides(image)
+    image = pad_image_sides(image, 48 - image.width, 0)
+    return image
+
+
+def add_page_number_to_cup_name_image(filepath: str, page_number: int, page_count: int):
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        cupname_filename = os.path.basename(filepath)
+        tmp_filepath = os.path.join(tmp_dir, cupname_filename[:-len('.bti')] + '.png')
+
+        convert_bti_to_png(filepath, tmp_filepath)
+
+        cupname_image = Image.open(tmp_filepath)
+        original_mode = cupname_image.mode  # Original mode is 'LA'.
+        cupname_image = cupname_image.convert('RGBA')
+
+        numbers_image = build_page_numbers_image(page_number, page_count)
+
+        margin = int(numbers_image.width / 1.5)
+        canvas_width = cupname_image.width + margin * 2
+        canvas_height = cupname_image.height
+
+        image = Image.new('RGBA', (canvas_width, canvas_height))
+        image.paste(cupname_image, (margin, 0))
+        image.alpha_composite(numbers_image,
+                              dest=(canvas_width - numbers_image.width,
+                                    canvas_height - numbers_image.height))
         image = image.convert(original_mode)
         image.save(tmp_filepath)
 
@@ -925,6 +970,7 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
             sample_rate = downsample_sample_rate
 
         with wave.open(wav_filepath, 'wb') as f:
+            f: wave.Wave_write
             f.setsampwidth(bit_depth // 8)
             f.setnchannels(channel_count)
             f.setframerate(sample_rate)
@@ -1025,7 +1071,7 @@ def patch_bnr_file(iso_tmp_dir: str):
     log.info('Game title tweaked.')
 
 
-def patch_title_lines(iso_tmp_dir: str):
+def patch_title_lines(args: argparse.Namespace, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -1043,7 +1089,7 @@ def patch_title_lines(iso_tmp_dir: str):
         for title_filename in ('selectcourse.bti', 'selectcup.bti'):
             title_filepath = os.path.join(timg_dir, title_filename)
             log.info(f'Modifying {title_filepath}...')
-            add_controls_to_title_image(title_filepath, language)
+            add_controls_to_title_image(args, title_filepath, language)
 
         # Gradient colors are specified in the BLO file, which we want to avoid in the controls
         # icons. Also, avoid the game blurrying the images.
@@ -1079,7 +1125,13 @@ def patch_title_lines(iso_tmp_dir: str):
     log.info('Title lines patched.')
 
 
-def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
+def with_page_index_suffix(page_index: int, path: str) -> str:
+    stem, ext = os.path.splitext(path)
+    stem = stem[:-len(str(page_index))] + str(page_index)
+    return stem + ext
+
+
+def patch_cup_names(args: argparse.Namespace, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -1101,32 +1153,41 @@ def patch_cup_names(skip_cup_names: bool, iso_tmp_dir: str):
             cupname_filepath = os.path.join(timg_dir, cupname_filename)
             log.info(f'Modifying {cupname_filepath}...')
 
+            if not args.legacy_gecko_codes:
+                new_cupname_filepath = with_page_index_suffix(0, cupname_filepath)
+                os.rename(cupname_filepath, new_cupname_filepath)
+                cupname_filepath = new_cupname_filepath
+
             for page_index in range(3):
+                if not args.legacy_gecko_codes:
+                    page_index += 1
 
-                def with_page_index_suffix(path: str) -> str:
-                    # pylint: disable=cell-var-from-loop
-                    stem, ext = os.path.splitext(path)
-                    stem = stem[:-len(str(page_index))] + str(page_index)
-                    return stem + ext
-
-                page_cupname_filepath = with_page_index_suffix(cupname_filepath)
+                page_cupname_filepath = with_page_index_suffix(page_index, cupname_filepath)
                 make_link(cupname_filepath, page_cupname_filepath)
-                if not skip_cup_names:
-                    add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
+
+                if not args.skip_cup_names:
+                    if args.legacy_gecko_codes:
+                        add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
+                    else:
+                        add_page_number_to_cup_name_image(page_cupname_filepath, page_index + 1, 4)
                 make_link(page_cupname_filepath,
                           page_cupname_filepath.replace('courseselect', 'lanplay'))
 
-            if not skip_cup_names:
-                add_dpad_to_cup_name_image(cupname_filepath, -1)
+            if not args.skip_cup_names:
+                if args.legacy_gecko_codes:
+                    add_dpad_to_cup_name_image(cupname_filepath, -1)
+                else:
+                    add_page_number_to_cup_name_image(cupname_filepath, 1, 4)
             make_link(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
 
     log.info('Cup names patched.')
 
 
-def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
+def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | list]':
     minimap_data = {}
-    auxiliary_audio_data = {}
+    alternative_audio_data = {}
     matching_audio_override_data = {}
+    added_course_names = []
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
 
@@ -1193,14 +1254,27 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             checksum = md5sum(ast_filepath)
             audio_tracks_checksums[checksum] = filename
 
+        # Rename original directories if needed.
+        if not args.legacy_gecko_codes:
+            new_course_dirpath = with_page_index_suffix(0, course_dirpath)
+            new_coursename_dirpath = with_page_index_suffix(0, coursename_dirpath)
+            new_staffghosts_dirpath = with_page_index_suffix(0, staffghosts_dirpath)
+            os.rename(course_dirpath, new_course_dirpath)
+            os.rename(coursename_dirpath, new_coursename_dirpath)
+            os.rename(staffghosts_dirpath, new_staffghosts_dirpath)
+            course_dirpath = new_course_dirpath
+            coursename_dirpath = new_coursename_dirpath
+            staffghosts_dirpath = new_staffghosts_dirpath
+
         # Copy files into the ISO temporariy directory.
         log.info('Melding directories...')
         melded = 0
         for prefix in PREFIXES:
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
             page_index = ord(prefix[0]) - ord('A')
+            if not args.legacy_gecko_codes:
+                page_index += 1
             track_index = int(prefix[1:3]) - 1
-            assert 0 <= page_index <= 2
             assert 0 <= track_index <= 15
 
             nodename = prefix_to_nodename[prefix]
@@ -1208,15 +1282,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             log.info(f'Melding "{nodename}" ("{track_dirpath}")...')
             melded += 1
 
-            def with_page_index_suffix(path: str) -> str:
-                # pylint: disable=cell-var-from-loop
-                stem, ext = os.path.splitext(path)
-                stem = stem[:-len(str(page_index))] + str(page_index)
-                return stem + ext
-
-            page_course_dirpath = with_page_index_suffix(course_dirpath)
-            page_coursename_dirpath = with_page_index_suffix(coursename_dirpath)
-            page_staffghosts_dirpath = with_page_index_suffix(staffghosts_dirpath)
+            page_course_dirpath = with_page_index_suffix(page_index, course_dirpath)
+            page_coursename_dirpath = with_page_index_suffix(page_index, coursename_dirpath)
+            page_staffghosts_dirpath = with_page_index_suffix(page_index, staffghosts_dirpath)
 
             # Start off with a copy of the original directories. Relevant files will be replaced
             # next.
@@ -1236,8 +1304,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 trackinfo_filepath = os.path.join(track_dirpath, 'trackinfo.ini')
                 trackinfo = configparser.ConfigParser()
                 trackinfo.read(trackinfo_filepath)
-                trackname = trackinfo['Config']['trackname']
+                trackname = trackinfo['Config']['trackname'] or 'Unnamed'
                 main_language = trackinfo['Config']['main_language']
+                replaces = trackinfo['Config'].get('replaces')
                 auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
             except Exception:
                 log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
@@ -1245,10 +1314,15 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 trackinfo = None
                 trackname = prefix
                 main_language = None
+                replaces = None
                 auxiliary_audio_track = None
 
+            added_course_names.append(trackname)
+
             if auxiliary_audio_track:
-                auxiliary_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
+                alternative_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
+            elif replaces:
+                alternative_audio_data[prefix] = course_name_to_course(replaces)
 
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
@@ -1256,20 +1330,20 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 raise MKDDExtenderError(f'Unable to locate `track.arc` file in "{nodename}".')
             track_mp_filepath = os.path.join(track_dirpath, 'track_mp.arc')
             if not os.path.isfile(track_mp_filepath):
-                log.warning(f'Unable to locate `track_mp.arc` file in "{nodename}". '
-                            '`track.arc` will be used.')
                 track_mp_filepath = track_filepath
+            else:
+                log.info(f'Located `track_mp.arc` file in "{nodename}".')
             if track_index == 0:
                 track_50cc_filepath = os.path.join(track_dirpath, 'track_50cc.arc')
                 if not os.path.isfile(track_50cc_filepath):
-                    log.warning(f'Unable to locate `track_50cc.arc` file in "{nodename}". '
-                                '`track.arc` will be used.')
                     track_50cc_filepath = track_filepath
+                else:
+                    log.info(f'Located `track_50cc.arc` file in "{nodename}".')
                 track_mp_50cc_filepath = os.path.join(track_dirpath, 'track_mp_50cc.arc')
                 if not os.path.isfile(track_mp_50cc_filepath):
-                    log.warning(f'Unable to locate `track_mp_50cc.arc` file in "{nodename}". '
-                                '`track_mp.arc` will be used.')
                     track_mp_50cc_filepath = track_mp_filepath
+                else:
+                    log.info(f'Located `track_mp_50cc.arc` file in "{nodename}".')
             if track_index == 0:
                 page_track_filepath = os.path.join(page_course_dirpath,
                                                    f'{COURSES[track_index]}2.arc')
@@ -1320,6 +1394,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
             # Force use of auxiliary audio track if argument has been provided and the custo track
             # has the field defined.
             use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
+            use_replacee_audio_track = replaces and args.use_replacee_audio_track
+            use_alternative_audio_track = use_auxiliary_audio_track or use_replacee_audio_track
 
             def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args):
                 # Before copying a AST file to destination, check whether its checksum already
@@ -1341,7 +1417,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                 make_link(src_ast_filepath, dst_ast_filepath)
                 conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
 
-            if not use_auxiliary_audio_track:
+            if not use_alternative_audio_track:
                 # Copy audio files. Unlike with the previous files, audio files are stored in the
                 # stock directory. The names of the audio files strategically start with a "X_"
                 # prefix to ensure they are inserted after the stock audio files.
@@ -1369,13 +1445,22 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                         log.info(
                             f'Unable to locate `lap_music_normal.ast` in "{nodename}". Auxiliary '
                             f'audio track ("{course_name}") will be used.')
+                    elif replaces:
+                        course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
+                        log.info(
+                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Replacee\'s '
+                            f'audio track ("{course_name}") will be used.')
                     else:
                         log.warning(
                             f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
                             'Circuit\'s sound track will be used.')
             else:
-                course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
-                log.info(f'Auxiliary audio track ("{course_name}") will be used.')
+                if auxiliary_audio_track:
+                    course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
+                    log.info(f'Auxiliary audio track ("{course_name}") will be used.')
+                else:
+                    course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
+                    log.info(f'Replacee\'s audio track ("{course_name}") will be used.')
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
@@ -1485,11 +1570,33 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
                             filepath = os.path.join(language_dirpath, filename)
                             resize_preview_image(filepath)
 
-            # Copy preview image and label image.
             preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
             label_filename = f'coname_{COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]}.bti'
-            page_preview_filename = with_page_index_suffix(preview_filename)
-            page_label_filename = with_page_index_suffix(label_filename)
+
+            # Rename original directories if needed.
+            if not args.legacy_gecko_codes:
+                new_preview_filename = with_page_index_suffix(0, preview_filename)
+                new_label_filename = with_page_index_suffix(0, label_filename)
+
+                if page_index == 1:
+                    for language in expected_languages:
+                        courseselect_dirpath = os.path.join(scenedata_dirpath, language,
+                                                            'courseselect', 'timg')
+                        lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay',
+                                                       'timg')
+                        os.rename(os.path.join(courseselect_dirpath, preview_filename),
+                                  os.path.join(courseselect_dirpath, new_preview_filename))
+                        os.rename(os.path.join(courseselect_dirpath, label_filename),
+                                  os.path.join(courseselect_dirpath, new_label_filename))
+                        os.rename(os.path.join(lanplay_dirpath, label_filename),
+                                  os.path.join(lanplay_dirpath, new_label_filename))
+
+                preview_filename = new_preview_filename
+                label_filename = new_label_filename
+
+            # Copy preview image and label image.
+            page_preview_filename = with_page_index_suffix(page_index, preview_filename)
+            page_label_filename = with_page_index_suffix(page_index, label_filename)
             for language in expected_languages:
                 courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
                                                     'timg')
@@ -1530,10 +1637,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> dict:
         else:
             log.warning('No directory has been melded.')
 
-    return minimap_data, auxiliary_audio_data, matching_audio_override_data
+    return minimap_data, alternative_audio_data, matching_audio_override_data, added_course_names
 
 
-def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str, str]',
+def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
+                              alternative_audio_data: 'dict[str, str]',
                               matching_audio_override_data: 'dict[str, str]') -> tuple:
     # The Gecko code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
@@ -1592,7 +1700,7 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
         stock_audio_track_indices,
     )
 
-    for prefix, auxiliary_audio_track in auxiliary_audio_data.items():
+    for prefix, auxiliary_audio_track in alternative_audio_data.items():
         page_index = ord(prefix[0]) - ord('A')
         track_index = int(prefix[1:3]) - 1
         auxiliary_audio_index = course_stream_order.index(auxiliary_audio_track)
@@ -1623,18 +1731,18 @@ def gather_audio_file_indices(iso_tmp_dir: str, auxiliary_audio_data: 'dict[str,
             else:
                 pass  # Fallback audio file index will be used.
 
+    # Move stock indices to the front.
+    if not args.legacy_gecko_codes:
+        audio_track_data = [audio_track_data[0]] + list(audio_track_data[:-1])
+
     return tuple(tuple(l) for l in audio_track_data)
 
 
-def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
-                   auxiliary_audio_data: 'dict[str, str]',
-                   matching_audio_override_data: 'dict[str, str]', iso_tmp_dir: str):
+def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
-    bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
 
     assert os.path.isfile(dol_path)
-    assert os.path.isfile(bi2_path)
 
     checksum = md5sum(dol_path)
     if checksum not in (
@@ -1643,12 +1751,23 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             '81f1b05c6650d65326f757bb25bad604',  # GM4J01
             'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
     ):
-        message = (f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}')
+        message = (f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}.')
         if args.skip_dol_checksum_check:
             log.warning(message)
         else:
             raise MKDDExtenderError(f'{message} Re-run with --skip-dol-checksum-check to '
                                     'circumvent this safety measure.')
+
+
+def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
+                   alternative_audio_data: 'dict[str, str]',
+                   matching_audio_override_data: 'dict[str, str]', iso_tmp_dir: str):
+    sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
+    dol_path = os.path.join(sys_dirpath, 'main.dol')
+    bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
+
+    assert os.path.isfile(dol_path)
+    assert os.path.isfile(bi2_path)
 
     with open(dol_path, 'rb') as f:
         data = f.read()
@@ -1668,6 +1787,23 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             data = f.read(len(DEBUG_BUILD_DATE))
             if data == DEBUG_BUILD_DATE:
                 game_id += 'dbg'
+
+    audio_track_data = gather_audio_file_indices(args, iso_tmp_dir, alternative_audio_data,
+                                                 matching_audio_override_data)
+
+    if not args.legacy_gecko_codes:
+        code_patcher.patch_dol_file(game_id, minimap_data, audio_track_data, dol_path, log)
+
+        for language in LANGUAGES:
+            scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
+            if not os.path.isdir(scenedata_dirpath):
+                continue
+            for blo_path in (os.path.join(scenedata_dirpath, 'courseselect', 'scrn',
+                                          'courseselect_under.blo'),
+                             os.path.join(scenedata_dirpath, 'lanplay', 'scrn',
+                                          'lanselectmode.blo')):
+                log.info(f'Patching BLO file ("{blo_path}")...')
+                code_patcher.patch_bti_filenames_in_blo_file(game_id, blo_path)
 
     if args.extended_memory:
         # The simulated memory size in the disk information header needs to be updated to the new
@@ -1773,24 +1909,73 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             f.seek(functions_offset)
             f.write(NEW_FUNCTIONS_INSTRUCTIONS)
 
-    audio_track_data = gather_audio_file_indices(iso_tmp_dir, auxiliary_audio_data,
-                                                 matching_audio_override_data)
+    if args.legacy_gecko_codes:
+        with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+            tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
+            log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
 
-    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
-        tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
-        log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
+            gecko_code.write_code(game_id, dol_path, minimap_data, audio_track_data,
+                                  tmp_gecko_code_filepath)
 
-        gecko_code.write_code(game_id, dol_path, minimap_data, audio_track_data,
-                              tmp_gecko_code_filepath)
+            log.info(f'Injecting Gecko code into "{dol_path}"...')
 
-        log.info(f'Injecting Gecko code into "{dol_path}"...')
+            cli = GeckoLoader.GeckoLoaderCli('GeckoLoader')
+            args = cli.parse_args((dol_path, tmp_gecko_code_filepath, '--dest', dol_path,
+                                   '--hooktype', 'GX', '--quiet'))
+            # pylint: disable=protected-access
+            cli._exec(args, tmp_dir)
+            # pylint: enable=protected-access
 
-        cli = GeckoLoader.GeckoLoaderCli('GeckoLoader')
-        args = cli.parse_args(
-            (dol_path, tmp_gecko_code_filepath, '--dest', dol_path, '--hooktype', 'GX', '--quiet'))
-        # pylint: disable=protected-access
-        cli._exec(args, tmp_dir)
-        # pylint: enable=protected-access
+
+def write_description_file(args: argparse.Namespace, added_course_names: 'list[str]',
+                           iso_tmp_dir: str):
+    lines = []
+
+    lines.append('# MKDD Extender - Description File')
+    lines.append('')
+    lines.append('```')
+    lines.append(f'Application version:  {__version__}')
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    lines.append(f'Creation time:        {timestamp}')
+    lines.append('```')
+    lines.append('')
+
+    lines.append('## Options')
+    lines.append('')
+    option_lines = []
+    for _group_name, group_options in OPTIONAL_ARGUMENTS.items():
+        for option_label, option_type, _option_help in group_options:
+            option_member_name = f'{option_label.lower().replace(" ", "_")}'
+            option_value = getattr(args, option_member_name)
+            option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
+            if option_type is bool and option_value:
+                option_lines.append(f'- `{option_as_argument}`')
+            if option_type is int and option_value:
+                option_lines.append(f'-  `{option_as_argument}={option_value}`')
+    if option_lines:
+        lines.extend(option_lines)
+    else:
+        lines.append('Default options.')
+    lines.append('')
+
+    lines.append('## Custom Tracks')
+    lines.append('')
+    page_count = len(added_course_names) // 16
+    for page in range(page_count):
+        if page != 0:
+            lines.append('')
+        lines.append(f'### Page {page + 1}')
+        for i in range(16):
+            if i % 4 == 0:
+                lines.append('')
+                lines.append(f'#### {CUP_NAMES[i // 4]}')
+                lines.append('')
+            lines.append(f'- {added_course_names[page * 16 + i]}')
+
+    description_filepath = os.path.join(iso_tmp_dir, 'files', 'DESCRIPTION.md')
+    with open(description_filepath, 'w', encoding='utf-8') as f:
+        for line in lines:
+            f.write(f'{line}\n')
 
 
 OPTIONAL_ARGUMENTS = {
@@ -1826,6 +2011,14 @@ OPTIONAL_ARGUMENTS = {
             'tracks will rarely benefit from these specialized transforms; preserving these '
             'transforms will likely make some minimaps in custom tracks be cut off screen.',
         ),
+        (
+            'Add Description File',
+            bool,
+            'If specified, a plain text file (`DESCRIPTION.md`) containing the description of the '
+            'extended game will be written to the `files` directory in the ISO image.\n\n'
+            'The description file includes the application version, the creation time, the options '
+            'that were used to generate the ISO image, and the name of added custom tracks.',
+        ),
     ),
     'Audio options': (
         (
@@ -1844,6 +2037,14 @@ OPTIONAL_ARGUMENTS = {
             'can be used to reduce the size of the ISO image.',
         ),
         (
+            'Use Replacee Audio Track',
+            bool,
+            'If specified, all custom audio tracks will be disregarded from the ISO image. '
+            'Instead, the audio track of the retail course defined by the `replaces` field in the '
+            '`trackinfo.ini` file will be used. If the `auxiliary_audio_track` field is defined, '
+            'its value will be used instead. This can be used to reduce the size of the ISO image.',
+        ),
+        (
             'Mix to Mono',
             bool,
             'If enabled, custom audio tracks will be mixed into mono audio.\n\n'
@@ -1852,22 +2053,40 @@ OPTIONAL_ARGUMENTS = {
             'be switched to `MONO`.',
         ),
     ),
-    'Expert options': ((
-        'Extended Memory',
-        bool,
-        'If specified, the simulated memory size in the ISO image will be extended from 24 MiB to '
-        '32 MiB. This permits a greater heap size in the game, which is incremented too from 6656 '
-        'KiB to 10752 KiB (or from 6525 KiB to 10621 KiB in the PAL version), allowing certain '
-        'files to grow larger without causing crashes.'
-        '\n\n'
-        'By default, preview images of the extra courses are halved due to limited space in the '
-        '`courseselect.arc` file. When `--extended-memory` is provided, the full size is used.'
-        '\n\n'
-        'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to also '
-        'extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory Override** in '
-        'Dolphin. Failing to enable the emulated memory size in Dolphin will make the game crash '
-        'to a green screen.',
-    ), ),
+    'Expert options': (
+        (
+            'Extended Memory',
+            bool,
+            'If specified, the simulated memory size in the ISO image will be extended from 24 MiB '
+            'to 32 MiB. This permits a greater heap size in the game, which is incremented too '
+            'from 6656 KiB to 10752 KiB (or from 6525 KiB to 10621 KiB in the PAL version), '
+            'allowing certain files to grow larger without causing crashes.'
+            '\n\n'
+            'By default, preview images of the extra courses are halved due to limited space in '
+            'the `courseselect.arc` file. When `--extended-memory` is provided, the full size is '
+            'used.'
+            '\n\n'
+            'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to '
+            'also extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory '
+            'Override** in Dolphin. Failing to enable the emulated memory size in Dolphin will '
+            'make the game crash to a green screen.',
+        ),
+        (
+            'Legacy Gecko Codes',
+            bool,
+            'If specified, the legacy Gecko codes will be injected in the DOL file instead of the '
+            'more modern code patch that superseded them.'
+            '\n\n'
+            'In the modern system, course pages are numbered from 1 to 4, with the first page '
+            'holding the stock courses. The user can cycle through pages by pressing either '
+            '`D-pad Up` or `D-pad Down`. '
+            '\n\n'
+            'In the legacy system, course pages are labeled as **Right Page** (stock courses), '
+            '**Up Page**, **Down Page**, and **Left Page**, with their corresponding icon in the '
+            'cups names. The user can switch between pages by holding `Z` and pressing any of the '
+            'directions in the `D-pad`.'
+        ),
+    ),
     'Dangerous options': (
         (
             'Skip DOL Checksum Check',
@@ -1948,11 +2167,16 @@ def extend_game(args: argparse.Namespace):
             gcm_file.read_entire_disc()
         except Exception as e:
             raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}') from e
+        if 'files/Cours0' in gcm_file.dirs_by_path:
+            raise MKDDExtenderError('The input ISO image appears to have been extended already.')
         files_extracted = 0
         for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):
             if files_done > 0:
                 files_extracted = files_done
         log.info(f'Image extracted ({files_extracted} files).')
+
+        # Verify whether the DOL file is authentic or has been externally modified already.
+        verify_dol_checksum(args, iso_tmp_dir)
 
         # To determine which have been added, build the initial list now.
         log.info('Building initial file list...')
@@ -1977,11 +2201,15 @@ def extend_game(args: argparse.Namespace):
         if not args.skip_banner:
             patch_bnr_file(iso_tmp_dir)
         if not args.skip_menu_titles:
-            patch_title_lines(iso_tmp_dir)
-        patch_cup_names(args.skip_cup_names, iso_tmp_dir)
-        minimap_data, auxiliary_audio_data, matching_audio_override_data = meld_courses(
-            args, iso_tmp_dir)
-        patch_dol_file(args, minimap_data, auxiliary_audio_data, matching_audio_override_data,
+            patch_title_lines(args, iso_tmp_dir)
+        patch_cup_names(args, iso_tmp_dir)
+        (
+            minimap_data,
+            alternative_audio_data,
+            matching_audio_override_data,
+            added_course_names,
+        ) = meld_courses(args, iso_tmp_dir)
+        patch_dol_file(args, minimap_data, alternative_audio_data, matching_audio_override_data,
                        iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
@@ -2019,34 +2247,9 @@ def extend_game(args: argparse.Namespace):
                 raise MKDDExtenderError(f'{message}. Re-run with --skip-filesize-check to '
                                         'circumvent this safety measure.')
 
-        # It is paramount that the file list is sorted in the same order that has been used to
-        # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
-        # the correct order, but modified ISO files may have AST files in a different order.
-        log.info('Sorting file list in asciibetical order...')
-        gcm_file.file_entries = sorted(gcm_file.file_entries, key=lambda e: e.file_path)
-        for file_entry in gcm_file.file_entries:
-            if hasattr(file_entry, 'children'):
-                file_entry.children = sorted(file_entry.children, key=lambda e: e.file_path)
-        gcm_file.files_by_path = {
-            k: gcm_file.files_by_path[k]
-            for k in sorted(gcm_file.files_by_path.keys())
-        }
-        gcm_file.files_by_path_lowercase = {
-            k: gcm_file.files_by_path_lowercase[k]
-            for k in sorted(gcm_file.files_by_path_lowercase.keys())
-        }
-        gcm_file.changed_files = {
-            k: gcm_file.changed_files[k]
-            for k in sorted(gcm_file.changed_files.keys())
-        }
-        gcm_file.dirs_by_path = {
-            k: gcm_file.dirs_by_path[k]
-            for k in sorted(gcm_file.dirs_by_path.keys())
-        }
-        gcm_file.dirs_by_path_lowercase = {
-            k: gcm_file.dirs_by_path_lowercase[k]
-            for k in sorted(gcm_file.dirs_by_path_lowercase.keys())
-        }
+        # Generate description file.
+        if args.add_description_file:
+            write_description_file(args, added_course_names, iso_tmp_dir)
 
         # Cross-check which files have been added, and then import all files from disk. While it
         # could be more efficient to compare timestamps and import only the ones that have really
@@ -2054,6 +2257,16 @@ def extend_game(args: argparse.Namespace):
         # file will have to be read regardless.
         log.info('Preparing ISO image...')
         final_file_list = build_file_list(iso_tmp_dir)
+        # Also drop from the list those directories and files that no longer exist in the image.
+        for path in initial_file_list:
+            if path not in final_file_list:
+                dir_entry = gcm_file.dirs_by_path_lowercase.get(path.lower())
+                if dir_entry is not None:
+                    gcm_file.delete_directory(dir_entry)
+                    continue
+                file_entry = gcm_file.files_by_path_lowercase.get(path.lower())
+                if file_entry is not None:
+                    gcm_file.delete_file(file_entry)
         for path in final_file_list:
             if path not in initial_file_list:
                 if os.path.isfile(os.path.join(iso_tmp_dir, path)):
@@ -2062,6 +2275,35 @@ def extend_game(args: argparse.Namespace):
                     gcm_file.add_new_directory(path)
         gcm_file.import_all_files_from_disk(iso_tmp_dir)
         log.info('ISO image prepared.')
+
+        # It is paramount that the file list is sorted in the same order that has been used to
+        # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
+        # the correct order, but modified ISO files may have AST files in a different order.
+        log.info('Sorting file list in asciibetical order...')
+        gcm_file.file_entries = sorted(gcm_file.file_entries, key=lambda e: e.file_path.lower())
+        for file_entry in gcm_file.file_entries:
+            if hasattr(file_entry, 'children'):
+                file_entry.children = sorted(file_entry.children, key=lambda e: e.file_path.lower())
+        gcm_file.files_by_path = {
+            k: gcm_file.files_by_path[k]
+            for k in sorted(gcm_file.files_by_path.keys(), key=str.lower)
+        }
+        gcm_file.files_by_path_lowercase = {
+            k: gcm_file.files_by_path_lowercase[k]
+            for k in sorted(gcm_file.files_by_path_lowercase.keys())
+        }
+        gcm_file.changed_files = {
+            k: gcm_file.changed_files[k]
+            for k in sorted(gcm_file.changed_files.keys(), key=str.lower)
+        }
+        gcm_file.dirs_by_path = {
+            k: gcm_file.dirs_by_path[k]
+            for k in sorted(gcm_file.dirs_by_path.keys(), key=str.lower)
+        }
+        gcm_file.dirs_by_path_lowercase = {
+            k: gcm_file.dirs_by_path_lowercase[k]
+            for k in sorted(gcm_file.dirs_by_path_lowercase.keys())
+        }
 
         # Write the extended ISO file to the final location.
         log.info(f'Writing extended ISO image to "{args.output}"...')
