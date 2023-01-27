@@ -47,6 +47,7 @@ python3 -m venv venv
 ```
 
 Enable the virtual environment:
+
 _**Windows**_
 ```batch
 venv\Scripts\activate.bat
@@ -58,11 +59,13 @@ source venv/bin/activate
 ```
 
 Install the required dependencies (see [`requirements.txt`](requirements.txt)):
+
 ```shell
 python -m pip install -r requirements.txt
 ```
 
 Launch the application by executing the `mkdd_extender.py` file:
+
 ```shell
 python mkdd_extender.py
 ```
