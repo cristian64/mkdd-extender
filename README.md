@@ -33,6 +33,7 @@ Stand-alone precompiled bundles for Linux and Windows can be found in the
 ### Compiling From Source
 
 Clone the Git repository along with its submodules:
+
 ```shell
 git clone https://github.com/cristian64/mkdd-extender.git
 cd mkdd-extender
@@ -40,6 +41,7 @@ git submodule update --init
 ```
 
 Create a Python virtual environment via `venv`:
+
 ```shell
 python3 -m venv venv
 ```
