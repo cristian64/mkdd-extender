@@ -69,3 +69,12 @@ Launch the application by executing the `mkdd_extender.py` file:
 ```shell
 python mkdd_extender.py
 ```
+
+## References
+
+- https://github.com/RenolY2/mkdd-track-patcher
+- https://github.com/RenolY2/gc-c-kit
+- https://github.com/JoshuaMKW/GeckoLoader
+- https://szs.wiimm.de/wimgt/
+- https://github.com/LagoLunatic/wwrando
+- https://devkitpro.org
