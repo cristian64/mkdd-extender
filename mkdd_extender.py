@@ -2084,7 +2084,7 @@ OPTIONAL_ARGUMENTS = {
             'In the legacy system, course pages are labeled as **Right Page** (stock courses), '
             '**Up Page**, **Down Page**, and **Left Page**, with their corresponding icon in the '
             'cups names. The user can switch between pages by holding `Z` and pressing any of the '
-            'directions in the `D-pad`.'
+            'directions in the `D-pad`.',
         ),
     ),
     'Dangerous options': (
