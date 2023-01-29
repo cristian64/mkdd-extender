@@ -1010,6 +1010,8 @@ def patch_bti_filenames_in_blo_file(game_id: str, blo_path: str):
 
 def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tuple[int]]',
                    dol_path: str, log: logging.Logger):
+    import mkdd_extender  # pylint: disable=import-outside-toplevel
+
     log.info('Generating and injecting C code...')
 
     page_count = len(audio_track_data)
@@ -1140,7 +1142,7 @@ def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tu
         for name, value in replacements:
             code = code.replace(name, value)
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:
             with current_directory(tmp_dir):
                 project = devkit_tools.Project(dol_path, address=dol_section_address)
                 project.set_osarena_patcher(patch_osarena)
