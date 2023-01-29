@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 48 extra courses.
+MKDD Extender is a tool that extends Mario Kart: Double Dash!! with up to 144 extra courses.
 """
 import argparse
 import audioop
@@ -115,7 +115,14 @@ A dictionary to map the internal course name to the [partial] name of the label 
 This is identical to `COURSE_TO_PREVIEW_IMAGE_NAME`, except for the `Patapata` entry, which differs.
 """
 
-PREFIXES = tuple(f'{c}{i + 1:02}' for c, i in itertools.product(('A', 'B', 'C'), range(16)))
+MAX_EXTRA_PAGES = 9
+"""
+The maximum number of extra pages that can be added to the game, to a total of 10 pages, including
+the first page that features the stock courses.
+"""
+
+PREFIXES = tuple(f'{chr(ord("A") + page_index)}{i + 1:02}'
+                 for page_index, i in itertools.product(range(MAX_EXTRA_PAGES), range(16)))
 """
 A list of the "prefixes" that are used when naming the track archives. First letter states the page,
 and the next two digits indicate the track index in the page (from `01` to `16`).
@@ -1185,7 +1192,7 @@ def with_page_index_suffix(page_index: int, path: str) -> str:
     return stem + ext
 
 
-def patch_cup_names(args: argparse.Namespace, iso_tmp_dir: str):
+def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -1212,7 +1219,7 @@ def patch_cup_names(args: argparse.Namespace, iso_tmp_dir: str):
                 os.rename(cupname_filepath, new_cupname_filepath)
                 cupname_filepath = new_cupname_filepath
 
-            for page_index in range(3):
+            for page_index in range(page_count - 1):
                 if not args.legacy_gecko_codes:
                     page_index += 1
 
@@ -1223,7 +1230,8 @@ def patch_cup_names(args: argparse.Namespace, iso_tmp_dir: str):
                     if args.legacy_gecko_codes:
                         add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
                     else:
-                        add_page_number_to_cup_name_image(page_cupname_filepath, page_index + 1, 4)
+                        add_page_number_to_cup_name_image(page_cupname_filepath, page_index + 1,
+                                                          page_count)
                 make_link(page_cupname_filepath,
                           page_cupname_filepath.replace('courseselect', 'lanplay'))
 
@@ -1231,7 +1239,7 @@ def patch_cup_names(args: argparse.Namespace, iso_tmp_dir: str):
                 if args.legacy_gecko_codes:
                     add_dpad_to_cup_name_image(cupname_filepath, -1)
                 else:
-                    add_page_number_to_cup_name_image(cupname_filepath, 1, 4)
+                    add_page_number_to_cup_name_image(cupname_filepath, 1, page_count)
             make_link(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
 
     log.info('Cup names patched.')
@@ -1254,7 +1262,10 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
     if isinstance(args.tracks, str):
         paths = tuple(os.path.join(args.tracks, p) for p in sorted(os.listdir(args.tracks)))
         tracks_is_dir = True
-    elif isinstance(args.tracks, collections.abc.Sequence) and len(args.tracks) == len(PREFIXES):
+    elif isinstance(args.tracks, collections.abc.Sequence) and args.tracks:
+        if len(args.tracks) % 16 != 0:
+            raise MKDDExtenderError(
+                f'Number of items in the `tracks` argument not a multiple of 16: {args.tracks}')
         paths = args.tracks
         tracks_is_dir = False
     else:
@@ -1277,19 +1288,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         processed += 1
                         break
                 else:
-                    # For now, missing an archive will be considered an error. Perhaps a program
-                    # argument (e.g. `--on-missing`) can be added, so that the user can choose
-                    # between:
-                    # - Print error and exit script. Default?
-                    # - Fall back to the stock course in the slot that he missing track would
-                    #   occupy.
-                    # - Disable slot by making the label and preview images transparent or black,
-                    #   and replacing the course with the smallest, viable track that doesn't make
-                    #   the game crash if the player ends up selecting the track.
+                    # Check whether full pages have been sourced on the first missing prefix.
+                    if prefix_to_nodename and len(prefix_to_nodename) % 16 == 0:
+                        break
+
                     raise MKDDExtenderError(f'No track assigned to slot {prefix}.')
         else:
-            for i, prefix in enumerate(PREFIXES):
-                path = paths[i]
+            for i, path in enumerate(paths):
+                prefix = PREFIXES[i]
                 filename = os.path.basename(path)
                 track_dirpath = os.path.join(tracks_tmp_dir, prefix)
                 log.info(f'Extracting and flattening "{path}" into "{track_dirpath}"...')
@@ -1300,6 +1306,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             log.info(f'{processed} custom tracks have been processed.')
         else:
             log.warning('No archive has been processed.')
+        if args.legacy_gecko_codes and processed != 48:
+            raise MKDDExtenderError(
+                'With the legacy Gecko codes, exactly 48 custom tracks are required.')
 
         # Populate dictionary with checksums from all the stock AST files.
         audio_tracks_checksums = {}
@@ -1323,7 +1332,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         # Copy files into the ISO temporariy directory.
         log.info('Melding directories...')
         melded = 0
-        for prefix in PREFIXES:
+        for prefix in PREFIXES[:len(prefix_to_nodename)]:
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
             page_index = ord(prefix[0]) - ord('A')
             if not args.legacy_gecko_codes:
@@ -1747,12 +1756,12 @@ def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
     fallback_finallap_index = stock_audio_track_indices[
         course_stream_order.index(FALLBACK_AUDIO_COURSE) + 16]
 
-    audio_track_data = (
-        [fallback_index] * 16 + [fallback_finallap_index] * 16,  # Page 0
-        [fallback_index] * 16 + [fallback_finallap_index] * 16,  # Page 1
-        [fallback_index] * 16 + [fallback_finallap_index] * 16,  # Page 2
-        stock_audio_track_indices,
-    )
+    extra_page_count = len(alternative_audio_data) // 16
+
+    audio_track_data = []
+    for _ in range(extra_page_count):
+        audio_track_data.append([fallback_index] * 16 + [fallback_finallap_index] * 16)
+    audio_track_data.append(stock_audio_track_indices)
 
     for prefix, auxiliary_audio_track in alternative_audio_data.items():
         page_index = ord(prefix[0]) - ord('A')
@@ -1764,10 +1773,9 @@ def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
         audio_track_data_page[mapped_offset + 16] = \
             stock_audio_track_indices[auxiliary_audio_index + 16]
 
-    for prefix in PREFIXES:
+    for prefix in PREFIXES[:len(alternative_audio_data)]:
         page_index = ord(prefix[0]) - ord('A')
         track_index = int(prefix[1:3]) - 1
-        assert 0 <= page_index <= 2
         assert 0 <= track_index <= 15
 
         for i, speed_type in enumerate(SPEED_TYPES):
@@ -2014,11 +2022,11 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
 
     lines.append('## Custom Tracks')
     lines.append('')
-    page_count = len(added_course_names) // 16
-    for page in range(page_count):
+    extra_page_count = len(added_course_names) // 16
+    for page in range(extra_page_count):
         if page != 0:
             lines.append('')
-        lines.append(f'### Page {page + 1}')
+        lines.append(f'### Page {page + 2}/{extra_page_count + 1}')
         for i in range(16):
             if i % 4 == 0:
                 lines.append('')
@@ -2169,9 +2177,10 @@ def create_args_parser() -> argparse.ArgumentParser:
         'be added to the game.\n\n'
         'Custom tracks must be provided in the MKDD Track Patcher format: either compressed in a '
         'ZIP archive, or as a directory that contains the relevant files for the custom track.\n\n'
-        'Each archive name (or directory name) needs to be prefixed with a letter (A, B, or C), '
-        'and a number in the range `[01, 16]` (one-digit numbers padded with a 0).\n\n'
-        'Exactly 48 custom tracks must be provided: "A01...", "A02...", ..., "C16...".')
+        'Each archive name (or directory name) needs to be prefixed with a letter (A, B, C, ..., '
+        'I), and a number in the range `[01, 16]` (one-digit numbers padded with a 0).\n\n'
+        'The number of custom tracks provided must be multiple of 16: "A01...", "A02...", ..., '
+        '"C16...".')
     parser.add_argument('output',
                         type=str,
                         help='Path where the modified ISO file will be written.')
@@ -2256,13 +2265,17 @@ def extend_game(args: argparse.Namespace):
             patch_bnr_file(iso_tmp_dir)
         if not args.skip_menu_titles:
             patch_title_lines(args, iso_tmp_dir)
-        patch_cup_names(args, iso_tmp_dir)
+
         (
             minimap_data,
             alternative_audio_data,
             matching_audio_override_data,
             added_course_names,
         ) = meld_courses(args, iso_tmp_dir)
+
+        page_count = len(alternative_audio_data) // 16 + 1
+        patch_cup_names(args, page_count, iso_tmp_dir)
+
         patch_dol_file(args, minimap_data, alternative_audio_data, matching_audio_override_data,
                        iso_tmp_dir)
 
