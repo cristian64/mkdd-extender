@@ -23,13 +23,14 @@
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 
-void change_course_page(const char delta)
+void change_course_page(const int delta)
 {
     *(int*)PLAY_SOUND_R4 = 0x0002000c;
     JAISeMgr__startSound((void*)PLAY_SOUND_R3, (void*)PLAY_SOUND_R4, (void*)PLAY_SOUND_R5, 0);
 
-    const char page = (*(char*)CURRENT_PAGE_ADDRESS + delta) % PAGE_COUNT;
-    *(char*)CURRENT_PAGE_ADDRESS = page;
+    const int previous_page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
+    const int page = (previous_page + delta + PAGE_COUNT) % PAGE_COUNT;
+    *(char*)CURRENT_PAGE_ADDRESS = (char)page;
 
     const char suffix = '0' + page;
     // __STRING_DATA_PLACEHOLDER__
