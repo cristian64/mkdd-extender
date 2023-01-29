@@ -633,10 +633,10 @@ def add_dpad_to_cup_name_image(filepath: str, page_index: int):
 
 
 def build_page_numbers_image(page_number: int, page_count: int) -> Image.Image:
-    image, _overflow = build_text_image_from_bitmap_font(f'{page_number}/{page_count}', 48, 16, 2,
+    image, _overflow = build_text_image_from_bitmap_font(f'{page_number}/{page_count}', 80, 16, 2,
                                                          0, 0.6, 0.5)
     image = crop_image_sides(image)
-    image = pad_image_sides(image, 48 - image.width, 0)
+    image = pad_image_sides(image, 80 - image.width, 0)
     return image
 
 
