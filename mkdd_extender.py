@@ -1733,7 +1733,7 @@ def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
 
     # Move stock indices to the front.
     if not args.legacy_gecko_codes:
-        audio_track_data = [audio_track_data[0]] + list(audio_track_data[:-1])
+        audio_track_data = [audio_track_data[-1]] + list(audio_track_data[:-1])
 
     return tuple(tuple(l) for l in audio_track_data)
 
