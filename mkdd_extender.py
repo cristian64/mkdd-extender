@@ -12,6 +12,7 @@ import hashlib
 import itertools
 import json
 import logging
+import math
 import os
 import platform
 import shutil
@@ -804,31 +805,84 @@ def generate_bti_image_from_bitmap_font(text: str, width: int, height: int, imag
                                         background: 'tuple[int, int, int, int]', filepath: str):
     assert filepath.endswith('.bti')
 
-    text = ' '.join(text.split())
+    words = text.split()
+    multiline = height > 32 and len(words) > 1
 
-    margin = 0
-
-    # Some heuristics that seem to provide good results for a wide variety of lengths.
-    if len(text) < 10:
-        spacing = -12, 2
-        margin = 10
-    if len(text) < 14:
-        spacing = -12, 2
-        margin = 5
-    elif len(text) < 20:
-        spacing = -5, 5
+    if height <= 32:
+        default_scale = 0.95  # Close to the scale in the stock images when height is 32 pixels.
     else:
-        spacing = 1, 9
+        default_scale = 1.0
 
-    # Iteratively find a scale that makes the text fit in the image of the requested dimensions.
-    for scale in range(100, 50, -1):
-        image, overflow = build_text_image_from_bitmap_font(text, width - margin * 2, height,
-                                                            *spacing, scale / 100, 0.95)
-        if overflow:
-            continue
+    if multiline:
+        lines = None
+        diff = None
+        for i in range(len(words) - 1):
+            candidate = (' '.join(words[:i + 1]), ' '.join(words[i + 1:]))
+            candidate_diff = abs(len(candidate[0]) - len(candidate[1]))
+            if lines is None or candidate_diff < diff:
+                diff = candidate_diff
+                lines = candidate
+    else:
+        lines = (' '.join(words), )
 
+    FONT_HEIGHT = 32
+
+    vertical_scale = min(default_scale, height / len(lines) / FONT_HEIGHT)
+
+    line_image_height = math.ceil(FONT_HEIGHT * vertical_scale)
+
+    line_images = []
+    for line in lines:
+        # Some heuristics that seem to provide good results for a wide variety of lengths.
+        margin = 0
+        if width >= 208:
+            if len(line) < 7:
+                spacing = -12, 2
+                margin = 15
+            elif len(line) < 10:
+                spacing = -12, 2
+                margin = 10
+            elif len(line) < 14:
+                spacing = -12, 2
+                margin = 5
+            elif len(line) < 20:
+                spacing = -5, 5
+            else:
+                spacing = 1, 9
+        else:
+            if len(line) < 7:
+                spacing = -12, 2
+                margin = 3
+            elif len(line) < 10:
+                spacing = -3, 3
+                margin = 1
+            elif len(line) < 14:
+                spacing = -1, 6
+            elif len(line) < 20:
+                spacing = 1, 7
+            else:
+                spacing = 1, 9
+
+        line_image_width = width - margin * 2
+
+        # Iteratively find a scale that makes the line fit in the image of the requested dimensions.
+        for scale in range(100, 40, -1):
+            image, overflow = build_text_image_from_bitmap_font(line, line_image_width,
+                                                                line_image_height, *spacing,
+                                                                scale / 100, vertical_scale)
+            if not overflow:
+                line_images.append((image, margin))
+                break
+        else:
+            break
+
+    if len(line_images) == len(lines):
         image_with_background = Image.new('RGBA', (width, height), background)
-        image_with_background.alpha_composite(image, dest=(margin, 0))
+
+        offset_y = (height - len(lines) * line_image_height) // 2
+        for line_image, margin in line_images:
+            image_with_background.alpha_composite(line_image, dest=(margin, offset_y))
+            offset_y += line_image.height
 
         with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
             tmp_filepath = os.path.join(tmp_dir,
