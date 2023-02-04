@@ -1778,8 +1778,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             Start the game in GameCube, Wii, or Dolphin.
             </p>
             <p><h3>7. In-game course page selection</h3>
-            Use <code>Z + D-pad &lt;direction&gt;</code> while in the <b>SELECT COURSE</b> or
-            <b>SELECT CUP</b> screens to switch between the different course pages.
+            Use <code>D-pad Up</code> and <code>D-pad Down</code> while in the <b>SELECT COURSE</b>
+            or b>SELECT CUP</b> screens to increment or decrement course page number.
             </p>
         """)
         show_long_message('info', 'Instructions', text, self)
