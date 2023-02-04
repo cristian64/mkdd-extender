@@ -311,6 +311,40 @@ class IconWidget(QtWidgets.QLabel):
         del painter
 
 
+class VerticalLabel(QtWidgets.QWidget):
+
+    def __init__(self, text: str = '', parent: QtWidgets.QWidget = None):
+        super().__init__(parent=parent)
+        self._text = text
+
+    def setText(self, text: str):
+        if self._text != text:
+            self._text = text
+            self.update()
+
+    def minimumSizeHint(self) -> QtCore.QSize:
+        font_metrics = self.fontMetrics()
+        width = font_metrics.height()
+        margin = round(width * 0.5)
+        height = font_metrics.horizontalAdvance(self._text)
+        width += margin * 2
+        height += margin * 2
+        return QtCore.QSize(width, height)
+
+    def paintEvent(self, event: QtGui.QPaintEvent):
+        _ = event
+        painter = QtGui.QPainter(self)
+        rect = self.rect()
+        painter.fillRect(rect.marginsRemoved(QtCore.QMargins(0, 0, 0, 1)),
+                         self.palette().base().color().darker())
+        painter.translate(rect.center())
+        painter.rotate(90)
+        painter.translate(-rect.center())
+        rect = QtCore.QRect(round((rect.width() - rect.height()) / 2), 0, rect.height(),
+                            rect.height())
+        painter.drawText(rect, QtCore.Qt.AlignCenter | QtCore.Qt.AlignHCenter, self._text)
+
+
 class SpinnableSlider(QtWidgets.QWidget):
 
     value_changed = QtCore.Signal(int)
@@ -1409,26 +1443,34 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         custom_tracks_layout.addWidget(custom_tracks_drop_widget)
         pages_widget = QtWidgets.QWidget()
         pages_layout = QtWidgets.QVBoxLayout(pages_widget)
+        pages_layout.setSpacing(0)
         pages_layout.setContentsMargins(0, 0, 0, 0)
 
-        PAGE_LABELS = ('Page 2/4', 'Page 3/4', 'Page 4/4')
-        HEADER_LABELS = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
+        font_height = self.fontMetrics().height()
 
+        HEADER_LABELS = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
+        ROWS = 4
+        COLUMNS = len(HEADER_LABELS)
+
+        self._page_labels = []
         self._page_tables = []
-        for i, page_label in enumerate(PAGE_LABELS):
-            page_label = QtWidgets.QLabel(page_label)
-            page_label.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
-            page_label.setAlignment(QtCore.Qt.AlignCenter)
-            page_label_layout = QtWidgets.QHBoxLayout()
-            page_label_layout.addStretch()
-            page_label_layout.addWidget(page_label)
-            page_label_layout.addStretch()
-            page_table = DragDropTableWidget(4, 4)
+        self._page_widgets = []
+
+        for page_index in range(mkdd_extender.MAX_EXTRA_PAGES):
+            page_table = DragDropTableWidget(ROWS, COLUMNS)
+            page_table.setFixedHeight(round(font_height * 1.5) * (ROWS + 1))
             page_table.setItemDelegate(SelectionStyledItemDelegate(page_table))
             self._page_tables.append(page_table)
             page_table.setHorizontalHeaderLabels(HEADER_LABELS)
+            if page_index == 0:
+                page_table.setHorizontalHeaderLabels(HEADER_LABELS)
+            else:
+                page_table.setHorizontalHeaderLabels([''] * COLUMNS)
+                page_table.horizontalHeader().setFixedHeight(int(font_height * 0.4))
             page_table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
             page_table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+            page_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            page_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
             page_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
             page_table.horizontalHeader().setSectionsClickable(False)
             page_table.horizontalHeader().setSectionsMovable(False)
@@ -1440,20 +1482,53 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
             clear_selection_action.triggered.connect(self._clear_selection)
             page_table.addAction(clear_selection_action)
-            pages_layout.addLayout(page_label_layout)
-            pages_layout.addWidget(page_table)
+            page_label = VerticalLabel()
+            self._page_labels.append(page_label)
+            page_widget = QtWidgets.QWidget()
+            page_widget.setContentsMargins(0, 0, 0, 0)
+            page_widget_layout = QtWidgets.QHBoxLayout(page_widget)
+            page_widget_layout.setContentsMargins(0, 0, 0, 0)
+            page_widget_layout.setSpacing(0)
+            page_widget_layout.addWidget(page_table)
+            page_widget_layout.addWidget(page_label)
+            self._page_widgets.append(page_widget)
+            pages_layout.addWidget(page_widget)
+        pages_layout.addStretch(1)
         for page_table in self._page_tables:
             for other_page_table in self._page_tables:
                 if page_table != other_page_table:
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
         custom_tracks_drop_widget.set_sources(self._page_tables)
+        pages_scroll_widget = QtWidgets.QScrollArea()
+        pages_scroll_widget.setWidgetResizable(True)
+        pages_scroll_widget.setFrameShape(QtWidgets.QFrame.NoFrame)
+        pages_scroll_widget.setWidget(pages_widget)
+
+        self._extra_pages_count_combobox = QtWidgets.QComboBox()
+        for i in range(mkdd_extender.MAX_EXTRA_PAGES):
+            self._extra_pages_count_combobox.addItem(str(i + 2))
+        self._update_page_visibility(1)
+        self._extra_pages_count_combobox.currentIndexChanged.connect(
+            self._on_extra_pages_count_combobox_currentIndexChanged)
+
+        extra_pages_layout = QtWidgets.QHBoxLayout()
+        extra_pages_layout.addStretch()
+        self._total_page_count_label = QtWidgets.QLabel('Total Page Count')
+        extra_pages_layout.addWidget(self._total_page_count_label)
+        extra_pages_layout.addWidget(self._extra_pages_count_combobox)
+
+        main_area_widget = QtWidgets.QWidget()
+        main_area_layout = QtWidgets.QVBoxLayout(main_area_widget)
+        main_area_layout.setContentsMargins(0, 0, 0, 0)
+        main_area_layout.addLayout(extra_pages_layout)
+        main_area_layout.addWidget(pages_scroll_widget)
 
         self._info_view = InfoViewWidget()
         self._info_view.shown.connect(self._update_info_view)
         self._splitter = QtWidgets.QSplitter()
         self._splitter.addWidget(SplitterChildHolder(custom_tracks_widget))
-        self._splitter.addWidget(SplitterChildHolder(pages_widget))
+        self._splitter.addWidget(SplitterChildHolder(main_area_widget))
         self._splitter.addWidget(SplitterChildHolder(self._info_view))
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 4)
@@ -1567,7 +1642,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 (f'{custom_tracks_table_header.sortIndicatorSection()} '
                                  f'{sort_indicator_order}'))
 
-        page_item_values = self._get_page_item_values()
+        extra_page_count = self._get_configured_extra_page_count()
+        page_item_values = self._get_page_item_values()[:extra_page_count * 16]
         self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
 
         options = []
@@ -1638,6 +1714,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 pass
             else:
                 self._set_page_item_values(page_item_values, also_selected_state=False)
+                self._update_page_visibility(len(page_item_values) // 16)
 
         options = self._settings.value('miscellaneous/options')
         if options:
@@ -1681,7 +1758,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         def on_create_button_clicked():
             name = name_edit.text()
             shelf_items = list(self._get_shelf_items())
-            course_names = tuple(item[3] for item in self._get_page_item_values())
+            extra_page_count = self._get_configured_extra_page_count()
+            course_names = tuple(item[3]
+                                 for item in self._get_page_item_values()[:extra_page_count * 16])
             shelf_items.append((name, course_names))
             self._settings.setValue('shelf/items', shelf_items)
             dialog.close()
@@ -1729,7 +1808,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 items[i] = list(items[i])
                 items[i][3] = course_name
                 items[i][4] = False
-            self._set_page_item_values(items)
+            extra_page_count = len(course_names) // 16
+            self._set_page_item_values(items[:extra_page_count * 16])
+
+            self._update_page_visibility(extra_page_count)
 
             self._sync_emblems()
             self._update_info_view()
@@ -1768,7 +1850,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             right-hand side.
             <br/>
             <br/>
-            If any of the 48 slots is not filled in, a placeholder will be provided.
+            If any of the slots is not filled in, a placeholder will be provided.
+            <br/>
+            <br/>
+            The number of course pages can be customized in the
+            <b>{self._total_page_count_label.text()}</b> drop down (from 2 to
+            {mkdd_extender.MAX_EXTRA_PAGES + 1} pages). The first page is reserved for the stock
+            courses in the input ISO file; it does not appear in the list, which starts counting at
+            2.
             </p>
             <p><h3>5. Build ISO file</h3>
             When ready, press the <b>{self._build_button.text()}</b> button to generate the extended
@@ -1932,6 +2021,32 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if not signals_were_blocked:
                     page_table.blockSignals(False)
 
+    def _get_configured_extra_page_count(self):
+        return sum(int(page_widget.isVisible()) for page_widget in self._page_widgets)
+
+    def _update_page_visibility(self, extra_page_count: int):
+        for page_widget in self._page_widgets[:extra_page_count]:
+            page_widget.show()
+        for page_widget in self._page_widgets[extra_page_count:]:
+            page_widget.hide()
+        for page_index, page_label in enumerate(self._page_labels):
+            page_label.setText(f'{page_index + 2} / {extra_page_count + 1}')
+        with blocked_signals(self._extra_pages_count_combobox):
+            self._extra_pages_count_combobox.setCurrentIndex(extra_page_count - 1)
+
+    def _on_extra_pages_count_combobox_currentIndexChanged(self, index: int):
+        extra_page_count = index + 1
+        items = self._get_page_item_values()
+        self._set_page_item_values(items[:extra_page_count * 16])
+
+        self._update_page_visibility(index + 1)
+
+        self._sync_emblems()
+        self._update_info_view()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
     def _get_page_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
         items = []
         for page_table in self._page_tables:
@@ -1958,6 +2073,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     def _set_page_item_values(self,
                               page_item_values: 'list[tuple[int, int, int, str]]',
                               also_selected_state: bool = True):
+        assert len(page_item_values) % 16 == 0
+
+        # Pad the values with an empty version of the expected tuple.
+        reference_item_values = self._get_page_item_values()
+        if len(reference_item_values) != len(page_item_values):
+            page_item_values = list(page_item_values)
+            for _ in range(len(page_item_values)):
+                reference_item_values.pop(0)
+            for i, column, row, _value, _selected in reference_item_values:
+                page_item_values.append((i, column, row, '', False))
+
         with self._blocked_page_signals():
             if also_selected_state:
                 for page_table in self._page_tables:
@@ -2095,7 +2221,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         # Resolve any potential pending event (e.g. item selection changed events).
         QtWidgets.QApplication.instance().processEvents()
 
-        page_item_values = self._get_page_item_values()
+        extra_page_count = self._get_configured_extra_page_count()
+        page_item_values = self._get_page_item_values()[:extra_page_count * 16]
 
         # Undo action is only collected if the values (excluding the selection state) are actually
         # different.
@@ -2119,6 +2246,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._redo_history.insert(0, self._undo_history.pop())
             page_item_values = self._undo_history[-1]
             self._set_page_item_values(page_item_values)
+            self._update_page_visibility(len(page_item_values) // 16)
             self._sync_emblems()
             self._update_info_view()
 
@@ -2129,6 +2257,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_item_values = self._redo_history.pop(0)
             self._undo_history.append(page_item_values)
             self._set_page_item_values(page_item_values)
+            self._update_page_visibility(len(page_item_values) // 16)
             self._sync_emblems()
             self._update_info_view()
 
@@ -2271,7 +2400,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         description_label.setWordWrap(True)
         description_label.setText(
             'This is a helper tool that copies, extracts, and flattens the custom tracks that are '
-            'currently mapped to each of the 48 slots.'
+            'currently mapped to each of the slots.'
             '\n\n'
             'Its main purpose is to provide a directory of custom tracks that can be used with the '
             'MKDD Extender in command-line mode.')
@@ -2317,14 +2446,18 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             if os.listdir(dirpath):
                 raise mkdd_extender.MKDDExtenderError('Output directory is not empty.')
 
+            extra_page_count = self._get_configured_extra_page_count()
+
             names = []
-            for item in self._get_page_items():
+            for item in self._get_page_items()[:extra_page_count * 16]:
                 name = self._item_text_to_name.get(item.text())
-                if name:
-                    names.append(name)
-            if len(names) != 48:
-                raise mkdd_extender.MKDDExtenderError(
-                    'Please make sure that all slots have been assigned to a valid custom track.')
+                if not name:
+                    raise mkdd_extender.MKDDExtenderError(
+                        'Please make sure that all slots have been assigned to a valid custom '
+                        'track.')
+                names.append(name)
+
+            LETTER_RANGE = f'A-{chr(ord("A") + mkdd_extender.MAX_EXTRA_PAGES - 1)}'
 
             tracks_dirpath = self._custom_tracks_directory_edit.get_path()
             for i, name in enumerate(names):
@@ -2333,7 +2466,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 # If the name had a recognizable prefix (probably as part of a previous run), get
                 # rid of it.
                 parts = name.split('_', maxsplit=1)
-                if len(parts) > 1 and re.match(r'[A-C][0-1][0-9].?', parts[0]):
+                if len(parts) > 1 and re.match(rf'[{LETTER_RANGE}][0-1][0-9].?', parts[0]):
                     filtered_name = parts[1]
                 else:
                     filtered_name = name
@@ -2683,7 +2816,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         items = self._get_shelf_items()
 
         for i, (name, course_names) in enumerate(items):
-            assert len(course_names) == 48
+            assert len(course_names) % 16 == 0
 
             shelf_item_widget = QtWidgets.QWidget()
             shelf_item_layout = QtWidgets.QVBoxLayout(shelf_item_widget)
@@ -2738,19 +2871,26 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             args.tracks = []
             tracks_dirpath = self._custom_tracks_directory_edit.get_path()
 
-            slots_assigned = 0
-            for item in self._get_page_items():
+            extra_page_count = self._get_configured_extra_page_count()
+
+            for item in self._get_page_items()[:extra_page_count * 16]:
                 name = self._item_text_to_name.get(item.text())
                 if name:
                     args.tracks.append(os.path.join(tracks_dirpath, name))
-                    slots_assigned += 1
                 else:
-                    args.tracks.append(placeholder_course_dir)
-            assert len(args.tracks) == 48
+                    args.tracks.append('')
 
-            if slots_assigned < 48:
+            slots_unassigned = len([None for t in args.tracks if not t])
+            slots_assigned = len(args.tracks) - slots_unassigned
+
+            if slots_unassigned > 0:
                 mkdd_extender.log.warning(f'Only {slots_assigned} slots have been assigned. Empty '
-                                          'slots will be provided with a placeholder.')
+                                          f'slots ({slots_unassigned}) will be provided with a '
+                                          'placeholder.')
+
+                args.tracks = [t or placeholder_course_dir for t in args.tracks]
+
+            assert len(args.tracks) % 16 == 0
 
             for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
                 for option_label, _option_type, _option_help in group_options:
