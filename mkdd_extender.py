@@ -984,6 +984,37 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
         convert_png_to_bti(tmp_filepath, filepath, image_format)
 
 
+def downscale_bti_image(image_size: 'tuple[int]', image_format: str, filepath: str):
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        png_tmp_filepath = os.path.join(tmp_dir,
+                                        os.path.splitext(os.path.basename(filepath))[0] + '.png')
+
+        failed = False
+        try:
+            convert_bti_to_png(filepath, png_tmp_filepath)
+        except Exception:
+            failed = True
+        if not os.path.isfile(png_tmp_filepath):
+            failed = True
+        if failed:
+            # If the attempt fails (unlikely but possible), we won't be able to downscale the BTI
+            # image, and that cannot be allowed, or else the size of the archive would grow too
+            # great. If neither `wimgt`` nor the `bti`` module succeeded on converting the image,
+            # this is considered fatal.
+            raise MKDDExtenderError(f'Unable to convert BTI image to PNG ("{filepath}") Image '
+                                    'cannot be downscaled.')
+
+        image = Image.open(png_tmp_filepath)
+        if image.size[0] <= image_size[0] and image.size[1] <= image_size[1]:
+            return
+        image = image.resize(image_size, resample=RESAMPLING_FILTER, reducing_gap=3.0)
+        image.save(png_tmp_filepath)
+
+        remove_file(filepath)  # It may be a hard link; unlink early.
+
+        convert_png_to_bti(png_tmp_filepath, filepath, image_format)
+
+
 def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate: int):
     if not mix_to_mono and not downsample_sample_rate:
         return
@@ -1310,6 +1341,34 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             raise MKDDExtenderError(
                 'With the legacy Gecko codes, exactly 48 custom tracks are required.')
 
+        extra_page_count = len(prefix_to_nodename) // 16
+        total_page_count = extra_page_count + 1
+
+        # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
+        # However, if extended memory has been set, the retail dimensions can be used instead.
+        PREVIEW_IMAGE_SIZE = 256, 184
+        LABEL_IMAGE_SIZE = 256, 32
+        if not args.extended_memory:
+            if total_page_count <= 2:
+                preview_image_factor = 1
+            else:
+                preview_image_factor = 2 / total_page_count
+            preview_image_size = (round(PREVIEW_IMAGE_SIZE[0] * preview_image_factor),
+                                  round(PREVIEW_IMAGE_SIZE[1] * preview_image_factor))
+
+            if total_page_count <= 7:
+                label_image_factor = 1
+            else:
+                label_image_factor = 7 / total_page_count
+            label_image_size = (round(LABEL_IMAGE_SIZE[0] * label_image_factor),
+                                round(LABEL_IMAGE_SIZE[1] * label_image_factor))
+        else:
+            preview_image_size = PREVIEW_IMAGE_SIZE
+            label_image_size = LABEL_IMAGE_SIZE
+
+        downscale_preview_images = tuple(preview_image_size) != PREVIEW_IMAGE_SIZE
+        downscale_label_images = tuple(label_image_size) != LABEL_IMAGE_SIZE
+
         # Populate dictionary with checksums from all the stock AST files.
         audio_tracks_checksums = {}
         for filename in os.listdir(stream_dirpath):
@@ -1574,64 +1633,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                                         f'{COURSES[track_index]}_name.bti')
                 make_link(logo_filepath, page_coursename_filepath)
 
-            # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
-            # However, if extended memory has been set, the retail dimensions can be used instead.
-            if args.extended_memory:
-                PREVIEW_IMAGE_SIZE = 256, 184
-            else:
-                PREVIEW_IMAGE_SIZE = 256 // 2, 184 // 2
-
-            def resize_preview_image(filepath: str):
-                # pylint: disable=cell-var-from-loop
-
-                with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
-                    png_tmp_filepath = os.path.join(
-                        tmp_dir,
-                        os.path.splitext(os.path.basename(filepath))[0] + '.png')
-
-                    # At this time, there are a number of images that `wimgt` cannot convert. If the
-                    # attempt fails, we won't be able to downscale the BTI image, and that cannot be
-                    # allowed, or else the size of the archive would grow too great. In those cases,
-                    # the BTI image will be deleted; an auto-geneated image will be provided later.
-                    failed = False
-                    try:
-                        convert_bti_to_png(filepath, png_tmp_filepath)
-                    except Exception:
-                        failed = True
-                    if not os.path.isfile(png_tmp_filepath):
-                        failed = True
-                    if failed:
-                        log.warning(f'Unable to downscale BTI image ("{filepath}"). This image '
-                                    'will be discarded.')
-                        os.remove(filepath)
-                        return
-
-                    image = Image.open(png_tmp_filepath)
-                    image = image.resize(PREVIEW_IMAGE_SIZE,
-                                         resample=RESAMPLING_FILTER,
-                                         reducing_gap=3.0)
-                    image.save(png_tmp_filepath)
-
-                    remove_file(filepath)  # It may be a hard link; unlink early.
-
-                    convert_png_to_bti(png_tmp_filepath, filepath, 'CMPR')
-
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
             if not expected_languages:
                 raise MKDDExtenderError('Unable to locate `SceneData/language` directories in '
                                         f'"{nodename}".')
-
-            # Downscale preview images in all available languages.
-            if not args.extended_memory:
-                for language in expected_languages:
-                    language_dirpath = os.path.join(course_images_dirpath, language)
-                    if not os.path.isdir(language_dirpath):
-                        continue
-                    for filename in os.listdir(language_dirpath):
-                        if filename == 'track_image.bti':
-                            filepath = os.path.join(language_dirpath, filename)
-                            resize_preview_image(filepath)
 
             preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
             label_filename = f'coname_{COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]}.bti'
@@ -1666,14 +1672,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
 
                 preview_filepath = find_or_generate_image_path(language, 'track_image.bti',
-                                                               PREVIEW_IMAGE_SIZE[0],
-                                                               PREVIEW_IMAGE_SIZE[1], 'CMPR',
+                                                               *preview_image_size, 'CMPR',
                                                                (0, 0, 0, 255))
                 page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
                 make_link(preview_filepath, page_preview_filepath)
 
-                label_filepath = find_or_generate_image_path(language, 'track_name.bti', 256, 32,
-                                                             'IA4', (0, 0, 0, 0))
+                label_filepath = find_or_generate_image_path(language, 'track_name.bti',
+                                                             *label_image_size, 'IA4', (0, 0, 0, 0))
                 page_label_filepath = os.path.join(courseselect_dirpath, page_label_filename)
                 make_link(label_filepath, page_label_filepath)
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
@@ -1694,6 +1699,31 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             except Exception as e:
                 raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": '
                                         f'{str(e)}.') from e
+
+        # Downscale images to ensure space limits are met.
+        if downscale_preview_images:
+            log.info(
+                f'Downscaling preview images to {preview_image_size[0]}x{preview_image_size[1]}...')
+
+            for language in LANGUAGES:
+                courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
+                                                    'timg')
+                if os.path.isdir(courseselect_dirpath):
+                    for filename in os.listdir(courseselect_dirpath):
+                        if filename.startswith('cop_') and filename.endswith('.bti'):
+                            filepath = os.path.join(courseselect_dirpath, filename)
+                            downscale_bti_image(preview_image_size, 'CMPR', filepath)
+        if downscale_label_images:
+            log.info(f'Downscaling label images to {label_image_size[0]}x{label_image_size[1]}...')
+
+            for language in LANGUAGES:
+                courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
+                                                    'timg')
+                if os.path.isdir(courseselect_dirpath):
+                    for filename in os.listdir(courseselect_dirpath):
+                        if filename.startswith('coname_') and filename.endswith('.bti'):
+                            filepath = os.path.join(courseselect_dirpath, filename)
+                            downscale_bti_image(label_image_size, 'IA4', filepath)
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
@@ -1884,7 +1914,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
 
         # In the DOL file, a heap needs to be extended from 6656 KiB to 10752 KiB. This value is
         # hardcoded in `SequenceApp::__ct()` (at `0x801d93c4` in the NTSC version) to `0x00680000`,
-        # and will be changed to `0x00A80000`. The instruction is:
+        # and will be changed to `0x00C80000`. The instruction is:
         #
         #   801d93dc 3c 80 00 68     lis        r4,0x68
         #
@@ -1905,17 +1935,17 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         # Note that the value in PAL is set in two instructions. Only the first one will need to be
         # modified, though.
         ORIGINAL_HEAP_SIZE = 0x00680000 if game_id != 'GM4P01' else 0x0065F400
-        EXTENDED_HEAP_SIZE = ORIGINAL_HEAP_SIZE + 0x00400000
+        EXTENDED_HEAP_SIZE = ORIGINAL_HEAP_SIZE + 0x00600000
         log.info('Heap memory size will be extended from {} KiB to {} KiB...'.format(
             ORIGINAL_HEAP_SIZE // 1024,
             EXTENDED_HEAP_SIZE // 1024,
         ))
         if game_id != 'GM4P01':
             ORIGINAL_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0x80, 0x00, 0x68))
-            EXTENDED_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0x80, 0x00, 0xA8))
+            EXTENDED_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0x80, 0x00, 0xC8))
         else:
             ORIGINAL_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0xc0, 0x00, 0x66))
-            EXTENDED_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0xc0, 0x00, 0xA6))
+            EXTENDED_HEAP_SIZE_INSTRUCTION = bytes((0x3c, 0xc0, 0x00, 0xC6))
         with open(dol_path, 'rb') as f:
             data = f.read()
         assert data.count(ORIGINAL_HEAP_SIZE_INSTRUCTION) == 1
@@ -2121,12 +2151,11 @@ OPTIONAL_ARGUMENTS = {
             bool,
             'If specified, the simulated memory size in the ISO image will be extended from 24 MiB '
             'to 32 MiB. This permits a greater heap size in the game, which is incremented too '
-            'from 6656 KiB to 10752 KiB (or from 6525 KiB to 10621 KiB in the PAL version), '
+            'from 6656 KiB to 12800 KiB (or from 6525 KiB to 12669 KiB in the PAL version), '
             'allowing certain files to grow larger without causing crashes.'
             '\n\n'
-            'By default, preview images of the extra courses are halved due to limited space in '
-            'the `courseselect.arc` file. When `--extended-memory` is provided, the full size is '
-            'used.'
+            'By default, preview and label images are downscaled due to limited space in the '
+            '`courseselect.arc` file. When `--extended-memory` is provided, the full size is used.'
             '\n\n'
             'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to '
             'also extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory '
@@ -2303,7 +2332,8 @@ def extend_game(args: argparse.Namespace):
             COURSESELECT_MAX_FILESIZE = 1792 * 1024
             courseselect_max_filesize = COURSESELECT_MAX_FILESIZE
             if args.extended_memory:
-                courseselect_max_filesize += 2048 * 1024
+                # The emulated memory has been extended by 6 MiB. Allow the file to grow a larger.
+                courseselect_max_filesize += 5 * 1024 * 1024
             if filesize > courseselect_max_filesize:
                 message = (f'Size of the "{filepath}" file ({filesize} bytes) is greater than '
                            f'the maximum size that is considered safe ({courseselect_max_filesize} '
