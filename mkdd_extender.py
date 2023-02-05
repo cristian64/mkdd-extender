@@ -314,6 +314,32 @@ def get_custom_track_name(path: str) -> str:
     return str()
 
 
+def scan_custom_tracks_directory(dirpath: str) -> 'dict[str, str]':
+    try:
+        names = sorted(os.listdir(dirpath))
+    except Exception:
+        return None
+
+    paths_to_track_name = {}
+    for name in names:
+        path = os.path.join(dirpath, name)
+
+        try:
+            track_name = get_custom_track_name(path)
+            if track_name:
+                paths_to_track_name[path] = track_name
+                continue
+        except Exception:
+            pass
+
+        if os.path.isdir(path):
+            pathsd_names_to_track_name = scan_custom_tracks_directory(path)
+            if pathsd_names_to_track_name:
+                paths_to_track_name.update(pathsd_names_to_track_name)
+
+    return paths_to_track_name
+
+
 def extract_and_flatten(src_path: str, dst_dirpath: str):
     # Extracts a ZIP archive into the given directory. If the archive contains a single directory,
     # it will be unwrapped. If the archive contains a nested archive, it will be extracted too.

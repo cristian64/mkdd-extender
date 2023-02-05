@@ -1334,7 +1334,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options_icon_path = os.path.join(data_dir, 'gui', 'options.svg')
         options_icon = QtGui.QIcon(options_icon_path)
 
-        self._item_text_to_name = {}
+        self._item_text_to_path = {}
 
         self._directory_watcher = DelayedDirectoryWatcher()
         self._directory_watcher.changed.connect(self._load_custom_tracks_directory)
@@ -1929,7 +1929,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_table.setEnabled(False)
         self._custom_tracks_table.setRowCount(0)
 
-        self._item_text_to_name = {}
+        self._item_text_to_path.clear()
 
         dirpath = dirpath or self._custom_tracks_directory_edit.get_path()
 
@@ -1937,31 +1937,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._directory_watcher.set_directory(dirpath)
 
         if dirpath:
+            progress_dialog = ProgressDialog(
+                'Scanning custom tracks directory...',
+                lambda: mkdd_extender.scan_custom_tracks_directory(dirpath), self)
+            paths_to_track_name = progress_dialog.execute_and_wait()
 
-            def scan_custom_tracks_directory():
-                try:
-                    names = sorted(os.listdir(dirpath))
-                except Exception:
-                    return None
-
-                names_to_track_name = {}
-                for name in names:
-                    try:
-                        path = os.path.join(dirpath, name)
-                        track_name = mkdd_extender.get_custom_track_name(path)
-                        if track_name:
-                            names_to_track_name[name] = track_name
-                    except Exception:
-                        pass
-
-                return names_to_track_name
-
-            progress_dialog = ProgressDialog('Scanning custom tracks directory...',
-                                             scan_custom_tracks_directory, self)
-            names_to_track_name = progress_dialog.execute_and_wait()
-
-            if not names_to_track_name:
-                if names_to_track_name is None:
+            if not paths_to_track_name:
+                if paths_to_track_name is None:
                     label = 'Directory not accessible.'
                     color = self._red_color
                 else:
@@ -1973,19 +1955,20 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._custom_tracks_table.setItem(0, 0, item)
 
             else:
-                self._custom_tracks_table.setRowCount(len(names_to_track_name))
-                track_names = tuple(names_to_track_name.values())
+                self._custom_tracks_table.setRowCount(len(paths_to_track_name))
+                track_names = tuple(paths_to_track_name.values())
 
                 item_text_to_item = {}
 
-                for i, (name, track_name) in enumerate(names_to_track_name.items()):
+                for i, (path, track_name) in enumerate(paths_to_track_name.items()):
                     # If the track name is not unique (e.g. different versions of the same course),
                     # the entry name is added to the text).
+                    name = os.path.basename(path)
                     if track_names.count(track_name) > 1:
                         text = f'{track_name} ({name})'
                     else:
                         text = track_name
-                    self._item_text_to_name[text] = name
+                    self._item_text_to_path[text] = path
                     item = QtWidgets.QTableWidgetItem(text)
                     item_text_to_item[text] = item
                     self._custom_tracks_table.setItem(i, 0, item)
@@ -2170,12 +2153,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if not item_text:
                     self._info_view.show_placeholder_message()
                 else:
-                    name = self._item_text_to_name.get(item_text)
-                    if not name:
+                    path = self._item_text_to_path.get(item_text)
+                    if not path:
                         self._info_view.show_not_valid_message()
                     else:
-                        tracks_dirpath = self._custom_tracks_directory_edit.get_path()
-                        path = os.path.join(tracks_dirpath, name)
                         self._info_view.set_path(path)
                 return
 
@@ -2275,7 +2256,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         # done manually.
         if logical_index == -1:
             # Initialize dictionary in the correct [insertion] order.
-            item_text_to_item = {item_text: None for item_text in self._item_text_to_name}
+            item_text_to_item = {item_text: None for item_text in self._item_text_to_path}
 
             # Take all the items and add in dictionary in the new order.
             for row in range(self._custom_tracks_table.rowCount()):
@@ -2448,20 +2429,19 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             extra_page_count = self._get_configured_extra_page_count()
 
-            names = []
+            paths = []
             for item in self._get_page_items()[:extra_page_count * 16]:
-                name = self._item_text_to_name.get(item.text())
-                if not name:
+                path = self._item_text_to_path.get(item.text())
+                if not path:
                     raise mkdd_extender.MKDDExtenderError(
                         'Please make sure that all slots have been assigned to a valid custom '
                         'track.')
-                names.append(name)
+                paths.append(path)
 
             LETTER_RANGE = f'A-{chr(ord("A") + mkdd_extender.MAX_EXTRA_PAGES - 1)}'
 
-            tracks_dirpath = self._custom_tracks_directory_edit.get_path()
-            for i, name in enumerate(names):
-                src_path = os.path.join(tracks_dirpath, name)
+            for i, src_path in enumerate(paths):
+                name = os.path.basename(src_path)
 
                 # If the name had a recognizable prefix (probably as part of a previous run), get
                 # rid of it.
@@ -2869,14 +2849,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             args.input = input_path
             args.output = output_path
             args.tracks = []
-            tracks_dirpath = self._custom_tracks_directory_edit.get_path()
 
             extra_page_count = self._get_configured_extra_page_count()
 
             for item in self._get_page_items()[:extra_page_count * 16]:
-                name = self._item_text_to_name.get(item.text())
-                if name:
-                    args.tracks.append(os.path.join(tracks_dirpath, name))
+                path = self._item_text_to_path.get(item.text())
+                if path:
+                    args.tracks.append(path)
                 else:
                     args.tracks.append('')
 
