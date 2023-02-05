@@ -133,6 +133,14 @@ def extract(src_filepath: str, dst_dirpath: str):
         for i in range(string_offset, string_table_size):
             if string_table[i] == 0:
                 return bytes(string_table[string_offset:i])
+        # NOTE: Again, there is a tool out there that can put strings in the string table without
+        # the corresponding null character for, presumably, the last string. Instead of immediately
+        # raising an exception, now the entire string until the end of the string table is returned.
+        remainder = bytes(string_table[string_offset:])
+        if remainder:
+            log.warning(f'Null character in string at offset {string_offset} not found. Assuming '
+                        'end of string table as the end of the string.')
+            return remainder
         raise RuntimeError(f'String at offset {string_offset} not found.')
 
     # In the RARC files seen in Mario Kart: Double Dash!!, these two strings always appear first.
