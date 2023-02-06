@@ -1030,11 +1030,13 @@ def downscale_bti_image(image_size: 'tuple[int]', image_format: str, filepath: s
             raise MKDDExtenderError(f'Unable to convert BTI image to PNG ("{filepath}") Image '
                                     'cannot be downscaled.')
 
-        image = Image.open(png_tmp_filepath)
-        if image.size[0] <= image_size[0] and image.size[1] <= image_size[1]:
-            return
-        image = image.resize(image_size, resample=RESAMPLING_FILTER, reducing_gap=3.0)
-        image.save(png_tmp_filepath)
+        with Image.open(png_tmp_filepath) as image:
+            if image.size[0] <= image_size[0] and image.size[1] <= image_size[1]:
+                return
+            downscaled_image = image.resize(image_size,
+                                            resample=RESAMPLING_FILTER,
+                                            reducing_gap=3.0)
+        downscaled_image.save(png_tmp_filepath)
 
         remove_file(filepath)  # It may be a hard link; unlink early.
 
