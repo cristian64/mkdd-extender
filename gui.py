@@ -780,6 +780,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             return
 
         dirpath = os.path.dirname(trackinfo_filepath)
+        parent_dirpath = os.path.dirname(dirpath)
         dirname = os.path.basename(dirpath)
 
         minimap_filepath = os.path.join(dirpath, 'minimap.json')
@@ -817,6 +818,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Track Name: </b> </td><td>{track_name}</td></tr>
             <tr><td><b>Author: </b> </td><td>{author}</td></tr>
             <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
+            <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
             <tr><td><b>Minimap Coordinates: </b> </td><td>{'Yes' if minimap_present else ''}</td></tr>
             <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
             <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
