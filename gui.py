@@ -381,8 +381,10 @@ class SpinnableSlider(QtWidgets.QWidget):
         return self.__slider.value()
 
     def _on_value_changed(self, value: int):
-        self.__slider.setValue(value)
-        self.__spinbox.setValue(value)
+        with blocked_signals(self.__slider):
+            self.__slider.setValue(value)
+        with blocked_signals(self.__spinbox):
+            self.__spinbox.setValue(value)
         self.value_changed.emit(value)
 
 
