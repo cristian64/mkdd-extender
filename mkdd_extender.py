@@ -371,6 +371,32 @@ def extract_and_flatten(src_path: str, dst_dirpath: str):
                 shutil.move(path, dst_dirpath)
 
 
+def unwrap_custom_track(dirpath: str):
+    # With the assumption that a `trackinfo.ini` file exists in the given directory, or in a
+    # subdirectory, ensure that the file remains reachable in the top-level directory.
+
+    # Early out if file already present in the top-level directory.
+    if os.path.isfile(os.path.join(dirpath, 'trackinfo.ini')):
+        return
+
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        nested_dirpath = None
+        for rootpath, _dirnames, filenames in os.walk(dirpath):
+            for filename in filenames:
+                if filename == 'trackinfo.ini':
+                    nested_dirpath = rootpath
+                    break
+            if nested_dirpath is not None:
+                break
+
+        if nested_dirpath is None:
+            raise MKDDExtenderError(f'Unable to locate `trackinfo.ini` in "{dirpath}".')
+
+        shutil.move(nested_dirpath, tmp_dir)
+        shutil.rmtree(dirpath)
+        shutil.move(os.path.join(tmp_dir, os.path.basename(nested_dirpath)), dirpath)
+
+
 def course_name_to_course(course_name: str) -> str:
     # A distance between strings is used for the comparison, as there are some courses names that
     # are often used inaccurately (e.g. missing apostrophe in Bowser's Castle).
@@ -1343,6 +1369,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         track_dirpath = os.path.join(tracks_tmp_dir, prefix)
                         log.info(f'Extracting and flattening "{path}" into "{track_dirpath}"...')
                         extract_and_flatten(path, track_dirpath)
+                        unwrap_custom_track(track_dirpath)
                         prefix_to_nodename[prefix] = filename
                         processed += 1
                         break
@@ -1359,6 +1386,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 track_dirpath = os.path.join(tracks_tmp_dir, prefix)
                 log.info(f'Extracting and flattening "{path}" into "{track_dirpath}"...')
                 extract_and_flatten(path, track_dirpath)
+                unwrap_custom_track(track_dirpath)
                 prefix_to_nodename[prefix] = filename
                 processed += 1
         if processed > 0:
