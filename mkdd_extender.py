@@ -547,7 +547,11 @@ def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
     #   > will ensure that the images are not messed up on Nintendont.
     #
     # Dolphin does not show any difference with or without these bytes set.
-    with open(dst_filepath, 'r+b') as f:
+    zero_bti_wrap_values(dst_filepath)
+
+
+def zero_bti_wrap_values(filepath: str):
+    with open(filepath, 'r+b') as f:
         f.seek(0x06)
         f.write(bytes((0x00, 0x00)))
 
