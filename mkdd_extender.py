@@ -556,6 +556,23 @@ def zero_bti_wrap_values(filepath: str):
         f.write(bytes((0x00, 0x00)))
 
 
+def extract_bti_wrap_values(filepath: str) -> 'tuple[int, int]':
+    with open(filepath, 'rb') as f:
+        f.seek(0x06)
+        wrap_st = f.read(2)
+        return wrap_st[0], wrap_st[1]
+
+
+def copy_or_link_bti_image(src_filepath: str, dst_filepath: str):
+    wrap_st = extract_bti_wrap_values(src_filepath)
+    if wrap_st == (0x00, 0x00):
+        make_link(src_filepath, dst_filepath)
+        return
+
+    shutil.copyfile(src_filepath, dst_filepath)
+    zero_bti_wrap_values(dst_filepath)
+
+
 def crop_image_sides(image: Image.Image) -> Image.Image:
     bbox = list(image.getbbox())
     bbox[1] = 0
@@ -1691,7 +1708,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
                 page_coursename_filepath = os.path.join(page_coursename_language_dirpath,
                                                         f'{COURSES[track_index]}_name.bti')
-                make_link(logo_filepath, page_coursename_filepath)
+                copy_or_link_bti_image(logo_filepath, page_coursename_filepath)
 
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
@@ -1735,14 +1752,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                                                *preview_image_size, 'CMPR',
                                                                (0, 0, 0, 255))
                 page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
-                make_link(preview_filepath, page_preview_filepath)
+                copy_or_link_bti_image(preview_filepath, page_preview_filepath)
 
                 label_filepath = find_or_generate_image_path(language, 'track_name.bti',
                                                              *label_image_size, 'IA4', (0, 0, 0, 0))
                 page_label_filepath = os.path.join(courseselect_dirpath, page_label_filename)
-                make_link(label_filepath, page_label_filepath)
+                copy_or_link_bti_image(label_filepath, page_label_filepath)
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
-                make_link(label_filepath, page_label_filepath)
+                copy_or_link_bti_image(label_filepath, page_label_filepath)
 
             # Gather minimap values.
             minimap_filepath = os.path.join(track_dirpath, 'minimap.json')
