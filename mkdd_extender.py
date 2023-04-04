@@ -33,7 +33,7 @@ import rarc
 from tools import bti, gcm
 from tools.GeckoLoader import GeckoLoader
 
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
