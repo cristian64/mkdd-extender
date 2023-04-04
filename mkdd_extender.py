@@ -324,6 +324,12 @@ def scan_custom_tracks_directory(dirpath: str) -> 'dict[str, str]':
     for name in names:
         path = os.path.join(dirpath, name)
 
+        if os.path.isdir(path):
+            nested_paths_to_track_name = scan_custom_tracks_directory(path)
+            if nested_paths_to_track_name:
+                paths_to_track_name.update(nested_paths_to_track_name)
+                continue
+
         try:
             track_name = get_custom_track_name(path)
             if track_name:
@@ -331,11 +337,6 @@ def scan_custom_tracks_directory(dirpath: str) -> 'dict[str, str]':
                 continue
         except Exception:
             pass
-
-        if os.path.isdir(path):
-            pathsd_names_to_track_name = scan_custom_tracks_directory(path)
-            if pathsd_names_to_track_name:
-                paths_to_track_name.update(pathsd_names_to_track_name)
 
     return paths_to_track_name
 
