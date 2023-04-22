@@ -52,7 +52,6 @@ void change_course_page(const int delta)
     }
 
     // __AUDIO_DATA_PLACEHOLDER__
-    const char* const page_audio_indexes = audio_indexes[(int)page];
     for (int i = 0; i < 32; ++i)
     {
         ((int*)COURSE_TO_STREAM_FILE_INDEX_ADDRESS)[i] = page_audio_indexes[i];
