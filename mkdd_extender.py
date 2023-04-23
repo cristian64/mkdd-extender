@@ -570,6 +570,8 @@ def copy_or_link_bti_image(src_filepath: str, dst_filepath: str):
         make_link(src_filepath, dst_filepath)
         return
 
+    remove_file(dst_filepath)  # It may be a hard link; unlink early.
+
     shutil.copyfile(src_filepath, dst_filepath)
     zero_bti_wrap_values(dst_filepath)
 
