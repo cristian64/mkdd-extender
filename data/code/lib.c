@@ -54,7 +54,7 @@ void change_course_page(const int delta)
     // __AUDIO_DATA_PLACEHOLDER__
     for (int i = 0; i < 32; ++i)
     {
-        ((int*)COURSE_TO_STREAM_FILE_INDEX_ADDRESS)[i] = page_audio_indexes[i];
+        ((unsigned int*)COURSE_TO_STREAM_FILE_INDEX_ADDRESS)[i] = page_audio_indexes[i];
     }
 }
 

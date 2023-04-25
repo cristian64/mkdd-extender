@@ -1106,8 +1106,8 @@ def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tu
     audio_data_code_lines.append('};')
     audio_data_type = 'char' if max_audio_index <= 255 else 'short'
     audio_data_code_lines.insert(0, f'const {audio_data_type} audio_indexes[PAGE_COUNT][32] = {{')
-    audio_data_code_lines.append(
-        f'const {audio_data_type}* const page_audio_indexes = audio_indexes[(int)page];')
+    audio_data_code_lines.append(f'const unsigned {audio_data_type}* const page_audio_indexes = '
+                                 f'(const unsigned {audio_data_type}*)audio_indexes[(int)page];')
     audio_data_code = '\n'.join(audio_data_code_lines)
 
     for pass_number in range(2):
