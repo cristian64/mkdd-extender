@@ -4,6 +4,10 @@
 
 #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 
+#define bool char
+#define false 0
+#define true 1
+
 #define BUTTON_DOWN 0x00000004
 #define BUTTON_UP 0x00000008
 
@@ -69,7 +73,7 @@ void refresh_lanselectmode()
     *(int*)(lan_struct_address - __LAN_STRUCT_OFFSET5__) |= 0x00000001;
 }
 
-void process_course_page_change(const char lanmode)
+void process_course_page_change(const bool lanmode)
 {
     char next_spam_flag;
     float next_redraw_courseselect_screen;
@@ -113,11 +117,11 @@ void process_course_page_change(const char lanmode)
 void scenecourseselect_calcanm_ex()
 {
     SceneCourseSelect__calcAnm();
-    process_course_page_change(0);
+    process_course_page_change(false);
 }
 
 void lanselectmode_calcanm_ex()
 {
     LANSelectMode__calcAnm();
-    process_course_page_change(1);
+    process_course_page_change(true);
 }
