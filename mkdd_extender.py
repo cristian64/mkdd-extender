@@ -1380,6 +1380,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
     else:
         raise MKDDExtenderError('Unexpected value in `tracks` argument.')
 
+    SUPPORTED_CODE_PATCHES = tuple(name.lower().replace(' ', '-')
+                                   for name, *_rest in OPTIONAL_ARGUMENTS['Code Patches'])
+    enabled_code_patches = tuple(name for name in SUPPORTED_CODE_PATCHES
+                                 if getattr(args, name.replace('-', '_')))
+
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tracks_tmp_dir:
         # Unpack ZIP archives (or copy directory is pre-unpacked) to their respective directories.
         prefix_to_nodename = {}
@@ -1510,6 +1515,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 main_language = trackinfo['Config']['main_language']
                 replaces = trackinfo['Config'].get('replaces')
                 auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
+                code_patches = trackinfo['Config'].get('code_patches', '')
             except Exception:
                 log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
                             'the `trackname` field or `main_language` field.')
@@ -1518,6 +1524,23 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 main_language = None
                 replaces = None
                 auxiliary_audio_track = None
+
+            # Verify that the required code patches for the track have been enabled.
+            for code_patch in code_patches.replace('"', '').replace("'", '').split(','):
+                code_patch = code_patch.strip().lower().replace(' ', '-')
+                if not code_patch or code_patch in enabled_code_patches:
+                    continue
+                supported = code_patch in SUPPORTED_CODE_PATCHES
+                message = f'Code patch "{code_patch}", required by "{nodename}", '
+                if supported:
+                    message += 'has not been enabled.'
+                else:
+                    message += 'is not supported.'
+                if args.skip_code_patches_check:
+                    log.warning(message)
+                else:
+                    raise MKDDExtenderError(f'{message} Re-run with --skip-code-patches-check to '
+                                            'circumvent this safety measure.')
 
             added_course_names.append(trackname)
 
@@ -2226,6 +2249,7 @@ OPTIONAL_ARGUMENTS = {
             'be switched to `MONO`.',
         ),
     ),
+    'Code Patches': (),
     'Expert Options': (
         (
             'Extended Memory',
@@ -2272,6 +2296,12 @@ OPTIONAL_ARGUMENTS = {
             'If specified, no filesize check will be performed. It is known that certain files '
             'need to remain under a specific size (e.g. `courseselect.arc`), and unexpected '
             'crashes can occur when the limits are exceeded.',
+        ),
+        (
+            'Skip Code Patches Check',
+            bool,
+            'If specified, missing code patches will not fail the program. Custom tracks that '
+            'rely on the missing code patches may present unexpected behavior, or crash the game.',
         ),
     ),
 }
