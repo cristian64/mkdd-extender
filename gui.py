@@ -1316,7 +1316,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
             for option_label, _option_type, _option_help in group_options:
-                option_member_name = f'_{option_label.lower().replace(" ", "_")}'
+                option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 setattr(self, option_member_name, None)
 
         organization = application = 'mkdd-extender'
@@ -1653,7 +1653,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options = []
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
             for option_label, _option_type, _option_help in group_options:
-                option_variable_name = f'{option_label.lower().replace(" ", "_")}'
+                option_variable_name = mkdd_extender.option_label_as_variable_name(option_label)
                 option_member_name = f'_{option_variable_name}'
                 option_value = getattr(self, option_member_name)
                 if option_value:
@@ -2324,7 +2324,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             group_box.setLayout(QtWidgets.QVBoxLayout())
 
             for option_label, option_type, option_help in group_options:
-                option_member_name = f'_{option_label.lower().replace(" ", "_")}'
+                option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 option_value = getattr(self, option_member_name)
                 option_help = markdown_to_html(option_label, option_help)
 
@@ -2381,9 +2381,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options_strings = []
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
             for option_label, option_type, _option_help in group_options:
-                option_member_name = f'_{option_label.lower().replace(" ", "_")}'
+                option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 option_value = getattr(self, option_member_name)
-                option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
+                option_as_argument = mkdd_extender.option_label_as_argument_name(option_label)
 
                 if option_type is bool:
                     if option_value:
@@ -2895,7 +2895,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
                 for option_label, _option_type, _option_help in group_options:
-                    option_variable_name = f'{option_label.lower().replace(" ", "_")}'
+                    option_variable_name = mkdd_extender.option_label_as_variable_name(option_label)
                     option_member_name = f'_{option_variable_name}'
                     option_value = getattr(self, option_member_name) or None
                     setattr(args, option_variable_name, option_value)

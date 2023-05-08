@@ -2118,9 +2118,9 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
     option_lines = []
     for _group_name, group_options in OPTIONAL_ARGUMENTS.items():
         for option_label, option_type, _option_help in group_options:
-            option_member_name = f'{option_label.lower().replace(" ", "_")}'
+            option_member_name = option_label_as_variable_name(option_label)
             option_value = getattr(args, option_member_name)
-            option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
+            option_as_argument = option_label_as_argument_name(option_label)
             if option_type is bool and option_value:
                 option_lines.append(f'- `{option_as_argument}`')
             if option_type is int and option_value:
@@ -2277,6 +2277,14 @@ OPTIONAL_ARGUMENTS = {
 }
 
 
+def option_label_as_argument_name(option_label: str) -> str:
+    return f'--{option_label.lower().replace(" ", "-")}'
+
+
+def option_label_as_variable_name(option_label: str) -> str:
+    return option_label.lower().replace(' ', '_').replace('-', '_')
+
+
 def create_args_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the original ISO file.')
@@ -2307,7 +2315,7 @@ def create_args_parser() -> argparse.ArgumentParser:
     for group_name, group_options in OPTIONAL_ARGUMENTS.items():
         argument_group = parser.add_argument_group(group_name)
         for option_label, option_type, option_help in group_options:
-            option_as_argument = f'--{option_label.lower().replace(" ", "-")}'
+            option_as_argument = option_label_as_argument_name(option_label)
 
             if option_type is bool:
                 argument_group.add_argument(option_as_argument,
