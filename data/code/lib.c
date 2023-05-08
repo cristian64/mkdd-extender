@@ -14,6 +14,7 @@
 #define BUTTONS_STATE_ADDRESS __BUTTONS_STATE_ADDRESS__
 #define COURSE_TO_STREAM_FILE_INDEX_ADDRESS __COURSE_TO_STREAM_FILE_INDEX_ADDRESS__
 #define CURRENT_PAGE_ADDRESS __CURRENT_PAGE_ADDRESS__
+#define GM4E01_DEBUG_BUILD __GM4E01_DEBUG_BUILD__
 #define LAN_STRUCT_ADDRESS __LAN_STRUCT_ADDRESS__
 #define LAN_STRUCT_OFFSET1 __LAN_STRUCT_OFFSET1__
 #define LAN_STRUCT_OFFSET2 __LAN_STRUCT_OFFSET2__
@@ -26,6 +27,7 @@
 #define PLAY_SOUND_R5 __PLAY_SOUND_R5__
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
+#define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 
 void change_course_page(const int delta)
 {
@@ -125,3 +127,91 @@ void lanselectmode_calcanm_ex()
     LANSelectMode__calcAnm();
     process_course_page_change(true);
 }
+
+#if TYPE_SPECIFIC_ITEM_BOXES
+
+struct GeoObject
+{
+    char field_0[232];
+    struct SObject* sobj;
+};
+
+struct SObject
+{
+    int xpos;
+    int ypos;
+    int zpos;
+    int xscale;
+    int yscale;
+    int zscale;
+    short forwardx;
+    short forwardy;
+    short forwardz;
+    short upx;
+    short upy;
+    short upz;
+    short objectid;
+    short link;
+    short field_28;
+    short targetpoint;
+    char proclevel_filter;
+    char proclevel;
+    char collisionflag;
+    char field_2F;
+    short s16fixedpoint1;
+    short s16fixedpoint2;
+    short field_34;
+    short field_36;
+    short s16fixedpoint3;
+    short s16fixedpoint4;
+    short field_3C;
+    short idk_availability;
+};
+
+volatile signed char player_item_rolls[] = {[0 ... 7] = -1};
+
+int itemobjmgr_isavailablerollingslot_ex(const unsigned int* const itemobjmgr,
+                                         const int player,
+                                         const unsigned int val2)
+{
+#if GM4E01_DEBUG_BUILD
+    register const struct GeoObject* const itembox asm("r28");
+#else
+    register const struct GeoObject* const itembox asm("r29");
+#endif
+
+    const int is_available = ItemObjMgr__IsAvailableRollingSlot(itemobjmgr, player, val2);
+    if (is_available)
+    {
+        const struct SObject* const sobj = itembox->sobj;
+        player_item_rolls[player] = (signed char)(sobj->field_36 == 0 ? -1 : sobj->field_36 - 1);
+    }
+
+    return is_available;
+}
+
+int itemshufflemgr_calcslot_ex(const unsigned int* const itemshufflemgr,
+                               const unsigned int* const kartrankdataset,
+                               const int unk1,
+                               const int unk2,
+                               const bool unk3)
+{
+    const int player = *(kartrankdataset - 8 / 4);
+    const int player_item_type = (int)player_item_rolls[player];
+
+    if (player_item_type == -1)
+    {
+        return ItemShuffleMgr__calcSlot(itemshufflemgr, kartrankdataset, unk1, unk2, unk3);
+    }
+
+    if (player_item_type == 20)
+    {
+        const int other_data = *(kartrankdataset - 1);
+        const char character = (char)(other_data >> 24);
+        return ItemObj__getSpecialKind(&player, &character);
+    }
+
+    return player_item_type;
+}
+
+#endif

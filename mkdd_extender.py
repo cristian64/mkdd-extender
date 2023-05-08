@@ -1988,7 +1988,8 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
                                                  matching_audio_override_data)
 
     if not args.legacy_gecko_codes:
-        code_patcher.patch_dol_file(game_id, minimap_data, audio_track_data, dol_path, log)
+        code_patcher.patch_dol_file(game_id, minimap_data, audio_track_data,
+                                    bool(args.type_specific_item_boxes), dol_path, log)
 
         for language in LANGUAGES:
             scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
@@ -2249,7 +2250,47 @@ OPTIONAL_ARGUMENTS = {
             'be switched to `MONO`.',
         ),
     ),
-    'Code Patches': (),
+    'Code Patches': (
+        (
+            'Type-specific Item Boxes',
+            bool,
+            'If enabled, support for type-specific item boxes will be added to the game.'
+            '\n\n'
+            'The patch allows custom tracks to include item boxes that have been configured for a '
+            'specific item type (i.e. players always get the same item type from the item box). '
+            'The item type is defined in the fourth user data field of the item box in the BOL '
+            'file (only the first three fields are used in the original game).'
+            '\n\n'
+            'Valid values for the field are:\n\n'
+            '- **1:** Green Shell\n'
+            '- **2:** Bowser Shell\n'
+            '- **3:** Red Shell\n'
+            '- **4:** Banana\n'
+            '- **5:** Giant Banana\n'
+            '- **6:** Mushroom\n'
+            '- **7:** Star\n'
+            '- **8:** Chain Chomp\n'
+            '- **9:** Bob-omb\n'
+            '- **10:** Single Red Fireball\n'
+            '- **11:** Lightning\n'
+            '- **12:** Yoshi / Birdo Egg\n'
+            '- **13:** Golden Mushroom\n'
+            '- **14:** Blue Shell\n'
+            '- **15:** Heart\n'
+            '- **16:** Fake Item Box\n'
+            '- **17:** Nothing\n'
+            '- **18:** Triple Green / Red Shells\n'
+            '- **19:** Triple Mushrooms\n'
+            '- **20:** Triple Red Shells\n'
+            '- **21:** Special Item\n'
+            '- **22:** Green / Red Fireballs\n'
+            '\n\n'
+            'NOTE: Some item types are capped to a limited number of instances in the game (e.g. '
+            'Chain Chomps or Lightnings). There cannot be in play more than a certain amount. When '
+            'the limit is reached, item boxes of these types will not give any item (but they will '
+            'trigger the item rolling animation).'
+        ),
+    ),
     'Expert Options': (
         (
             'Extended Memory',

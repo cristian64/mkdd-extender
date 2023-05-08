@@ -1,5 +1,7 @@
 """
-Module for generating and injecting the game logic that makes possible the course page selection.
+Module for generating and injecting the game logic that makes possible the course page selection,
+as well as other code patches.
+
 The GC-C-Kit tool is used for building and extracting the symbols that are then injected in the
 input DOL file.
 """
@@ -873,6 +875,28 @@ locate in the debugger if a breakpoint is set, or in Ghidra when looking for ref
 This is one of the `bl` instructions that will be hijacked.
 """
 
+ITEMOBJMGR_ISAVAILABLEROLLINGSLOT_CALL_ADDRESSES = {
+    'GM4E01': 0x801FBE84,
+    'GM4P01': 0x801FBE54,
+    'GM4J01': 0x801FBEAC,
+    'GM4E01dbg': 0x8022ED1C,
+}
+"""
+The address to one of the two places from where `ItemObjMgr::IsAvailableRollingSlot()` is called.
+This `bl` instruction will be hijacked to add support for type-specific item boxes.
+"""
+
+ITEMSHUFFLEMGR_CALCSLOT_CALL_ADDRESSES = {
+    'GM4E01': 0x8020CBC4,
+    'GM4P01': 0x8020CB94,
+    'GM4J01': 0x8020CBEC,
+    'GM4E01dbg': 0x80243000,
+}
+"""
+The address to the one place from where `ItemShuffleMgr::calcSlot()` is called. This `bl`
+instruction will be hijacked to add support for type-specific item boxes.
+"""
+
 OSARENALO_INSTRUCTIONS_ADDRESSES = {
     'GM4E01': 0x800E5CD4,
     'GM4P01': 0x800E5C98,
@@ -906,6 +930,9 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
         LANSelectMode__calcAnm = 0x801e428c;
+        ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
+        ItemShuffleMgr__calcSlot = 0x8020CFEC;
+        ItemObj__getSpecialKind = 0x8021A024;
         """),
     'GM4P01':
     textwrap.dedent("""\
@@ -913,6 +940,9 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016a584;
         LANSelectMode__calcAnm = 0x801e4264;
+        ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
+        ItemShuffleMgr__calcSlot = 0x8020CFBC;
+        ItemObj__getSpecialKind = 0x8021A008;
         """),
     'GM4J01':
     textwrap.dedent("""\
@@ -920,6 +950,9 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
         LANSelectMode__calcAnm = 0x801e42b4;
+        ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
+        ItemShuffleMgr__calcSlot = 0x8020D014;
+        ItemObj__getSpecialKind = 0x8021A04C;
         """),
     'GM4E01dbg':
     textwrap.dedent("""\
@@ -927,6 +960,9 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x80089974;
         SceneCourseSelect__calcAnm = 0x80189448;
         LANSelectMode__calcAnm = 0x80216028;
+        ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
+        ItemShuffleMgr__calcSlot = 0x80243508;
+        ItemObj__getSpecialKind = 0x802512DC;
         """),
 }
 """
@@ -1008,8 +1044,14 @@ def patch_bti_filenames_in_blo_file(game_id: str, blo_path: str):
         f.write(data)
 
 
-def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tuple[int]]',
-                   dol_path: str, log: logging.Logger):
+def patch_dol_file(
+    game_id: str,
+    minimap_data: dict,
+    audio_track_data: 'tuple[tuple[int]]',
+    type_specific_item_boxes: bool,
+    dol_path: str,
+    log: logging.Logger,
+):
     import mkdd_extender  # pylint: disable=import-outside-toplevel
 
     log.info('Generating and injecting C code...')
@@ -1124,6 +1166,7 @@ def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tu
             ('__COURSE_TO_STREAM_FILE_INDEX_ADDRESS__',
              f'0x{COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + offset:08X}'),
             ('__CURRENT_PAGE_ADDRESS__', f'0x{CURRENT_PAGE_ADDRESSES[game_id]:08X}'),
+            ('__GM4E01_DEBUG_BUILD__', str(int(game_id == 'GM4E01dbg'))),
             ('__LAN_STRUCT_ADDRESS__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][0]:08X}'),
             ('__LAN_STRUCT_OFFSET1__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][1]:04X}'),
             ('__LAN_STRUCT_OFFSET2__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][2]:04X}'),
@@ -1137,6 +1180,7 @@ def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tu
             ('__REDRAW_COURSESELECT_SCREEN_ADDRESS__',
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
+            ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
@@ -1171,10 +1215,20 @@ def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tu
                     f.write(code)
 
                 project.add_file('lib.c')
+
+                # Page selection logic.
                 project.branchlink(SCENECOURSESELECT_CALCANM_CALL_ADDRESSES[game_id],
                                    'scenecourseselect_calcanm_ex')
                 project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
                                    'lanselectmode_calcanm_ex')
+
+                # Code extensions.
+                if type_specific_item_boxes:
+                    project.branchlink(ITEMOBJMGR_ISAVAILABLEROLLINGSLOT_CALL_ADDRESSES[game_id],
+                                       'itemobjmgr_isavailablerollingslot_ex')
+                    project.branchlink(ITEMSHUFFLEMGR_CALCSLOT_CALL_ADDRESSES[game_id],
+                                       'itemshufflemgr_calcslot_ex')
+
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
                 # Diagnosis logging only if enabled on the user end.
