@@ -2152,7 +2152,7 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
 
 
 OPTIONAL_ARGUMENTS = {
-    'General options': (
+    'General Options': (
         (
             'Skip Banner',
             bool,
@@ -2193,7 +2193,7 @@ OPTIONAL_ARGUMENTS = {
             'that were used to generate the ISO image, and the name of added custom tracks.',
         ),
     ),
-    'Audio options': (
+    'Audio Options': (
         (
             'Sample Rate',
             int,
@@ -2226,7 +2226,7 @@ OPTIONAL_ARGUMENTS = {
             'be switched to `MONO`.',
         ),
     ),
-    'Expert options': (
+    'Expert Options': (
         (
             'Extended Memory',
             bool,
@@ -2259,7 +2259,7 @@ OPTIONAL_ARGUMENTS = {
             'directions in the `D-pad`.',
         ),
     ),
-    'Dangerous options': (
+    'Dangerous Options': (
         (
             'Skip DOL Checksum Check',
             bool,
