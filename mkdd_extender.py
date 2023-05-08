@@ -1923,7 +1923,7 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
             '81f1b05c6650d65326f757bb25bad604',  # GM4J01
             'bfb79b2e98fb632d863bb39cb3ca6e08',  # GM4E01 (debug)
     ):
-        message = (f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}.')
+        message = f'DOL file ("{dol_path}") is not original. Unrecognized checksum: {checksum}.'
         if args.skip_dol_checksum_check:
             log.warning(message)
         else:
