@@ -2294,7 +2294,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             html = f'<h3>{title}</h3>\n'
             for paragraph in text.split('\n\n'):
                 paragraph = paragraph.strip()
-                paragraph = paragraph.replace('\n', ' ')
+                if paragraph.startswith('- '):
+                    unordered_list = ''
+                    for line in paragraph.splitlines():
+                        unordered_list += f'<li>{line[1:].strip()}</li>\n'
+                    paragraph = f'<ul>{unordered_list}</ul>\n'
+                else:
+                    paragraph = paragraph.replace('\n', ' ')
                 paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
                                    paragraph)
                 paragraph = re.sub(
