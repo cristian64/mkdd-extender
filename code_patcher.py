@@ -1172,9 +1172,9 @@ def patch_dol_file(game_id: str, minimap_data: dict, audio_track_data: 'tuple[tu
 
                 project.add_file('lib.c')
                 project.branchlink(SCENECOURSESELECT_CALCANM_CALL_ADDRESSES[game_id],
-                                   "scenecourseselect_calcanm_ex")
+                                   'scenecourseselect_calcanm_ex')
                 project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
-                                   "lanselectmode_calcanm_ex")
+                                   'lanselectmode_calcanm_ex')
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
                 # Diagnosis logging only if enabled on the user end.
