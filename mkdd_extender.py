@@ -1681,11 +1681,12 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         # No need to generate warning in this case. This is acceptable.
                         return filepath
 
-                for l in LANGUAGES:
-                    filepath = os.path.join(course_images_dirpath, l, filename)
+                for lang in LANGUAGES:
+                    filepath = os.path.join(course_images_dirpath, lang, filename)
                     if os.path.isfile(filepath):
-                        log.warning(f'Unable to locate `{filename}` in "{nodename}" for '
-                                    f'current language ({language}). Image for {l} will be used.')
+                        log.warning(
+                            f'Unable to locate `{filename}` in "{nodename}" for '
+                            f'current language ({language}). Image for {lang} will be used.')
                         return filepath
 
                 log.warning(f'Unable to locate `{filename}` in "{nodename}" for {language}. '
@@ -1698,7 +1699,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
             # Copy course logo.
             expected_languages = os.listdir(page_coursename_dirpath)
-            expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
+            expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
             if not expected_languages:
                 raise MKDDExtenderError(f'Unable to locate language directories in "{nodename}" '
                                         'for course logo.')
@@ -1714,7 +1715,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 copy_or_link_bti_image(logo_filepath, page_coursename_filepath)
 
             expected_languages = os.listdir(scenedata_dirpath)
-            expected_languages = tuple(l for l in LANGUAGES if l in expected_languages)
+            expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
             if not expected_languages:
                 raise MKDDExtenderError('Unable to locate `SceneData/language` directories in '
                                         f'"{nodename}".')
@@ -1907,7 +1908,7 @@ def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
     if not args.legacy_gecko_codes:
         audio_track_data = [audio_track_data[-1]] + list(audio_track_data[:-1])
 
-    return tuple(tuple(l) for l in audio_track_data)
+    return tuple(tuple(indices) for indices in audio_track_data)
 
 
 def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
