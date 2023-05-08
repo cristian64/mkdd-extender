@@ -120,7 +120,7 @@ class Project:
 
         try:
             _offset, addr, _size = tmp.allocate_text_section(4, address)
-        except SectionCountFull as e:
+        except SectionCountFull:
             try:
                 _offset, addr, _size = tmp.allocate_data_section(4, address)
             except SectionCountFull as e:
