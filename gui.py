@@ -2290,6 +2290,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         layout = QtWidgets.QVBoxLayout(dialog)
 
+        horizontal_layout = QtWidgets.QHBoxLayout()
+        horizontal_layout.setSpacing(dialog.fontMetrics().height())
+        layout.addLayout(horizontal_layout)
+        vertical_layouts = [QtWidgets.QVBoxLayout(), QtWidgets.QVBoxLayout()]
+        for vertical_layout in vertical_layouts:
+            vertical_layout.setSpacing(dialog.fontMetrics().height())
+            horizontal_layout.addLayout(vertical_layout)
+
         def markdown_to_html(title: str, text: str) -> str:
             html = f'<h3>{title}</h3>\n'
             for paragraph in text.split('\n\n'):
@@ -2309,7 +2317,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 html += f'<p>{paragraph}</p>\n'
             return html
 
-        for group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
+        group_count = len(mkdd_extender.OPTIONAL_ARGUMENTS.items())
+
+        for i, (group_name, group_options) in enumerate(mkdd_extender.OPTIONAL_ARGUMENTS.items()):
             group_box = QtWidgets.QGroupBox(group_name)
             group_box.setLayout(QtWidgets.QVBoxLayout())
 
@@ -2353,9 +2363,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_widget.textChanged.connect(self._update_options_string)
                     group_box.layout().addLayout(option_widget_layout)
 
-            layout.addWidget(group_box)
+            vertical_layouts[int(i >= group_count / 2)].addWidget(group_box)
 
-        layout.addStretch()
+        for vertical_layout in vertical_layouts:
+            vertical_layout.addStretch()
+
         layout.addSpacing(dialog.fontMetrics().height() * 2)
         close_button = QtWidgets.QPushButton('Close')
         close_button.clicked.connect(dialog.close)
