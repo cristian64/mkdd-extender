@@ -28,10 +28,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 import ast_converter
 import code_patcher
-import gecko_code
 import rarc
 from tools import bti, gcm
-from tools.GeckoLoader import GeckoLoader
 
 __version__ = '0.5.3'
 
@@ -602,14 +600,14 @@ def split_image(image: Image.Image) -> 'list[Image.Image]':
     return [image]
 
 
-def add_controls_to_title_image(args: argparse.Namespace, filepath: str, language: str):
+def add_controls_to_title_image(filepath: str, language: str):
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         title_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, title_filename[:-len('.bti')] + '.png')
 
         convert_bti_to_png(filepath, tmp_filepath)
 
-        controls_filename = 'controls.png' if args.legacy_gecko_codes else 'dpad_up_down.png'
+        controls_filename = 'dpad_up_down.png'
         controls_filepath = os.path.join(data_dir, 'controls', controls_filename)
         controls_image = Image.open(controls_filepath)
         slash_filepath = os.path.join(data_dir, 'controls', 'slash.png')
@@ -653,66 +651,6 @@ def add_controls_to_title_image(args: argparse.Namespace, filepath: str, languag
         remove_file(filepath)  # It may be a hard link; unlink early.
 
         convert_png_to_bti(tmp_filepath, filepath, 'RGB5A3')
-
-
-def add_dpad_to_cup_name_image(filepath: str, page_index: int):
-    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
-        cupname_filename = os.path.basename(filepath)
-        tmp_filepath = os.path.join(tmp_dir, cupname_filename[:-len('.bti')] + '.png')
-
-        convert_bti_to_png(filepath, tmp_filepath)
-
-        dpad_filepath = os.path.join(data_dir, 'controls', 'dpad.png')
-        dpad_image = Image.open(dpad_filepath)
-
-        # It is assumed that the D-pad image is set to the initial state (that is, pointing to the
-        # right). Only for the extra custom pages a rotation is needed.
-        if page_index == 0:
-            dpad_image = dpad_image.rotate(90)  # Up
-        elif page_index == 1:
-            dpad_image = dpad_image.rotate(-90)  # Down
-        elif page_index == 2:
-            dpad_image = dpad_image.rotate(180)  # Left
-
-        cupname_image = Image.open(tmp_filepath)
-        original_mode = cupname_image.mode  # Original mode is 'LA'.
-        cupname_image = cupname_image.convert('RGBA')
-
-        canvas_width = cupname_image.width - dpad_image.width
-        canvas_height = cupname_image.height
-
-        words = split_image(cupname_image)
-
-        effective_width = sum(img.width for img in words)
-        available_width = canvas_width - effective_width
-
-        MAX_SPACING = 3
-        spaces = len(words) - 1
-        spacing = min(MAX_SPACING, available_width // spaces) if spaces > 0 else 0
-        spacing_width = spacing * spaces
-
-        margin_width = max(0, available_width - spacing_width)
-        offset = max(0, margin_width // 2)
-        if not spacing:
-            offset += min(dpad_image.width, cupname_image.width - effective_width)
-        else:
-            offset += dpad_image.width
-
-        ops = []
-        for word in words:
-            ops.append((word, (offset, 0)))
-            offset += spacing + word.width
-
-        image = Image.new('RGBA', (canvas_width + dpad_image.width, canvas_height))
-        for word, box in reversed(ops):
-            image.alpha_composite(word, dest=box)
-        image.alpha_composite(dpad_image)
-        image = image.convert(original_mode)
-        image.save(tmp_filepath)
-
-        remove_file(filepath)  # It may be a hard link; unlink early.
-
-        convert_png_to_bti(tmp_filepath, filepath, 'IA4')
 
 
 def build_page_numbers_image(page_number: int, page_count: int) -> Image.Image:
@@ -1241,7 +1179,7 @@ def patch_bnr_file(iso_tmp_dir: str):
     log.info('Game title tweaked.')
 
 
-def patch_title_lines(args: argparse.Namespace, iso_tmp_dir: str):
+def patch_title_lines(iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -1259,7 +1197,7 @@ def patch_title_lines(args: argparse.Namespace, iso_tmp_dir: str):
         for title_filename in ('selectcourse.bti', 'selectcup.bti'):
             title_filepath = os.path.join(timg_dir, title_filename)
             log.info(f'Modifying {title_filepath}...')
-            add_controls_to_title_image(args, title_filepath, language)
+            add_controls_to_title_image(title_filepath, language)
 
         # Gradient colors are specified in the BLO file, which we want to avoid in the controls
         # icons. Also, avoid the game blurrying the images.
@@ -1323,32 +1261,24 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
             cupname_filepath = os.path.join(timg_dir, cupname_filename)
             log.info(f'Modifying {cupname_filepath}...')
 
-            if not args.legacy_gecko_codes:
-                new_cupname_filepath = with_page_index_suffix(0, cupname_filepath)
-                os.rename(cupname_filepath, new_cupname_filepath)
-                cupname_filepath = new_cupname_filepath
+            new_cupname_filepath = with_page_index_suffix(0, cupname_filepath)
+            os.rename(cupname_filepath, new_cupname_filepath)
+            cupname_filepath = new_cupname_filepath
 
             for page_index in range(page_count - 1):
-                if not args.legacy_gecko_codes:
-                    page_index += 1
+                page_index += 1
 
                 page_cupname_filepath = with_page_index_suffix(page_index, cupname_filepath)
                 make_link(cupname_filepath, page_cupname_filepath)
 
                 if not args.skip_cup_names:
-                    if args.legacy_gecko_codes:
-                        add_dpad_to_cup_name_image(page_cupname_filepath, page_index)
-                    else:
-                        add_page_number_to_cup_name_image(page_cupname_filepath, page_index + 1,
-                                                          page_count)
+                    add_page_number_to_cup_name_image(page_cupname_filepath, page_index + 1,
+                                                      page_count)
                 make_link(page_cupname_filepath,
                           page_cupname_filepath.replace('courseselect', 'lanplay'))
 
             if not args.skip_cup_names:
-                if args.legacy_gecko_codes:
-                    add_dpad_to_cup_name_image(cupname_filepath, -1)
-                else:
-                    add_page_number_to_cup_name_image(cupname_filepath, 1, page_count)
+                add_page_number_to_cup_name_image(cupname_filepath, 1, page_count)
             make_link(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
 
     log.info('Cup names patched.')
@@ -1422,9 +1352,6 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             log.info(f'{processed} custom tracks have been processed.')
         else:
             log.warning('No archive has been processed.')
-        if args.legacy_gecko_codes and processed != 48:
-            raise MKDDExtenderError(
-                'With the legacy Gecko codes, exactly 48 custom tracks are required.')
 
         extra_page_count = len(prefix_to_nodename) // 16
         total_page_count = extra_page_count + 1
@@ -1461,17 +1388,16 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             checksum = md5sum(ast_filepath)
             audio_tracks_checksums[checksum] = filename
 
-        # Rename original directories if needed.
-        if not args.legacy_gecko_codes:
-            new_course_dirpath = with_page_index_suffix(0, course_dirpath)
-            new_coursename_dirpath = with_page_index_suffix(0, coursename_dirpath)
-            new_staffghosts_dirpath = with_page_index_suffix(0, staffghosts_dirpath)
-            os.rename(course_dirpath, new_course_dirpath)
-            os.rename(coursename_dirpath, new_coursename_dirpath)
-            os.rename(staffghosts_dirpath, new_staffghosts_dirpath)
-            course_dirpath = new_course_dirpath
-            coursename_dirpath = new_coursename_dirpath
-            staffghosts_dirpath = new_staffghosts_dirpath
+        # Rename original directories.
+        new_course_dirpath = with_page_index_suffix(0, course_dirpath)
+        new_coursename_dirpath = with_page_index_suffix(0, coursename_dirpath)
+        new_staffghosts_dirpath = with_page_index_suffix(0, staffghosts_dirpath)
+        os.rename(course_dirpath, new_course_dirpath)
+        os.rename(coursename_dirpath, new_coursename_dirpath)
+        os.rename(staffghosts_dirpath, new_staffghosts_dirpath)
+        course_dirpath = new_course_dirpath
+        coursename_dirpath = new_coursename_dirpath
+        staffghosts_dirpath = new_staffghosts_dirpath
 
         # Copy files into the ISO temporariy directory.
         log.info('Melding directories...')
@@ -1479,8 +1405,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         for prefix in PREFIXES[:len(prefix_to_nodename)]:
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
             page_index = ord(prefix[0]) - ord('A')
-            if not args.legacy_gecko_codes:
-                page_index += 1
+            page_index += 1
             track_index = int(prefix[1:3]) - 1
             assert 0 <= track_index <= 15
 
@@ -1746,26 +1671,24 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
             label_filename = f'coname_{COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]}.bti'
 
-            # Rename original directories if needed.
-            if not args.legacy_gecko_codes:
-                new_preview_filename = with_page_index_suffix(0, preview_filename)
-                new_label_filename = with_page_index_suffix(0, label_filename)
+            # Rename original directories.
+            new_preview_filename = with_page_index_suffix(0, preview_filename)
+            new_label_filename = with_page_index_suffix(0, label_filename)
 
-                if page_index == 1:
-                    for language in expected_languages:
-                        courseselect_dirpath = os.path.join(scenedata_dirpath, language,
-                                                            'courseselect', 'timg')
-                        lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay',
-                                                       'timg')
-                        os.rename(os.path.join(courseselect_dirpath, preview_filename),
-                                  os.path.join(courseselect_dirpath, new_preview_filename))
-                        os.rename(os.path.join(courseselect_dirpath, label_filename),
-                                  os.path.join(courseselect_dirpath, new_label_filename))
-                        os.rename(os.path.join(lanplay_dirpath, label_filename),
-                                  os.path.join(lanplay_dirpath, new_label_filename))
+            if page_index == 1:
+                for language in expected_languages:
+                    courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
+                                                        'timg')
+                    lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
+                    os.rename(os.path.join(courseselect_dirpath, preview_filename),
+                              os.path.join(courseselect_dirpath, new_preview_filename))
+                    os.rename(os.path.join(courseselect_dirpath, label_filename),
+                              os.path.join(courseselect_dirpath, new_label_filename))
+                    os.rename(os.path.join(lanplay_dirpath, label_filename),
+                              os.path.join(lanplay_dirpath, new_label_filename))
 
-                preview_filename = new_preview_filename
-                label_filename = new_label_filename
+            preview_filename = new_preview_filename
+            label_filename = new_label_filename
 
             # Copy preview image and label image.
             page_preview_filename = with_page_index_suffix(page_index, preview_filename)
@@ -1837,10 +1760,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
     return minimap_data, alternative_audio_data, matching_audio_override_data, added_course_names
 
 
-def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
-                              alternative_audio_data: 'dict[str, str]',
+def gather_audio_file_indices(iso_tmp_dir: str, alternative_audio_data: 'dict[str, str]',
                               matching_audio_override_data: 'dict[str, str]') -> tuple:
-    # The Gecko code generator needs the list of 32 integers with the file index of each audio track
+    # The code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
 
     file_list = build_file_list(iso_tmp_dir)
@@ -1928,8 +1850,7 @@ def gather_audio_file_indices(args: argparse.Namespace, iso_tmp_dir: str,
                 pass  # Fallback audio file index will be used.
 
     # Move stock indices to the front.
-    if not args.legacy_gecko_codes:
-        audio_track_data = [audio_track_data[-1]] + list(audio_track_data[:-1])
+    audio_track_data = [audio_track_data[-1]] + list(audio_track_data[:-1])
 
     return tuple(tuple(indices) for indices in audio_track_data)
 
@@ -1984,23 +1905,21 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             if data == DEBUG_BUILD_DATE:
                 game_id += 'dbg'
 
-    audio_track_data = gather_audio_file_indices(args, iso_tmp_dir, alternative_audio_data,
+    audio_track_data = gather_audio_file_indices(iso_tmp_dir, alternative_audio_data,
                                                  matching_audio_override_data)
 
-    if not args.legacy_gecko_codes:
-        code_patcher.patch_dol_file(game_id, minimap_data, audio_track_data,
-                                    bool(args.type_specific_item_boxes), dol_path, log)
+    code_patcher.patch_dol_file(game_id, minimap_data, audio_track_data,
+                                bool(args.type_specific_item_boxes), dol_path, log)
 
-        for language in LANGUAGES:
-            scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
-            if not os.path.isdir(scenedata_dirpath):
-                continue
-            for blo_path in (os.path.join(scenedata_dirpath, 'courseselect', 'scrn',
-                                          'courseselect_under.blo'),
-                             os.path.join(scenedata_dirpath, 'lanplay', 'scrn',
-                                          'lanselectmode.blo')):
-                log.info(f'Patching BLO file ("{blo_path}")...')
-                code_patcher.patch_bti_filenames_in_blo_file(game_id, blo_path)
+    for language in LANGUAGES:
+        scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
+        if not os.path.isdir(scenedata_dirpath):
+            continue
+        for blo_path in (os.path.join(scenedata_dirpath, 'courseselect', 'scrn',
+                                      'courseselect_under.blo'),
+                         os.path.join(scenedata_dirpath, 'lanplay', 'scrn', 'lanselectmode.blo')):
+            log.info(f'Patching BLO file ("{blo_path}")...')
+            code_patcher.patch_bti_filenames_in_blo_file(game_id, blo_path)
 
     if args.extended_memory:
         # The simulated memory size in the disk information header needs to be updated to the new
@@ -2071,8 +1990,8 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         # are referenced; they cannot be changed. The MKDD Track Patcher modifies the `lfs`
         # instructions that load the float values to pick and choose some of the smaller values
         # among the available float values that are hardcoded in the static memory. This is tedious
-        # work that we'd have to do implement with Gecko codes, and there is no guarantee that other
-        # arbitrary numbers will be better (or worse).
+        # work that we'd have to do implement with codes patches, and there is no guarantee that
+        # other arbitrary numbers will be better (or worse) numbers.
         #
         # For the MKDD Extender, instead of replacing the `lfs` instructions, the setter functions
         # that store the values (`Race2DParam::setX()`, `Race2DParam::setY()`, and
@@ -2105,23 +2024,6 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         with open(dol_path, 'r+b') as f:
             f.seek(functions_offset)
             f.write(NEW_FUNCTIONS_INSTRUCTIONS)
-
-    if args.legacy_gecko_codes:
-        with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
-            tmp_gecko_code_filepath = os.path.join(tmp_dir, 'gecko_code.txt')
-            log.info(f'Generating Gecko codes to "{tmp_gecko_code_filepath}"...')
-
-            gecko_code.write_code(game_id, dol_path, minimap_data, audio_track_data,
-                                  tmp_gecko_code_filepath)
-
-            log.info(f'Injecting Gecko code into "{dol_path}"...')
-
-            cli = GeckoLoader.GeckoLoaderCli('GeckoLoader')
-            args = cli.parse_args((dol_path, tmp_gecko_code_filepath, '--dest', dol_path,
-                                   '--hooktype', 'GX', '--quiet'))
-            # pylint: disable=protected-access
-            cli._exec(args, tmp_dir)
-            # pylint: enable=protected-access
 
 
 def write_description_file(args: argparse.Namespace, added_course_names: 'list[str]',
@@ -2308,21 +2210,6 @@ OPTIONAL_ARGUMENTS = {
             'Override** in Dolphin. Failing to enable the emulated memory size in Dolphin will '
             'make the game crash to a green screen.',
         ),
-        (
-            'Legacy Gecko Codes',
-            bool,
-            'If specified, the legacy Gecko codes will be injected in the DOL file instead of the '
-            'more modern code patch that superseded them.'
-            '\n\n'
-            'In the modern system, course pages are numbered from 1 to 4, with the first page '
-            'holding the stock courses. The user can cycle through pages by pressing either '
-            '`D-pad Up` or `D-pad Down`. '
-            '\n\n'
-            'In the legacy system, course pages are labeled as **Right Page** (stock courses), '
-            '**Up Page**, **Down Page**, and **Left Page**, with their corresponding icon in the '
-            'cups names. The user can switch between pages by holding `Z` and pressing any of the '
-            'directions in the `D-pad`.',
-        ),
     ),
     'Dangerous Options': (
         (
@@ -2453,7 +2340,7 @@ def extend_game(args: argparse.Namespace):
         if not args.skip_banner:
             patch_bnr_file(iso_tmp_dir)
         if not args.skip_menu_titles:
-            patch_title_lines(args, iso_tmp_dir)
+            patch_title_lines(iso_tmp_dir)
 
         (
             minimap_data,

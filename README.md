@@ -32,12 +32,11 @@ Stand-alone precompiled bundles for Linux and Windows can be found in the
 
 ### Development Version
 
-Clone the Git repository along with its submodules:
+Clone the Git repository:
 
 ```shell
 git clone https://github.com/cristian64/mkdd-extender.git
 cd mkdd-extender
-git submodule update --init
 ```
 
 Create a Python virtual environment via `venv`:
@@ -74,7 +73,6 @@ python mkdd_extender.py
 
 - https://github.com/RenolY2/mkdd-track-patcher
 - https://github.com/RenolY2/gc-c-kit
-- https://github.com/JoshuaMKW/GeckoLoader
 - https://szs.wiimm.de/wimgt/
 - https://github.com/LagoLunatic/wwrando
 - https://devkitpro.org
