@@ -49,7 +49,7 @@ def set_dark_theme(app: QtWidgets.QApplication):
         def styleHint(self, hint, option, widget, return_data) -> int:
             if hint == QtWidgets.QStyle.SH_ToolTip_WakeUpDelay:
                 if QtWidgets.QApplication.instance().property('insta_tool_tips') is not None:
-                    return 0
+                    return 150
 
             return super().styleHint(hint, option, widget, return_data)
 
