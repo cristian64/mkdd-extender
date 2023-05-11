@@ -111,6 +111,19 @@ Memory address where the currently selected page index is stored. Defined as the
 the spam flag.
 """
 
+PLAYER_ITEM_ROLLS_ADDRESSES = {
+    'GM4E01': 0x802ED64F,
+    'GM4P01': 0x802F9D06,
+    'GM4J01': 0x8030A786,
+    'GM4E01dbg': 0x8032B1AF,
+}
+"""
+Memory address for the **Type-specific Item Boxes** code patch, where the players' item rolls will
+be temporarily stored. 8 bytes are used (one for each kart in the race).
+
+This is the address to the second "This is padding" string in the game.
+"""
+
 COURSES = (
     'Luigi',
     'Peach',
@@ -1177,6 +1190,7 @@ def patch_dol_file(
             ('__PLAY_SOUND_R3__', f'0x{PLAY_SOUND_ADDRESSES[game_id][0] + offset:08X}'),
             ('__PLAY_SOUND_R4__', f'0x{PLAY_SOUND_ADDRESSES[game_id][1]:08X}'),
             ('__PLAY_SOUND_R5__', f'0x{PLAY_SOUND_ADDRESSES[game_id][2]:08X}'),
+            ('__PLAYER_ITEM_ROLLS_ADDRESS__', f'0x{PLAYER_ITEM_ROLLS_ADDRESSES[game_id]:08X}'),
             ('__REDRAW_COURSESELECT_SCREEN_ADDRESS__',
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
@@ -1199,6 +1213,8 @@ def patch_dol_file(
                 for address in (SPAM_FLAG_ADDRESSES[game_id], CURRENT_PAGE_ADDRESSES[game_id]):
                     project.dol.seek(address)
                     project.dol.write(b'\0')
+                project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
+                project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
                 # Initialize the strings with the character of the first page ('0').
                 for string, address in STRING_ADDRESSES[game_id].items():

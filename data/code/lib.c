@@ -25,6 +25,7 @@
 #define PLAY_SOUND_R3 __PLAY_SOUND_R3__
 #define PLAY_SOUND_R4 __PLAY_SOUND_R4__
 #define PLAY_SOUND_R5 __PLAY_SOUND_R5__
+#define PLAYER_ITEM_ROLLS_ADDRESS __PLAYER_ITEM_ROLLS_ADDRESS__
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
@@ -168,8 +169,6 @@ struct SObject
     short idk_availability;
 };
 
-volatile signed char player_item_rolls[] = {[0 ... 7] = -1};
-
 int itemobjmgr_isavailablerollingslot_ex(const unsigned int* const itemobjmgr,
                                          const int player,
                                          const unsigned int val2)
@@ -184,6 +183,7 @@ int itemobjmgr_isavailablerollingslot_ex(const unsigned int* const itemobjmgr,
     if (is_available)
     {
         const struct SObject* const sobj = itembox->sobj;
+        signed char* const player_item_rolls = (signed char*)PLAYER_ITEM_ROLLS_ADDRESS;
         player_item_rolls[player] = (signed char)(sobj->field_36 == 0 ? -1 : sobj->field_36 - 1);
     }
 
@@ -197,6 +197,7 @@ int itemshufflemgr_calcslot_ex(const unsigned int* const itemshufflemgr,
                                const bool unk3)
 {
     const int player = *(kartrankdataset - 8 / 4);
+    const signed char* const player_item_rolls = (const signed char*)PLAYER_ITEM_ROLLS_ADDRESS;
     const int player_item_type = (int)player_item_rolls[player];
 
     if (player_item_type == -1)
