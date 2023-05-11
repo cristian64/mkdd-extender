@@ -2190,7 +2190,7 @@ OPTIONAL_ARGUMENTS = {
             'NOTE: Some item types are capped to a limited number of instances in the game (e.g. '
             'Chain Chomps or Lightnings). There cannot be in play more than a certain amount. When '
             'the limit is reached, item boxes of these types will not give any item (but they will '
-            'trigger the item rolling animation).'
+            'trigger the item rolling animation).',
         ),
     ),
     'Expert Options': (
