@@ -2363,6 +2363,38 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_widget.textChanged.connect(self._update_options_string)
                     group_box.layout().addLayout(option_widget_layout)
 
+                if isinstance(option_type, tuple):
+                    option_type, *rest = option_type
+
+                    if option_type == 'choices':
+                        option_values, default_value = rest
+
+                        option_widget_label = QtWidgets.QLabel(option_label)
+                        option_widget_label.setToolTip(option_help)
+                        option_widget = QtWidgets.QComboBox()
+                        option_widget.addItems(tuple(str(v) for v in option_values))
+                        if option_value in option_values:
+                            option_widget.setCurrentIndex(option_values.index(option_value))
+                        elif default_value in option_values:
+                            option_widget.setCurrentIndex(option_values.index(default_value))
+                        option_widget.setToolTip(option_help)
+                        option_widget_layout = QtWidgets.QHBoxLayout()
+                        option_widget_layout.addWidget(option_widget_label)
+                        option_widget_layout.addWidget(option_widget, 1)
+
+                        def on_currentTextChanged(text,
+                                                  default_value=default_value,
+                                                  option_member_name=option_member_name):
+                            try:
+                                value = type(default_value)(text)
+                            except ValueError:
+                                value = type(default_value)()
+                            setattr(self, option_member_name, value)
+
+                        option_widget.currentTextChanged.connect(on_currentTextChanged)
+                        option_widget.currentTextChanged.connect(self._update_options_string)
+                        group_box.layout().addLayout(option_widget_layout)
+
             vertical_layouts[int(i >= group_count / 2)].addWidget(group_box)
 
         for vertical_layout in vertical_layouts:
@@ -2392,6 +2424,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if option_type is int:
                     if option_value:
                         options_strings.append(f'{option_as_argument}={option_value}')
+
+                if isinstance(option_type, tuple):
+                    option_type, *rest = option_type
+
+                    if option_type == 'choices':
+                        _option_values, default_value = rest
+                        if option_value != default_value:
+                            options_strings.append(f'{option_as_argument}={option_value}')
+
         self._options_edit.setText(' '.join(options_strings))
 
     def _on_pack_generator_action_triggered(self):

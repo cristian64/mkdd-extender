@@ -2283,6 +2283,17 @@ def create_args_parser() -> argparse.ArgumentParser:
             if option_type is int:
                 argument_group.add_argument(option_as_argument, type=int, help=option_help)
 
+            if isinstance(option_type, tuple):
+                option_type, *rest = option_type
+
+                if option_type == 'choices':
+                    option_values, default_value = rest
+                    argument_group.add_argument(option_as_argument,
+                                                type=type(default_value),
+                                                default=default_value,
+                                                choices=option_values,
+                                                help=option_help)
+
     return parser
 
 
