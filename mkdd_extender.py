@@ -1908,7 +1908,8 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
     audio_track_data = gather_audio_file_indices(iso_tmp_dir, alternative_audio_data,
                                                  matching_audio_override_data)
 
-    code_patcher.patch_dol_file(game_id, minimap_data, audio_track_data,
+    code_patcher.patch_dol_file(iso_tmp_dir, game_id,
+                                args.initial_page_number, minimap_data, audio_track_data,
                                 bool(args.type_specific_item_boxes), dol_path, log)
 
     for language in LANGUAGES:
@@ -2117,6 +2118,12 @@ OPTIONAL_ARGUMENTS = {
             'extended game will be written to the `files` directory in the ISO image.\n\n'
             'The description file includes the application version, the creation time, the options '
             'that were used to generate the ISO image, and the name of added custom tracks.',
+        ),
+        (
+            'Initial Page Number',
+            ('choices', list(range(1, MAX_EXTRA_PAGES + 2)), 1),
+            'Specifies the course page that will be selected from the start. Default is `1`: the '
+            'page containing the stock courses in the input ISO file.',
         ),
     ),
     'Audio Options': (

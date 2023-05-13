@@ -1057,8 +1057,64 @@ def patch_bti_filenames_in_blo_file(game_id: str, blo_path: str):
         f.write(data)
 
 
+def read_bsft_file_from_baa_file(filepath: str) -> 'tuple[str]':
+    paths = []
+
+    with open(filepath, 'rb') as f:
+        data = f.read()
+    bsft_offset_offset = data.find(b'bsft') + 4
+    bsft_offset = struct.unpack('>I', data[bsft_offset_offset:bsft_offset_offset + 4])[0]
+
+    with open(filepath, 'rb') as f:
+        f.seek(bsft_offset)
+        magic = f.read(4)
+        assert magic == b'bsft'
+        path_count = struct.unpack('>I', f.read(4))[0]
+        offsets = []
+        for _ in range(path_count):
+            offsets.append(struct.unpack('>I', f.read(4))[0] + bsft_offset)
+        for offset in offsets:
+            f.seek(offset)
+            string = bytearray()
+            while (value := f.read(1)) != b'\0':
+                string += value
+            paths.append(bytes(string).decode(encoding='ascii'))
+
+    return tuple(paths)
+
+
+def update_bsft_file_in_baa_file(paths: 'tuple[str]', filepath: str):
+    with open(filepath, 'rb') as f:
+        data = f.read()
+    bsft_offset_offset = data.find(b'bsft') + 4
+    bsft_offset = len(data)
+
+    with open(filepath, 'r+b') as f:
+        f.seek(bsft_offset_offset)
+        f.write(struct.pack('>I', bsft_offset))
+        f.seek(bsft_offset)
+        f.write(b'bsft')
+        f.write(struct.pack('>I', len(paths)))
+        f.write(b'\0' * len(paths) * 4)  # Placeholder. Offsets to each path.
+        offsets = []
+        offsets_map = {}
+        for path in paths:
+            offset = offsets_map.get(path)
+            if offset is None:
+                offset = f.tell() - bsft_offset
+                offsets_map[path] = offset
+                f.write(path.encode(encoding='ascii'))
+                f.write(b'\0')
+            offsets.append(offset)
+        f.seek(8 + bsft_offset)
+        for offset in offsets:
+            f.write(struct.pack('>I', offset))
+
+
 def patch_dol_file(
+    iso_tmp_dir: str,
     game_id: str,
+    initial_page_number: int,
     minimap_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
     type_specific_item_boxes: bool,
@@ -1069,6 +1125,7 @@ def patch_dol_file(
 
     log.info('Generating and injecting C code...')
 
+    initial_page_index = initial_page_number - 1
     page_count = len(audio_track_data)
 
     unaligned_previous_osarena_value = read_osarena(dol_path, game_id)
@@ -1210,9 +1267,10 @@ def patch_dol_file(
                 project.set_osarena_patcher(patch_osarena)
 
                 # Initialize static variables.
-                for address in (SPAM_FLAG_ADDRESSES[game_id], CURRENT_PAGE_ADDRESSES[game_id]):
-                    project.dol.seek(address)
-                    project.dol.write(b'\0')
+                project.dol.seek(SPAM_FLAG_ADDRESSES[game_id])
+                project.dol.write(b'\0')
+                project.dol.seek(CURRENT_PAGE_ADDRESSES[game_id])
+                project.dol.write(initial_page_index.to_bytes(1, 'big'))
                 project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
                 project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
@@ -1221,7 +1279,18 @@ def patch_dol_file(
                     char_offset = find_char_offset_in_string(string)
                     char_address = address + char_offset
                     project.dol.seek(char_address)
-                    project.dol.write(b'0')
+                    project.dol.write(str(initial_page_index).encode('utf-8'))
+
+                if initial_page_index > 0:
+                    # Set up minimap coordinates for the selected initial page.
+                    for track_index in range(16):
+                        addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
+                        values = minimap_data[(initial_page_index, track_index)]
+                        for i in range(4):
+                            project.dol.seek(addresses[i])
+                            project.dol.write(struct.pack('>f', values[i]))
+                        project.dol.seek(addresses[4] + 3)
+                        project.dol.write(struct.pack('>B', values[4]))
 
                 with open('symbols.txt', 'w', encoding='ascii') as f:
                     f.write(SYMBOLS_MAP[game_id])
@@ -1278,6 +1347,23 @@ def patch_dol_file(
                     print(f'{" Object Dump ":#^80}')
                     print('#' * 80)
                     devkit_tools.objdump('project.o', '--full-content')
+
+    if initial_page_index > 0:
+        # Audio track indexes need to be adjusted for the selected initial page. This is done by
+        # rewriting the BSFT file where each course's audio ID is mapped to a file in the `Stream`
+        # directory. This makes the game load the audio indexes of the selected initial page.
+
+        files_dirpath = os.path.join(iso_tmp_dir, 'files')
+        baa_file = os.path.join(files_dirpath, 'AudioRes', 'GCKart.baa')
+
+        paths = list(read_bsft_file_from_baa_file(baa_file))
+
+        audio_indexes = audio_track_data[initial_page_index]
+        file_list = mkdd_extender.build_file_list(iso_tmp_dir)
+        for i, audio_index in enumerate(audio_indexes):
+            paths[i] = file_list[audio_index].lstrip('files/')
+
+        update_bsft_file_in_baa_file(paths, baa_file)
 
     log.info(f'Injected {injected_code_size} bytes of new code. '
              f'OS Arena: 0x{aligned(unaligned_previous_osarena_value):08X} (previous) -> '
