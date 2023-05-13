@@ -2098,8 +2098,8 @@ OPTIONAL_ARGUMENTS = {
             'Skip Cup Names',
             bool,
             'If specified, cup names will be left untouched.\n\n'
-            'By default, cup names are modified to include an icon that indicates the currently '
-            'selected course page.',
+            'By default, cup names are modified to include a text containing the currently '
+            'selected page number, as well as the total page count.',
         ),
         (
             'Skip Minimap Transforms Removal',
