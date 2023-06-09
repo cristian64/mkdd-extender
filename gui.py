@@ -2947,17 +2947,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         except mkdd_extender.MKDDExtenderError as e:
             error_message = str(e)
+            mkdd_extender.log.error(error_message)
         except AssertionError as e:
             error_message = str(e) or 'Assertion error.'
+            mkdd_extender.log.exception(error_message)
             exception_info = traceback.format_exc()
         except Exception as e:
-            error_message = str(e)
+            error_message = str(e) or 'Unknown error'
+            mkdd_extender.log.exception(error_message)
             exception_info = traceback.format_exc()
 
         if error_message is not None:
-            error_message = error_message or 'Unknown error.'
-            mkdd_extender.log.error(error_message)
-
             icon_name = 'error'
             title = 'Error'
             text = error_message
