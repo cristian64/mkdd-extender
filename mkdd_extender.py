@@ -136,6 +136,11 @@ MAX_ISO_SIZE = 1459978240
 The maximum size of the GameCube ISO files that GameCube or Wii can support.
 """
 
+EXTREME_MAX_ISO_SIZE = 4 * 1024 * 1024 * 1024
+"""
+The maximum size that the GCM file format can support.
+"""
+
 linux = platform.system() == 'Linux'
 windows = platform.system() == 'Windows'
 macos = platform.system() == 'Darwin'
@@ -2469,13 +2474,26 @@ def extend_game(args: argparse.Namespace):
 
         # Write the extended ISO file to the final location.
         log.info(f'Writing extended ISO image to "{args.output}"...')
-        files_written = 0
-        for _filepath, files_done in gcm_file.export_disc_to_iso_with_changed_files(args.output):
-            if files_done > 0:
-                files_written = files_done
+        try:
+            files_written = 0
+            for _filepath, files_done in gcm_file.export_disc_to_iso_with_changed_files(
+                    args.output):
+                if files_done > 0:
+                    files_written = files_done
+        except gcm.MaxFileSizeError as e:
+            raise MKDDExtenderError(
+                f'ISO file is larger than the absolute maximum file size ({EXTREME_MAX_ISO_SIZE} '
+                'bytes). Possible solutions: remove some audio tracks, downsample audio tracks, or '
+                'remove some custom tracks.') from e
         iso_size = os.path.getsize(args.output)
         human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
         log.info(f'ISO image written ({files_written} files - {human_readable_iso_size} MiB).')
+
+        if iso_size > EXTREME_MAX_ISO_SIZE:
+            raise MKDDExtenderError(
+                f'ISO file ({iso_size} bytes) is larger than the absolute maximum file size '
+                f'({EXTREME_MAX_ISO_SIZE} bytes). Possible solutions: remove some audio tracks, '
+                'downsample audio tracks, or remove some custom tracks.')
 
         if iso_size > MAX_ISO_SIZE:
             log.warning(f'ISO file ({iso_size} bytes) is larger than the size that GameCube or Wii '
