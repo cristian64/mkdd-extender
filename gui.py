@@ -131,8 +131,7 @@ def show_message(icon_name: str,
 
     icon_path = os.path.join(data_dir, 'gui', f'{icon_name}.svg')
     icon = QtGui.QIcon(icon_path)
-    char_width = message_box.fontMetrics().averageCharWidth()
-    icon_size = char_width * 6
+    icon_size = message_box.fontMetrics().averageCharWidth() * 6
     message_box.setIconPixmap(icon.pixmap(icon.actualSize(QtCore.QSize(icon_size, icon_size))))
 
     if detailed_text:
@@ -146,9 +145,13 @@ def show_message(icon_name: str,
             text_edit.setStyleSheet(
                 f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
 
-            # If a detailed message is present, make sure the width is sufficient to show a few
-            # words per line (e.g. stack traces).
-            text_edit.setMinimumWidth(char_width * 60)
+            # If a detailed message is present, make sure the size is sufficient to show a few
+            # words per line, and several lines (e.g. stack traces).
+            char_width = text_edit.fontMetrics().averageCharWidth()
+            char_height = text_edit.fontMetrics().height()
+            text_edit.setFixedWidth(char_width * 80)
+            text_edit.setFixedHeight(char_height * min(30, len(detailed_text.split('\n')) + 2))
+            text_edit.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)
 
         buttons = message_box.buttons()
         assert len(buttons) == 1, 'Expected a single button in the message box'
