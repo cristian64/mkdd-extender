@@ -36,6 +36,11 @@ PADDING_BYTES = b"This is padding data to alignme"
 class InvalidOffsetError(Exception):
   pass
 
+
+class MaxFileSizeError(Exception):
+  pass
+
+
 def data_len(data):
   data_length = data.seek(0, 2)
   return data_length
@@ -185,6 +190,8 @@ def write_u16(data, offset, new_value):
   data.write(new_value)
 
 def write_u32(data, offset, new_value):
+  if new_value >= 4294967296:
+    raise MaxFileSizeError(f'Offset "{offset}" exceeds the 4 GiB mark.')
   new_value = struct.pack(">I", new_value)
   data.seek(offset)
   data.write(new_value)
