@@ -2312,6 +2312,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     paragraph = f'<ul>{unordered_list}</ul>\n'
                 else:
                     paragraph = paragraph.replace('\n', ' ')
+                paragraph = re.sub(r'\b_(.+)_\b', r'<em>\1</em>', paragraph)
                 paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
                                    paragraph)
                 paragraph = re.sub(
