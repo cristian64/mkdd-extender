@@ -8,7 +8,7 @@ MKDD Extender needs to be provided with the following items:
 
 - A retail ISO file of the original Mario Kart: Double Dash!! game. All regions are supported.
 - The custom tracks that will be inserted in the game. Custom tracks can be downloaded from the
-  community-powered [Custom Mario Kart: Double Dash Wiki!!](https://mkdd.miraheze.org).
+  community-powered [Custom Mario Kart: Double Dash Wiki!!](https://mkdd.org).
 
 Once the directory containing the custom tracks is specified, drag & drop the custom tracks from
 the left-hand side pane onto each of the 48 slots in the main area.

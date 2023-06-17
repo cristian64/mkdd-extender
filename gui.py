@@ -1848,7 +1848,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <br/>
             <br/>
             Custom tracks can be downloaded from the community-powered
-            <a href="https://mkdd.miraheze.org">Custom Mario Kart: Double Dash Wiki!!</a>.
+            <a href="https://mkdd.org">Custom Mario Kart: Double Dash Wiki!!</a>.
             </p>
             <p><h3>4. Assign custom tracks</h3>
             Once the custom tracks directory has been selected, the
