@@ -221,9 +221,15 @@ def remove_file(filepath: str):
         pass
 
 
-def make_link(src_filepath: str, dst_filepath: str):
+def make_link(src_filepath: str, dst_filepath: str, attempt_copy_on_error: bool = True):
     remove_file(dst_filepath)
-    os.link(src_filepath, dst_filepath)
+    try:
+        os.link(src_filepath, dst_filepath)
+    except OSError as e:
+        if attempt_copy_on_error:
+            shutil.copyfile(src_filepath, dst_filepath)
+        else:
+            raise e
 
 
 def clean_stale_temp_dirs():
