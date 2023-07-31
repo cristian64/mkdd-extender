@@ -232,6 +232,30 @@ def make_link(src_filepath: str, dst_filepath: str, attempt_copy_on_error: bool 
             raise e
 
 
+def rename(src_path: str, dst_path: str):
+    if src_path == dst_path:
+        return
+
+    if os.path.exists(dst_path):
+        raise RuntimeError(f'Rename "{src_path}" to "{dst_path}" failed: destination exists.')
+
+    if windows and os.path.isdir(src_path) and shutil.which('robocopy'):
+        with subprocess.Popen(('robocopy', '/e', '/move', '/ndl', '/nfl', src_path, dst_path),
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE) as process:
+            process.communicate()
+            success_code = 0 <= process.returncode <= 7  # https://ss64.com/nt/robocopy-exit.html
+            if not success_code:
+                raise RuntimeError(f'Rename "{src_path}" to "{dst_path}" failed: '
+                                   f'robocopy returned {process.returncode}.')
+    else:
+        try:
+            os.rename(src_path, dst_path)
+        except Exception as e:
+            error = str(e) or 'Unknown error'
+            raise RuntimeError(f'Rename "{src_path}" to "{dst_path}" failed: {error}') from e
+
+
 def clean_stale_temp_dirs():
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         user_tmp_dir = os.path.dirname(tmp_dir)
@@ -475,7 +499,7 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
         dirname = dirnames[0]
         dirpath = os.path.join(tmp_dir, dirname)
         new_dirpath = os.path.join(tmp_dir, new_dirname)
-        os.rename(dirpath, new_dirpath)
+        rename(dirpath, new_dirpath)
 
         course_name = new_dirname
         if course_name.endswith('l'):
@@ -491,7 +515,7 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
                     parts = filename.split('_', maxsplit=1)
                     new_filename = f'{course_name}_{parts[1]}'
                     new_filepath = os.path.join(new_dirpath, new_filename)
-                    os.rename(filepath, new_filepath)
+                    rename(filepath, new_filepath)
 
         remove_file(archive_filepath)  # It may be a hard link; unlink early.
 
@@ -1273,7 +1297,7 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
             log.info(f'Modifying {cupname_filepath}...')
 
             new_cupname_filepath = with_page_index_suffix(0, cupname_filepath)
-            os.rename(cupname_filepath, new_cupname_filepath)
+            rename(cupname_filepath, new_cupname_filepath)
             cupname_filepath = new_cupname_filepath
 
             for page_index in range(page_count - 1):
@@ -1403,9 +1427,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         new_course_dirpath = with_page_index_suffix(0, course_dirpath)
         new_coursename_dirpath = with_page_index_suffix(0, coursename_dirpath)
         new_staffghosts_dirpath = with_page_index_suffix(0, staffghosts_dirpath)
-        os.rename(course_dirpath, new_course_dirpath)
-        os.rename(coursename_dirpath, new_coursename_dirpath)
-        os.rename(staffghosts_dirpath, new_staffghosts_dirpath)
+        rename(course_dirpath, new_course_dirpath)
+        rename(coursename_dirpath, new_coursename_dirpath)
+        rename(staffghosts_dirpath, new_staffghosts_dirpath)
         course_dirpath = new_course_dirpath
         coursename_dirpath = new_coursename_dirpath
         staffghosts_dirpath = new_staffghosts_dirpath
@@ -1691,12 +1715,12 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
                                                         'timg')
                     lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
-                    os.rename(os.path.join(courseselect_dirpath, preview_filename),
-                              os.path.join(courseselect_dirpath, new_preview_filename))
-                    os.rename(os.path.join(courseselect_dirpath, label_filename),
-                              os.path.join(courseselect_dirpath, new_label_filename))
-                    os.rename(os.path.join(lanplay_dirpath, label_filename),
-                              os.path.join(lanplay_dirpath, new_label_filename))
+                    rename(os.path.join(courseselect_dirpath, preview_filename),
+                           os.path.join(courseselect_dirpath, new_preview_filename))
+                    rename(os.path.join(courseselect_dirpath, label_filename),
+                           os.path.join(courseselect_dirpath, new_label_filename))
+                    rename(os.path.join(lanplay_dirpath, label_filename),
+                           os.path.join(lanplay_dirpath, new_label_filename))
 
             preview_filename = new_preview_filename
             label_filename = new_label_filename
