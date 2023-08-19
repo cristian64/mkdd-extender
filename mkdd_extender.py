@@ -15,6 +15,7 @@ import logging
 import math
 import os
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -730,7 +731,7 @@ CHARACTERS = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', ':', '
               'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
               'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', "'", '"', '&', 'Ä', 'Ë', 'Ï', 'Ö', 'Ü',
               'Á', 'É', 'Í', 'Ó', 'Ú', 'À', 'È', 'Ì', 'Ò', 'Ù', 'Â', 'Ê', 'Î', 'Ô', 'Û', 'Ç', 'ẞ',
-              'Ñ', '¡', '¿')
+              'Ñ', '¡', '¿', 'i')
 CHARACTER_SET = set(CHARACTERS)
 CHARACTER_INDEX = {c: i for i, c in enumerate(CHARACTERS)}
 CHARACTER_IMAGE_MAP = {}
@@ -755,6 +756,7 @@ CHARACTER_PADDING_REMOVAL = {
     'V': (1, 1),
     "'": (8, 8),
     '"': (3, 3),
+    'i': (4, 4),
 }
 """
 Some characters, due to their shape, can benefit from a smaller padding. It makes some letter
@@ -780,6 +782,7 @@ def build_text_image_from_bitmap_font(text: str, width: int, height: int, charac
                                       word_spacing: int, horizontal_scaling: float,
                                       vertical_scaling: float) -> (Image.Image, bool):
     text = text.upper()
+    text = re.sub(r'\bWII\b', 'Wii', text)  # Allow minuscules in this special case.
     character_spacing -= CHARACTER_DEFAULT_PADDING * 2
     word_spacing -= CHARACTER_DEFAULT_PADDING * 2
     if horizontal_scaling <= 0.0 or 1.0 < horizontal_scaling:
