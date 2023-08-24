@@ -756,7 +756,7 @@ CHARACTER_PADDING_REMOVAL = {
     'V': (1, 1),
     "'": (8, 8),
     '"': (3, 3),
-    'i': (4, 4),
+    'i': (4, 7),
 }
 """
 Some characters, due to their shape, can benefit from a smaller padding. It makes some letter
