@@ -70,13 +70,7 @@ for line in data.splitlines():
 else:
     raise RuntimeError('Unable to parse product version.')
 
-system = platform.system().lower()
-if system != 'linux':
-    system = system[:3]
-
-arch = (sys.maxsize + 1).bit_length()
-
-collection_name = f'mkdd-extender-{version}-{system}{arch}'
+collection_name = f'mkdd-extender-{version}-{platform.system().lower()}'
 
 # Data files that will be copied verbatim.
 datas = [
