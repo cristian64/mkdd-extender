@@ -828,7 +828,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
             <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
             </table>
-        """))
+        """))  # noqa: E501
         info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         info_box.layout().addWidget(info_widget)
         layout.addWidget(info_box)
@@ -901,7 +901,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Loop Start: </b> </td><td>{human_readable_duration(loop_start) if looped else ''}</td></tr>
             <tr><td><b>Loop End: </b> </td><td>{human_readable_duration(loop_end) if looped else ''}</td></tr>
             </table>
-        """)
+        """)  # noqa: E501
 
     def _verify_image_files_ready(self, image_filepaths_by_language: 'dict[str, list[str]]'):
         for image_filepaths in image_filepaths_by_language.values():
