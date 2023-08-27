@@ -23,6 +23,7 @@ import tempfile
 import threading
 import time
 import traceback
+import wave
 
 from typing import Any
 
@@ -117,6 +118,24 @@ def style_message(text: str) -> str:
     text = text.replace('<b>', f'<b {b_style_attr}>')
 
     return text
+
+
+def human_readable_duration(sample_count: int, sample_rate: int) -> str:
+    duration = round(sample_count / sample_rate * 1000)
+    minutes = duration // 1000 // 60
+    seconds = duration // 1000 - minutes * 60
+    milliseconds = duration - (minutes * 60 + seconds) * 1000
+    text = []
+    if minutes:
+        text.append(f'{minutes} min')
+    if seconds:
+        text.append(f'{seconds} s')
+    if milliseconds:
+        text.append(f'{milliseconds} ms')
+    if not text:
+        text.append('0 s')
+    text.append(f'&nbsp;&nbsp;<small><small>({sample_count} samples)</small></small>')
+    return ' '.join(text)
 
 
 def show_message(icon_name: str,
@@ -382,6 +401,10 @@ class SpinnableSlider(QtWidgets.QWidget):
 
     def get_value(self) -> int:
         return self.__slider.value()
+
+    def set_read_only(self, read_only: bool):
+        self.__slider.setDisabled(bool(read_only))
+        self.__spinbox.setReadOnly(bool(read_only))
 
     def _on_value_changed(self, value: int):
         with blocked_signals(self.__slider):
@@ -840,7 +863,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 text = 'Normal' if 'normal' in audio_filepath else 'Fast'
                 label = QtWidgets.QLabel(f'<b>{text} Pace:</b>')
                 ast_player = ASTPlayer(audio_filepath)
-                tool_tip = self._generate_ast_file_tool_tip(audio_filepath)
+                tool_tip = self.generate_ast_file_tool_tip(audio_filepath)
                 label.setToolTip(tool_tip)
                 ast_player.setToolTip(tool_tip)
                 audio_box.layout().addRow(label, ast_player)
@@ -858,11 +881,12 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self.setWidget(widget)
         widget.show()
 
-    def _generate_ast_file_tool_tip(self, ast_filepath) -> str:
-        metadata = self._ast_metadata_cache.get(ast_filepath)
+    def generate_ast_file_tool_tip(self, ast_filepath, cache=True) -> str:
+        metadata = self._ast_metadata_cache.get(ast_filepath) if cache else None
         if metadata is None:
             metadata = ast_converter.get_ast_info(ast_filepath)
-            self._ast_metadata_cache[ast_filepath] = metadata
+            if cache:
+                self._ast_metadata_cache[ast_filepath] = metadata
 
         sample_count = metadata['sample_count']
         sample_rate = metadata['sample_rate']
@@ -873,33 +897,16 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         loop_start = metadata['loop_start']
         loop_end = metadata['loop_end']
 
-        def human_readable_duration(sample_count: int) -> str:
-            duration = round(sample_count / sample_rate * 1000)
-            minutes = duration // 1000 // 60
-            seconds = duration // 1000 - minutes * 60
-            milliseconds = duration - (minutes * 60 + seconds) * 1000
-            text = []
-            if minutes:
-                text.append(f'{minutes} min')
-            if seconds:
-                text.append(f'{seconds} s')
-            if milliseconds:
-                text.append(f'{milliseconds} ms')
-            if not text:
-                text.append('0 s')
-            text.append(f'&nbsp;&nbsp;<small><small>({sample_count} samples)</small></small>')
-            return ' '.join(text)
-
         return textwrap.dedent(f"""\
             <table>
-            <tr><td><b>Duration: </b> </td><td>{human_readable_duration(sample_count)}</td></tr>
+            <tr><td><b>Duration: </b> </td><td>{human_readable_duration(sample_count, sample_rate)}</td></tr>
             <tr><td><b>Sample Rate: </b> </td><td>{sample_rate} Hz</td></tr>
             <tr><td><b>Bit Depth: </b> </td><td>{bit_depth}</td></tr>
             <tr><td><b>Channel Count: </b> </td><td>{channel_count}</td></tr>
             <tr><td><b>Volume: </b> </td><td>{volume}</td></tr>
             <tr><td><b>Looped: </b> </td><td>{'Yes' if looped else ''}</td></tr>
-            <tr><td><b>Loop Start: </b> </td><td>{human_readable_duration(loop_start) if looped else ''}</td></tr>
-            <tr><td><b>Loop End: </b> </td><td>{human_readable_duration(loop_end) if looped else ''}</td></tr>
+            <tr><td><b>Loop Start: </b> </td><td>{human_readable_duration(loop_start, sample_rate) if looped else ''}</td></tr>
+            <tr><td><b>Loop End: </b> </td><td>{human_readable_duration(loop_end, sample_rate) if looped else ''}</td></tr>
             </table>
         """)  # noqa: E501
 
@@ -1378,6 +1385,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         pack_generator_action.triggered.connect(self._on_pack_generator_action_triggered)
         text_image_builder_action = tools_menu.addAction('Text Image Builder')
         text_image_builder_action.triggered.connect(self._on_text_image_builder_action_triggered)
+        ast_converter_action = tools_menu.addAction('AST Converter')
+        ast_converter_action.triggered.connect(self._on_ast_converter_action_triggered)
         view_menu = menu.addMenu('View')
         purge_preview_caches_action = view_menu.addAction('Purge Preview Caches')
         purge_preview_caches_action.triggered.connect(
@@ -2825,6 +2834,278 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 horizontal_scaling_slider.get_value())
         self._settings.setValue('text_image_builder/vertical_scaling',
                                 vertical_scaling_slider.get_value())
+
+    def _on_ast_converter_action_triggered(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setMinimumWidth(dialog.fontMetrics().averageCharWidth() * 100)
+        dialog.setWindowTitle('AST Converter')
+        dialog.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+        name_filters = ('WAV or AST (*.wav *.ast)', )
+        input_file_edit = PathEdit('Select Input Audio File', QtWidgets.QFileDialog.AcceptOpen,
+                                   QtWidgets.QFileDialog.ExistingFile, name_filters)
+        output_file_edit = PathEdit('Select Output Audio File', QtWidgets.QFileDialog.AcceptSave,
+                                    QtWidgets.QFileDialog.AnyFile, name_filters)
+
+        form_layout = QtWidgets.QFormLayout()
+        form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        form_layout.addRow('Input Audio File', input_file_edit)
+        form_layout.addRow('Output Audio File', output_file_edit)
+
+        info_frame = QtWidgets.QFrame()
+        info_frame.setAutoFillBackground(True)
+        info_frame.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+        MARGIN = dialog.fontMetrics().height() * 6
+        info_frame.setMinimumSize(MARGIN * 2, MARGIN * 2)
+        palette = info_frame.palette()
+        palette.setBrush(info_frame.backgroundRole(), palette.dark())
+        info_frame.setPalette(palette)
+        info_frame_layout = QtWidgets.QVBoxLayout(info_frame)
+        info_frame_layout.setContentsMargins(0, 0, 0, 0)
+
+        info_browser = QtWidgets.QTextBrowser()
+        info_browser.setFrameShape(QtWidgets.QFrame.NoFrame)
+        info_browser.viewport().setAutoFillBackground(False)
+        info_frame_layout.addWidget(info_browser)
+        info_label = QtWidgets.QLabel()
+        info_label.setWordWrap(True)
+        info_label.setAlignment(QtCore.Qt.AlignCenter)
+        info_frame_layout.addWidget(info_label)
+
+        info_box = QtWidgets.QGroupBox('Input File Info')
+        info_box.setContentsMargins(0, 0, 0, 0)
+        info_box_layout = QtWidgets.QVBoxLayout(info_box)
+        info_box_layout.addWidget(info_frame)
+        info_box_layout.setContentsMargins(0, 0, 0, 0)
+
+        ast_box = QtWidgets.QGroupBox('AST Output Settings')
+        volume_slider = SpinnableSlider()
+        volume_slider.set_range(0, 127, 127)
+        looped_box = QtWidgets.QCheckBox()
+        looped_box.setChecked(True)
+        loop_start_slider = SpinnableSlider()
+        ast_form_layout = QtWidgets.QFormLayout(ast_box)
+        ast_form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        ast_form_layout.addRow('Volume', volume_slider)
+        ast_form_layout.addRow('Looped', looped_box)
+        ast_form_layout.addRow('Loop Start', loop_start_slider)
+
+        body_layout = QtWidgets.QHBoxLayout()
+        body_layout.addWidget(info_box, 1)
+        body_layout.addWidget(ast_box, 1)
+
+        main_layout = QtWidgets.QVBoxLayout()
+        main_layout.addLayout(form_layout)
+        main_layout.addLayout(body_layout, 1)
+
+        reset_button = QtWidgets.QPushButton('Reset')
+        reset_button.setAutoDefault(False)
+        convert_button = QtWidgets.QPushButton('Convert')
+        convert_button.setAutoDefault(False)
+        bottom_layout = QtWidgets.QHBoxLayout()
+        bottom_layout.addWidget(reset_button)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(convert_button)
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.addLayout(main_layout)
+        layout.addSpacing(dialog.fontMetrics().height() // 2)
+        layout.addLayout(bottom_layout)
+
+        def set_info_label(text: str, color: QtGui.QColor = None):
+            info_label.setText(text)
+            palette = self.palette()  # To inherit background color from parent.
+            if color is not None:
+                palette.setColor(info_label.foregroundRole(), color)
+            info_label.setPalette(palette)
+            info_label.setVisible(bool(text))
+            info_browser.setVisible(not bool(text))
+
+        local_sample_count = [0]
+
+        def update_info():
+            set_info_label('')
+
+            input_filepath = input_file_edit.get_path()
+            output_filepath = output_file_edit.get_path()
+
+            stem, ext = os.path.splitext(input_filepath)
+            if not input_filepath:
+                set_info_label('Select an input audio file', QtGui.QColor(100, 100, 100))
+            elif ext not in ('.ast', '.wav'):
+                set_info_label(f'Unrecognized file extension "{ext}"', QtGui.QColor(170, 20, 20))
+            else:
+                if os.path.isfile(input_filepath):
+                    output_ext = '.ast' if ext == '.wav' else '.wav'
+                    if not output_filepath:
+                        output_filepath = f'{stem}{output_ext}'
+                    else:
+                        output_stem, _output_ext = os.path.splitext(output_filepath)
+                        output_filepath = f'{output_stem}{output_ext}'
+
+                    with blocked_signals(output_file_edit):
+                        output_file_edit.set_path(output_filepath)
+
+            if input_filepath.endswith('.ast'):
+                ast_box.setEnabled(False)
+                convert_button.setText('Convert to WAV')
+            else:
+                ast_box.setEnabled(True)
+                convert_button.setText('Convert to AST')
+
+            try:
+                html = ''
+
+                if ext == '.ast':
+                    html = self._info_view.generate_ast_file_tool_tip(input_filepath, cache=False)
+                elif ext == '.wav':
+                    with wave.open(input_filepath, 'rb') as f:
+                        bit_depth = f.getsampwidth() * 8
+                        channel_count = f.getnchannels()
+                        sample_rate = f.getframerate()
+                        sample_count = f.getnframes()
+
+                    local_sample_count[0] = sample_count
+
+                    html = textwrap.dedent(f"""\
+                        <table>
+                        <tr><td><b>Duration: </b> </td><td>{human_readable_duration(sample_count, sample_rate)}</td></tr>
+                        <tr><td><b>Sample Rate: </b> </td><td>{sample_rate} Hz</td></tr>
+                        <tr><td><b>Bit Depth: </b> </td><td>{bit_depth}</td></tr>
+                        <tr><td><b>Channel Count: </b> </td><td>{channel_count}</td></tr>
+                        </table>
+                    """)  # noqa: E501
+
+                info_browser.setHtml(html)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                set_info_label(f'Unexpected error: "{e}"', QtGui.QColor(170, 20, 20))
+
+            update_ast_form()
+
+        def update_ast_form():
+            sample_count = local_sample_count[0]
+            with blocked_signals(loop_start_slider):
+                clampped_value = max(0, min(loop_start_slider.get_value(), sample_count - 1))
+                loop_start_slider.set_range(0, max(0, sample_count - 1), clampped_value)
+                loop_start_slider.setEnabled(looped_box.isChecked())
+
+        def reset():
+            with blocked_signals(volume_slider):
+                volume_slider.set_value(127)
+            with blocked_signals(looped_box):
+                looped_box.setChecked(True)
+            with blocked_signals(loop_start_slider):
+                loop_start_slider.set_range(0, max(0, local_sample_count[0] - 1), 0)
+
+            update_ast_form()
+
+        def convert():
+            error_message = None
+            exception_info = None
+
+            input_path = input_file_edit.get_path()
+            output_path = output_file_edit.get_path()
+
+            try:
+                _output_stem, output_ext = os.path.splitext(output_path)
+
+                if input_path.endswith('.ast'):
+                    if output_ext != '.wav':
+                        raise mkdd_extender.MKDDExtenderError(
+                            f'Unexpected output file extension: "{output_ext}" (expected ".wav")')
+
+                    def func():
+                        ast_converter.convert_to_wav(input_path, output_path)
+                else:
+                    if output_ext != '.ast':
+                        raise mkdd_extender.MKDDExtenderError(
+                            f'Unexpected output file extension: "{output_ext}" (expected ".ast")')
+
+                    def func():
+                        if looped_box.isChecked():
+                            loop_start = loop_start_slider.get_value()
+                        else:
+                            loop_start = None
+
+                        ast_converter.convert_to_ast(
+                            input_path,
+                            output_path,
+                            looped=0xFFFF if looped_box.isChecked() else 0x0000,
+                            sample_count=None,
+                            loop_start=loop_start,
+                            loop_end=None,
+                            volume=volume_slider.get_value(),
+                        )
+
+                progress_dialog = ProgressDialog('Converting audio file...', func, dialog)
+                progress_dialog.execute_and_wait()
+
+            except mkdd_extender.MKDDExtenderError as e:
+                error_message = str(e)
+            except AssertionError as e:
+                error_message = str(e) or 'Assertion error.'
+                exception_info = traceback.format_exc()
+            except Exception as e:
+                error_message = str(e)
+                exception_info = traceback.format_exc()
+
+            if error_message is not None:
+                error_message = error_message or 'Unknown error.'
+
+                icon_name = 'error'
+                title = 'Error'
+                text = error_message
+                detailed_text = exception_info
+            else:
+                icon_name = 'success'
+                title = 'Success!!'
+                text = 'Audio file converted successfully.'
+                detailed_text = ''
+
+            show_message(icon_name, title, text, detailed_text, self)
+
+        path = self._settings.value('ast_converter/input_path')
+        if path:
+            input_file_edit.set_path(path)
+        path = self._settings.value('ast_converter/input_last_dir')
+        if path:
+            input_file_edit.set_last_dir(path)
+        path = self._settings.value('ast_converter/output_path')
+        if path:
+            output_file_edit.set_path(path)
+        path = self._settings.value('ast_converter/output_last_dir')
+        if path:
+            output_file_edit.set_last_dir(path)
+
+        update_info()
+
+        volume = self._settings.value('ast_converter/volume')
+        if volume is not None:
+            volume_slider.set_value(int(volume))
+        looped = self._settings.value('ast_converter/looped')
+        if looped is not None:
+            looped_box.setChecked(looped == 'true')
+        loop_start = self._settings.value('ast_converter/loop_start')
+        if loop_start is not None:
+            loop_start_slider.set_value(int(loop_start))
+
+        update_ast_form()
+
+        input_file_edit.textChanged.connect(lambda _text: update_info())
+        looped_box.toggled.connect(lambda _checked: update_ast_form())
+        loop_start_slider.value_changed.connect(lambda _value: update_ast_form())
+        reset_button.clicked.connect(reset)
+        convert_button.clicked.connect(convert)
+
+        dialog.exec_()
+
+        self._settings.setValue('ast_converter/input_path', input_file_edit.get_path())
+        self._settings.setValue('ast_converter/input_last_dir', input_file_edit.get_last_dir())
+        self._settings.setValue('ast_converter/output_path', output_file_edit.get_path())
+        self._settings.setValue('ast_converter/output_last_dir', output_file_edit.get_last_dir())
+        self._settings.setValue('ast_converter/volume', volume_slider.get_value())
+        self._settings.setValue('ast_converter/looped', looped_box.isChecked())
+        self._settings.setValue('ast_converter/loop_start', loop_start_slider.get_value())
 
     def _on_purge_preview_caches_action_triggered(self):
         self._info_view.purge_caches()
