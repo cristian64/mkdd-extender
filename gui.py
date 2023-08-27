@@ -802,7 +802,14 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             trackinfo.read(trackinfo_filepath)
             track_name = trackinfo['Config'].get('trackname') or ''
             author = trackinfo['Config'].get('author') or ''
+            replaces = trackinfo['Config'].get('replaces') or ''
+            if replaces:
+                replaces = mkdd_extender.COURSE_TO_NAME[mkdd_extender.course_name_to_course(
+                    replaces)]
             auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track') or ''
+            if auxiliary_audio_track:
+                auxiliary_audio_track = mkdd_extender.COURSE_TO_NAME[
+                    mkdd_extender.course_name_to_course(auxiliary_audio_track)]
         except Exception:
             self.show_not_valid_message()
             return
@@ -849,6 +856,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
             <tr><td><b>Minimap Coordinates: </b> </td><td>{'Yes' if minimap_present else ''}</td></tr>
             <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
+            <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
             <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
             </table>
         """))  # noqa: E501
