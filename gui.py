@@ -1334,7 +1334,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                           organization, application)
 
         self.resize(1100, 700)
-        self.setWindowTitle('MKDD Extender')
+        self.setWindowTitle(f'MKDD Extender {mkdd_extender.__version__}')
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
         logo_icon_path = os.path.join(data_dir, 'gui', 'logo.svg')
