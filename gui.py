@@ -2437,6 +2437,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for option_label, option_type, _option_help in group_options:
                 option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 option_value = getattr(self, option_member_name)
+                if option_value is None:
+                    continue
                 option_as_argument = mkdd_extender.option_label_as_argument_name(option_label)
 
                 if option_type is bool:
