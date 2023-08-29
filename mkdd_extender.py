@@ -1943,11 +1943,13 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             if data == DEBUG_BUILD_DATE:
                 game_id += 'dbg'
 
+    initial_page_number = max(1, args.initial_page_number or 0)
+
     audio_track_data = gather_audio_file_indices(iso_tmp_dir, alternative_audio_data,
                                                  matching_audio_override_data)
 
     code_patcher.patch_dol_file(iso_tmp_dir, game_id,
-                                args.initial_page_number, minimap_data, audio_track_data,
+                                initial_page_number, minimap_data, audio_track_data,
                                 bool(args.type_specific_item_boxes), dol_path, log)
 
     for language in LANGUAGES:
