@@ -32,7 +32,7 @@ import code_patcher
 import rarc
 from tools import bti, gcm
 
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
