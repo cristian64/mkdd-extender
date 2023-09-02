@@ -33,6 +33,7 @@ from PySide6 import QtCore, QtGui, QtMultimedia, QtWidgets
 
 import ast_converter
 import mkdd_extender
+import rarc
 
 FONT_FAMILIES = 'Liberation Mono, FreeMono, Nimbus Mono, Consolas, Courier New'
 
@@ -731,6 +732,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
     shown = QtCore.Signal()
 
+    _minimap_loaded = QtCore.Signal(str)
     _images_loaded = QtCore.Signal(object)
 
     def __init__(self, parent: QtWidgets.QWidget = None):
@@ -743,6 +745,9 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         self._ast_metadata_cache = {}
 
+        self._pending_minimap_filepath = None
+        self._minimap_loaded.connect(self._on_minimap_loaded)
+
         self._pending_image_filepaths_by_language = None
         self._images_loaded.connect(self._on_images_loaded)
 
@@ -752,6 +757,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         # To avoid calculating checksums often, another cache is used to map filepaths to checksums.
         self._checksum_cache = {}
         self._pixmap_cache = {}
+        self._minimap_pixmap_cache = {}
+        self._minimap_thread_pool_executor = concurrent.futures.ThreadPoolExecutor(1)
         self._thread_pool_executor = concurrent.futures.ThreadPoolExecutor(1)
         self._child_thread_pool_executor = concurrent.futures.ThreadPoolExecutor(4)
         self._about_to_quit = False
@@ -760,6 +767,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             self._about_to_quit = True
             shutdown_executor(self._child_thread_pool_executor)
             shutdown_executor(self._thread_pool_executor)
+            shutdown_executor(self._minimap_thread_pool_executor)
 
         QtWidgets.QApplication.instance().aboutToQuit.connect(shutdown_executors)
 
@@ -773,6 +781,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
     def purge_caches(self):
         self._ast_metadata_cache.clear()
         self._checksum_cache.clear()
+        self._minimap_pixmap_cache.clear()
         self._pixmap_cache.clear()
 
     def show_placeholder_message(self):
@@ -818,8 +827,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         parent_dirpath = os.path.dirname(dirpath)
         dirname = os.path.basename(dirpath)
 
-        minimap_filepath = os.path.join(dirpath, 'minimap.json')
-        minimap_present = os.path.isfile(minimap_filepath)
+        minimap_data_filepath = os.path.join(dirpath, 'minimap.json')
+        rarc_filepath = os.path.join(dirpath, 'track.arc')
         staffghost_filepath = os.path.join(dirpath, 'staffghost.ght')
         staffghost_present = os.path.isfile(staffghost_filepath)
 
@@ -854,7 +863,6 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Author: </b> </td><td>{author}</td></tr>
             <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
             <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
-            <tr><td><b>Minimap Coordinates: </b> </td><td>{'Yes' if minimap_present else ''}</td></tr>
             <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
             <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
             <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
@@ -876,6 +884,50 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 ast_player.setToolTip(tool_tip)
                 audio_box.layout().addRow(label, ast_player)
             layout.addWidget(audio_box)
+
+        minimap_box = QtWidgets.QGroupBox('Minimap', self)
+        minimap_box.setObjectName('minimap_box')
+        minimap_box.setLayout(QtWidgets.QHBoxLayout())
+        minimap_info_widget = QtWidgets.QLabel()
+        minimap_info_widget.setAlignment(QtCore.Qt.AlignTop)
+        try:
+            with open(minimap_data_filepath, 'r', encoding='ascii') as f:
+                minimap_json = json.loads(f.read())
+            top_left_corner_x = minimap_json['Top Left Corner X']
+            top_left_corner_z = minimap_json['Top Left Corner Z']
+            bottom_right_corner_x = minimap_json['Bottom Right Corner X']
+            bottom_right_corner_z = minimap_json['Bottom Right Corner Z']
+            orientation = int(minimap_json['Orientation'])  # TODO(CA): To string.
+            if orientation == 0:
+                orientation = 'Upwards'
+            elif orientation == 1:
+                orientation = 'Leftwards'
+            elif orientation == 2:
+                orientation = 'Downwards'
+            elif orientation == 3:
+                orientation = 'Rightwards'
+            else:
+                orientation = 'Unknown'
+        except Exception:  # pylint: disable=broad-exception-caught
+            top_left_corner_x = ''
+            top_left_corner_z = ''
+            bottom_right_corner_x = ''
+            bottom_right_corner_z = ''
+            orientation = ''
+        minimap_info_widget.setText(
+            textwrap.dedent(f"""\
+            <table>
+            <tr><td><b>Top Left Corner X: </b> </td><td>{top_left_corner_x}</td></tr>
+            <tr><td><b>Top Left Corner Z: </b> </td><td>{top_left_corner_z}</td></tr>
+            <tr><td><b>Bottom Right Corner X: </b> </td><td>{bottom_right_corner_x}</td></tr>
+            <tr><td><b>Bottom Right Corner Z: </b> </td><td><code>{bottom_right_corner_z}</code></td></tr>
+            <tr><td><b>Orientation: </b> </td><td>{orientation}</td></tr>
+            </table>
+        """))  # noqa: E501
+        minimap_info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        minimap_box.layout().addWidget(minimap_info_widget)
+        self._show_minimap_image(rarc_filepath)  # May load image asynchronously.
+        layout.addWidget(minimap_box)
 
         image_group_boxes = QtWidgets.QWidget(self)
         image_group_boxes.setObjectName('image_group_boxes')
@@ -1048,6 +1100,82 @@ class InfoViewWidget(QtWidgets.QScrollArea):
     def _on_images_loaded(self, image_filepaths_by_language: 'dict[str, list[str]]'):
         if image_filepaths_by_language == self._pending_image_filepaths_by_language:
             self._show_image_files(image_filepaths_by_language)
+
+    def _verify_minimap_image_ready(self, rarc_filepath: str) -> bool:
+        checksum = self._checksum_cache.get(rarc_filepath)
+        if checksum is None:
+            return False
+        pixmap = self._minimap_pixmap_cache.get(checksum)
+        if pixmap is None:
+            return False
+        return True
+
+    def _show_minimap_image(self, rarc_filepath: str):
+        if not self._verify_minimap_image_ready(rarc_filepath):
+            # Cancel all pending futures to prioritize the current request.
+            cancel_futures(self._minimap_thread_pool_executor)
+
+            self._pending_minimap_filepath = rarc_filepath
+            self._minimap_thread_pool_executor.submit(self._load_minimap_image, rarc_filepath)
+            return
+        self._pending_minimap_filepath = None
+
+        checksum = self._checksum_cache[rarc_filepath]
+        pixmap = self._minimap_pixmap_cache[checksum]
+
+        minimap_widget = QtWidgets.QLabel()
+        minimap_widget.setAutoFillBackground(True)
+        minimap_widget.setPixmap(pixmap)
+        minimap_widget.setFixedSize(pixmap.size())
+
+        minimap_box = self.findChild(QtWidgets.QWidget, 'minimap_box')
+        minimap_box.layout().addWidget(minimap_widget)
+
+    def _load_minimap_image(self, rarc_filepath: str):
+        checksum = self._checksum_cache.get(rarc_filepath)
+        if checksum is None:
+            try:
+                checksum = mkdd_extender.md5sum(rarc_filepath)
+            except Exception:
+                checksum = False
+            self._checksum_cache[rarc_filepath] = checksum
+
+        if checksum in self._minimap_pixmap_cache:
+            return
+
+        pixmap = QtGui.QPixmap()
+
+        if checksum is not False:
+            try:
+                with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:
+                    rarc.extract(rarc_filepath, tmp_dir)
+
+                    minimap_filepath = None
+                    for rootpath, _dirnames, filenames in os.walk(tmp_dir):
+                        for filename in filenames:
+                            if filename.endswith('_map.bti'):
+                                minimap_filepath = os.path.join(rootpath, filename)
+                                break
+                        if minimap_filepath is not None:
+                            break
+
+                    image = mkdd_extender.convert_bti_to_image(minimap_filepath)
+                    if image is not None:
+                        if image.mode != 'RGBA':
+                            image = image.convert('RGBA')
+                        data = image.tobytes("raw", "RGBA")
+                        image = QtGui.QImage(data, *image.size, QtGui.QImage.Format_RGBA8888)
+                        pixmap = QtGui.QPixmap.fromImage(image)
+            except Exception:
+                pass
+
+        self._minimap_pixmap_cache[checksum] = pixmap
+
+        self._minimap_loaded.emit(rarc_filepath)
+
+    def _on_minimap_loaded(self, rarc_filepath: str):
+        if rarc_filepath == self._pending_minimap_filepath:
+            self._show_minimap_image(rarc_filepath)
 
     def _build_label(self, text: str, color: QtGui.QColor = None):
         label = QtWidgets.QLabel(text)
