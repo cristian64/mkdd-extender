@@ -55,7 +55,17 @@ void change_course_page(const int delta)
     const char* const page_orientations = orientations[(int)page];
     for (int i = 0; i < 16; ++i)
     {
-        *orientations_addresses[i] = page_orientations[i];
+        register char* const reg8 asm("r8") = orientations_addresses[i];
+        *reg8 = page_orientations[i];
+        // Using GPR 8, as that was the compiler's choice for storing the address to the
+        // instruction. Although not relevant, GPR 7 was/is used for storing the actual orientation.
+
+        // Invalidate the instruction block so that the new, modified `li` instruction that loads
+        // the orientation is picked up.
+        asm("dcbf 0, 8\n"
+            "sync\n"
+            "icbi 0, 8\n"
+            "isync\n");
     }
 
     // __AUDIO_DATA_PLACEHOLDER__
