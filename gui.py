@@ -474,6 +474,12 @@ class DropWidget(QtWidgets.QWidget):
         self._overlay_widget = None
 
 
+class DragTableWidget(QtWidgets.QTableWidget):
+
+    def supportedDropActions(self):
+        return super().supportedDropActions() & ~QtCore.Qt.MoveAction
+
+
 class DragDropTableWidget(QtWidgets.QTableWidget):
 
     def __init__(self, rows: int, columns: int, parent: QtWidgets.QWidget = None):
@@ -1561,7 +1567,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             clear_icon, QtWidgets.QLineEdit.TrailingPosition)
         self._clear_filter_action.triggered.connect(self._custom_tracks_filter_edit.clear)
         self._clear_filter_action.setVisible(False)
-        self._custom_tracks_table = QtWidgets.QTableWidget()
+        self._custom_tracks_table = DragTableWidget()
         self._custom_tracks_table.setItemDelegate(
             SelectionStyledItemDelegate(self._custom_tracks_table))
         self._custom_tracks_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
