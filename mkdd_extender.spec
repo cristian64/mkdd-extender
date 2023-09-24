@@ -15,15 +15,15 @@ On Linux, in a Bash terminal:
     source venv/bin/activate
     export PYTHONNOUSERSITE=1
     python3 -m pip install -r requirements.txt
-    python3 -m pip install pyinstaller==5.3
-    python3 -m pip install pyinstaller-hooks-contrib==2022.13
+    python3 -m pip install altgraph==0.17.3 pyinstaller==5.13.2 pyinstaller-hooks-contrib==2023.8
     pyinstaller mkdd_extender.spec
     cd dist
     python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'xztar', '.', d)"
+    xdg-open .
 
 On Windows, in a cmd console:
 
-    cd %TMP%
+    cd C:\
     rmdir /s /q MKDDEXT_BUNDLE_TMP
     mkdir MKDDEXT_BUNDLE_TMP
     cd MKDDEXT_BUNDLE_TMP
@@ -34,15 +34,11 @@ On Windows, in a cmd console:
     call venv/Scripts/activate.bat
     set PYTHONNOUSERSITE=1
     python3 -m pip install -r requirements.txt
-    python3 -m pip install altgraph==0.17.3
-    python3 -m pip install future==0.18.2
-    python3 -m pip install pefile==2022.5.30
-    python3 -m pip install pyinstaller==5.3
-    python3 -m pip install pyinstaller-hooks-contrib==2022.13
-    python3 -m pip install pywin32-ctypes==0.2.0
+    python3 -m pip install altgraph==0.17.3 pefile==2023.2.7 pyinstaller==5.13.2 pyinstaller-hooks-contrib==2023.8 pywin32-ctypes==0.2.2
     pyinstaller mkdd_extender.spec
     cd dist
     python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'zip', '.', d)"
+    start .
 
 """
 
