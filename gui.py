@@ -903,7 +903,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             top_left_corner_z = minimap_json['Top Left Corner Z']
             bottom_right_corner_x = minimap_json['Bottom Right Corner X']
             bottom_right_corner_z = minimap_json['Bottom Right Corner Z']
-            orientation = int(minimap_json['Orientation'])  # TODO(CA): To string.
+            orientation = int(minimap_json['Orientation'])
             if orientation == 0:
                 orientation = 'Upwards'
             elif orientation == 1:
