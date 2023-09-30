@@ -1965,9 +1965,17 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
     audio_track_data = gather_audio_file_indices(iso_tmp_dir, alternative_audio_data,
                                                  matching_audio_override_data)
 
-    code_patcher.patch_dol_file(iso_tmp_dir, game_id,
-                                initial_page_number, minimap_data, audio_track_data,
-                                bool(args.type_specific_item_boxes), dol_path, log)
+    code_patcher.patch_dol_file(
+        iso_tmp_dir,
+        game_id,
+        initial_page_number,
+        minimap_data,
+        audio_track_data,
+        bool(args.type_specific_item_boxes),
+        dol_path,
+        log,
+        bool(args.debug_output),
+    )
 
     for language in LANGUAGES:
         scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
@@ -2242,6 +2250,12 @@ OPTIONAL_ARGUMENTS = {
             'also extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory '
             'Override** in Dolphin. Failing to enable the emulated memory size in Dolphin will '
             'make the game crash to a green screen.',
+        ),
+        (
+            'Debug Output',
+            bool,
+            'If specified, extra debug information (e.g. preprocessor, compiler, and linker '
+            'output) will be printed to the terminal/console.',
         ),
     ),
     'Dangerous Options': (

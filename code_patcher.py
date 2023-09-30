@@ -1120,6 +1120,7 @@ def patch_dol_file(
     type_specific_item_boxes: bool,
     dol_path: str,
     log: logging.Logger,
+    debug_output: bool,
 ):
     import mkdd_extender  # pylint: disable=import-outside-toplevel
 
@@ -1317,7 +1318,7 @@ def patch_dol_file(
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
                 # Diagnosis logging only if enabled on the user end.
-                if pass_number == 1 and os.environ.get('MKDDEXTENDER_VERBOSE'):
+                if pass_number == 1 and debug_output:
                     # If Clang-Format is available in the system, run the C file through it.
                     shutil.copyfile(os.path.join(code_dir, '.clang-format'), '.clang-format')
                     try:
