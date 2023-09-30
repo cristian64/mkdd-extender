@@ -142,6 +142,16 @@ EXTREME_MAX_ISO_SIZE = 4 * 1024 * 1024 * 1024
 The maximum size that the GCM file format can support.
 """
 
+PREVIEW_IMAGE_SIZE = 256, 184
+"""
+Resolution of the course preview images.
+"""
+
+LABEL_IMAGE_SIZE = 256, 32
+"""
+Resolution of the course label images.
+"""
+
 linux = platform.system() == 'Linux'
 windows = platform.system() == 'Windows'
 macos = platform.system() == 'Darwin'
@@ -1398,8 +1408,6 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
         # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
         # However, if extended memory has been set, the retail dimensions can be used instead.
-        PREVIEW_IMAGE_SIZE = 256, 184
-        LABEL_IMAGE_SIZE = 256, 32
         if not args.extended_memory:
             if total_page_count <= 2:
                 preview_image_factor = 1
