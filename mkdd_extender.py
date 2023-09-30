@@ -2216,7 +2216,7 @@ OPTIONAL_ARGUMENTS = {
             'If enabled, support for type-specific item boxes will be added to the game.'
             '\n\n'
             'The patch allows custom tracks to include item boxes that have been configured for a '
-            'specific item type (i.e. players always get the same item type from the item box).'
+            'specific item type (i.e. players always get the same item type from the item box).',
         ),
     ),
     'Expert Options': (
