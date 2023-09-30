@@ -456,15 +456,17 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
     with open(course_filepath, 'rb') as f:
         data = f.read()
 
-    # If the start of the BOL file can be located [once] in the archive, the BOL file can be edited
-    # directly without having to extract the archive first, which would be slower.
-    bol_offset = data.find(BOL_MAGIC)
-    if bol_offset > 0:
-        if data.find(BOL_MAGIC, bol_offset + len(BOL_MAGIC)) < 0:
-            with open(course_filepath, 'r+b') as f:
-                f.seek(bol_offset + MUSIC_ID_OFFSET)
-                f.write(bytes([music_id]))
-            return
+    # If the start of the BOL file can be located [once] in the RARC archive, the BOL file can be
+    # edited directly without having to extract the archive first, which would be slower. This
+    # shortcut only possible if the RARC file is uncompressed.
+    if data[:4] == b'RARC':
+        bol_offset = data.find(BOL_MAGIC)
+        if bol_offset > 0:
+            if data.find(BOL_MAGIC, bol_offset + len(BOL_MAGIC)) < 0:
+                with open(course_filepath, 'r+b') as f:
+                    f.seek(bol_offset + MUSIC_ID_OFFSET)
+                    f.write(bytes([music_id]))
+                return
 
     # Otherwise, extract the RARC file, locate the BOL file in the directory, patch the BOL file,
     # and re-pack the RARC archive.
