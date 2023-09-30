@@ -6,6 +6,7 @@ Details of the RARC format:
 - https://kuribo64.net/wiki/?page=RARC
 - https://wiki.tockdom.com/wiki/RARC_(File_Format)
 - https://mk8.tockdom.com/wiki/SARC_(File_Format) (related)
+- https://wiki.tockdom.com/wiki/YAZ0_(File_Format)
 
 When executed as a command-line tool, two paths need to be provided: one for the input file or input
 directory, and one for the output directory or output file.
@@ -22,6 +23,7 @@ import logging
 log = logging.getLogger(__name__)
 
 __MAGIC = b'RARC'
+__MAGIC_COMPRESSED = b'Yaz0'
 
 __HEADER_SIZE = 0x20
 __INFO_BLOCK_SIZE = 0x20
@@ -61,10 +63,79 @@ else:
         return name
 
 
+def _is_compressed(data: memoryview) -> bool:
+    return data[:len(__MAGIC_COMPRESSED)] == __MAGIC_COMPRESSED
+
+
+def _decompress(data: memoryview) -> memoryview:
+    uncompressed_data_size = struct.unpack('>L', data[4:8])[0]
+    uncompressed_data = bytearray(b'\x00') * uncompressed_data_size
+    uncompressed_data_view = memoryview(uncompressed_data)
+
+    data = data[16:]  # Skip magic number, size, and reserved data.
+    data_size = len(data)
+
+    read_data = 0
+    written_data = 0
+
+    group_head = 0
+    group_head_len = 0
+
+    while read_data < data_size and written_data < uncompressed_data_size:
+        if not group_head_len:
+            group_head = data[read_data]
+            read_data += 1
+            group_head_len = 8
+
+        group_head_len -= 1
+        if group_head & 0x80:
+            uncompressed_data[written_data] = data[read_data]
+            read_data += 1
+            written_data += 1
+        else:
+            b1, b2 = data[read_data:read_data + 2]
+            read_data += 2
+
+            temp_index = written_data - ((b1 & 0x0f) << 8 | b2) - 1
+
+            n = b1 >> 4
+            if not n:
+                n = data[read_data] + 0x12
+                read_data += 1
+            else:
+                n += 2
+
+            assert 3 <= n <= 0x111
+            assert written_data + n < uncompressed_data_size
+
+            overlap = ((written_data <= temp_index < written_data + n)
+                       or (temp_index <= written_data < temp_index + n))
+
+            if overlap:
+                # When the ranges overlap (~1.5% of the times in test subject), bytes will be copied
+                # one by one.
+                while n > 0:
+                    n -= 1
+                    uncompressed_data[written_data] = uncompressed_data[temp_index]
+                    temp_index += 1
+                    written_data += 1
+            else:
+                chunk = uncompressed_data_view[temp_index:temp_index + n]
+                uncompressed_data[written_data:written_data + n] = chunk
+                written_data += n
+
+        group_head = group_head << 1
+
+    return uncompressed_data_view
+
+
 def extract(src_filepath: str, dst_dirpath: str):
     # Read all file into nearby memory.
     with open(src_filepath, 'rb') as f:
         data = memoryview(f.read())
+
+    if _is_compressed(data):
+        data = _decompress(data)
 
     # Parse header.
     magic = data[:len(__MAGIC)]
