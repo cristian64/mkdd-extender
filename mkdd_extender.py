@@ -873,17 +873,23 @@ def build_text_image_from_bitmap_font(text: str, width: int, height: int, charac
     return image, overflow
 
 
-def generate_bti_image_from_bitmap_font(text: str, width: int, height: int, image_format: str,
-                                        background: 'tuple[int, int, int, int]', filepath: str):
+def generate_bti_image_from_bitmap_font(text: str,
+                                        width: int,
+                                        height: int,
+                                        image_format: str,
+                                        background: 'tuple[int, int, int, int]',
+                                        filepath: str,
+                                        default_scale: float = None):
     assert filepath.endswith('.bti')
 
     words = text.split()
     multiline = height > 32 and len(words) > 1
 
-    if height <= 32:
-        default_scale = 0.95  # Close to the scale in the stock images when height is 32 pixels.
-    else:
-        default_scale = 1.0
+    if default_scale is None:
+        if height <= 32:
+            default_scale = 0.95  # Close to the scale in the stock images when height is 32 pixels.
+        else:
+            default_scale = 1.0
 
     if multiline:
         lines = None
