@@ -32,9 +32,6 @@
 
 void change_course_page(const int delta)
 {
-    *(int*)PLAY_SOUND_R4 = 0x0002000c;
-    JAISeMgr__startSound((void*)PLAY_SOUND_R3, (void*)PLAY_SOUND_R4, (void*)PLAY_SOUND_R5, 0);
-
     const int previous_page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
     const int page = (previous_page + delta + PAGE_COUNT) % PAGE_COUNT;
     *(char*)CURRENT_PAGE_ADDRESS = (char)page;
@@ -106,6 +103,10 @@ void process_course_page_change(const bool lanmode)
             {
                 refresh_lanselectmode();
             }
+
+            *(int*)PLAY_SOUND_R4 = 0x0002000c;
+            JAISeMgr__startSound(
+                (void*)PLAY_SOUND_R3, (void*)PLAY_SOUND_R4, (void*)PLAY_SOUND_R5, 0);
         }
         else
         {
