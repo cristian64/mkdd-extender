@@ -1454,17 +1454,16 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         coursename_dirpath = new_coursename_dirpath
         staffghosts_dirpath = new_staffghosts_dirpath
 
-        # Copy files into the ISO temporariy directory.
-        log.info('Melding directories...')
         melded = 0
-        for prefix in PREFIXES[:len(prefix_to_nodename)]:
+
+        def meld_course(prefix: str, nodename: str):
+            nonlocal melded
+
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
             page_index = ord(prefix[0]) - ord('A')
             page_index += 1
             track_index = int(prefix[1:3]) - 1
             assert 0 <= track_index <= 15
-
-            nodename = prefix_to_nodename[prefix]
 
             log.info(f'Melding "{nodename}" ("{track_dirpath}")...')
             melded += 1
@@ -1781,6 +1780,19 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             except Exception as e:
                 raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": '
                                         f'{str(e)}.') from e
+
+        # Copy files into the ISO temporary directory.
+        log.info('Melding directories...')
+
+        for prefix in PREFIXES[:len(prefix_to_nodename)]:
+            nodename = prefix_to_nodename[prefix]
+
+            try:
+                meld_course(prefix, nodename)
+            except (AssertionError, Exception) as e:
+                error_message = f': {str(e)}' if str(e) else ''
+                raise type(e)(
+                    f'Unexpected error while processing "{nodename}"{error_message}.') from e
 
         # Downscale images to ensure space limits are met.
         if downscale_preview_images:
