@@ -879,7 +879,8 @@ def generate_bti_image_from_bitmap_font(text: str,
                                         image_format: str,
                                         background: 'tuple[int, int, int, int]',
                                         filepath: str,
-                                        default_scale: float = None):
+                                        default_scale: float = None,
+                                        postprocessing_callback: callable = None):
     assert filepath.endswith('.bti')
 
     words = text.split()
@@ -961,6 +962,9 @@ def generate_bti_image_from_bitmap_font(text: str,
         for line_image, margin in line_images:
             image_with_background.alpha_composite(line_image, dest=(margin, offset_y))
             offset_y += line_image.height
+
+        if postprocessing_callback is not None:
+            image_with_background = postprocessing_callback(image_with_background)
 
         with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
             tmp_filepath = os.path.join(tmp_dir,
