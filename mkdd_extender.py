@@ -789,6 +789,13 @@ combination such as "TA" less awkward, as otherwise the gap between the lower pa
 upper part in "A" is too great; it would almost look like as a word separation.
 """
 
+JAPANESE_CHARACTER_SET = set(('カ', 'ッ', 'プ', 'コ', 'ー', 'ス'))
+JAPANESE_CHARACTER_SPACING_OVERRIDE = -22
+"""
+A hardcoded value determined empirically so that Japanese characters combined with non-Japanese
+character do not overlap.
+"""
+
 FOREGROUND_CHARACTERS = set(("'", ))
 """
 Set of characters that will be drawn on top of the rest. This idea is seen in the stock Bowser's
@@ -857,6 +864,12 @@ def build_text_image_from_bitmap_font(text: str, width: int, height: int, charac
             required_width += image.width
         if character_spacing > 0 and word_images:
             required_width += character_spacing * (len(word_images) - 1)
+        for prev_character_image, character_image in zip(word_images, word_images[1:]):
+            prev_c = prev_character_image.character
+            c = character_image.character
+            if (c in JAPANESE_CHARACTER_SET) != (prev_c in JAPANESE_CHARACTER_SET):
+                required_width += JAPANESE_CHARACTER_SPACING_OVERRIDE - character_spacing
+                character_image.character_spacing_override = JAPANESE_CHARACTER_SPACING_OVERRIDE
     required_height = (image_groups[0][0].height if image_groups[0] else 0) if image_groups else 0
     if required_width < 1 or required_height < 1:
         return Image.new('RGBA', (width, height)), False
@@ -866,7 +879,10 @@ def build_text_image_from_bitmap_font(text: str, width: int, height: int, charac
     for i, word_images in enumerate(image_groups):
         offset += word_spacing if i else 0
         for j, character_image in enumerate(word_images):
-            offset += character_spacing if j else 0
+            if hasattr(character_image, 'character_spacing_override'):
+                offset += character_image.character_spacing_override
+            else:
+                offset += character_spacing if j else 0
             ops.append((character_image, (offset, 0)))
             offset += character_image.width
 
