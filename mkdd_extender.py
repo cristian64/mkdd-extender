@@ -719,15 +719,27 @@ def add_page_number_to_cup_name_image(filepath: str, page_number: int, page_coun
         cupname_image = Image.open(tmp_filepath)
         original_mode = cupname_image.mode  # Original mode is 'LA'.
         cupname_image = cupname_image.convert('RGBA')
-
-        numbers_image = build_page_numbers_image(page_number, page_count)
-
-        margin = int(numbers_image.width / 1.5)
-        canvas_width = cupname_image.width + margin * 2
+        canvas_width = cupname_image.width
         canvas_height = cupname_image.height
 
+        numbers_image = build_page_numbers_image(page_number, page_count)
+        numbers_image = numbers_image.resize(
+            (int(numbers_image.width * 0.75), numbers_image.height),
+            resample=RESAMPLING_FILTER,
+            reducing_gap=3.0)
+
+        needed_margin = int(numbers_image.width / 1.5)
+        cropped_cupname_image = crop_image_sides(cupname_image)
+        available_margin = (cupname_image.width - cropped_cupname_image.width) // 2
+
+        margin = max(0, needed_margin - available_margin)
+        cropped_cupname_image = cropped_cupname_image.resize(
+            (cropped_cupname_image.width - margin * 2, cropped_cupname_image.height),
+            resample=RESAMPLING_FILTER,
+            reducing_gap=3.0)
+
         image = Image.new('RGBA', (canvas_width, canvas_height))
-        image.paste(cupname_image, (margin, 0))
+        image.paste(cropped_cupname_image, ((canvas_width - cropped_cupname_image.width) // 2, 0))
         image.alpha_composite(numbers_image,
                               dest=(canvas_width - numbers_image.width,
                                     canvas_height - numbers_image.height))
