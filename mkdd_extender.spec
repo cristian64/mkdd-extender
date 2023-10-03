@@ -44,7 +44,6 @@ On Windows, in a cmd console:
 
 import platform
 import re
-import sys
 
 linux = platform.system() == 'Linux'
 windows = platform.system() == 'Windows'
