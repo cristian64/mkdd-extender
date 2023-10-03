@@ -114,6 +114,30 @@ A dictionary to map the internal course name to the [partial] name of the label 
 This is identical to `COURSE_TO_PREVIEW_IMAGE_NAME`, except for the `Patapata` entry, which differs.
 """
 
+EXTENDER_CUP_LABEL = {
+    'English': 'Extender Cup',
+    'French': 'Coupe Extender',
+    'German': 'Extender-Cup',
+    'Italian': 'Trofeo Extender',
+    'Japanese': 'Extenderカップ',
+    'Spanish': 'Copa Extender',
+}
+"""
+Text that is used in the label image for the Extender Cup.
+"""
+
+EXTENDER_CUP_PREVIEW_TEXT = {
+    'English': 'All the {} courses',
+    'French': 'Tous les {} cours',
+    'German': 'Alle {} Kurse',
+    'Italian': 'Tutti i {} percorsi',
+    'Japanese': '{}コース',
+    'Spanish': 'Todos los {} circuitos',
+}
+"""
+Text that is used in the preview image for the Extender Cup.
+"""
+
 MAX_EXTRA_PAGES = 9
 """
 The maximum number of extra pages that can be added to the game, to a total of 10 pages, including
@@ -1351,8 +1375,14 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
             log.info(f'Modifying {cupname_filepath}...')
 
             new_cupname_filepath = with_page_index_suffix(0, cupname_filepath)
-            rename(cupname_filepath, new_cupname_filepath)
+            if args.extender_cup and 'reverse2' not in cupname_filename:
+                # Preserve original images, which are used by the Extender Cup in its cup name list.
+                shutil.copyfile(cupname_filepath, new_cupname_filepath)
+            else:
+                rename(cupname_filepath, new_cupname_filepath)
             cupname_filepath = new_cupname_filepath
+
+            extender_cup = args.extender_cup and 'reverse2' in cupname_filename
 
             for page_index in range(page_count - 1):
                 page_index += 1
@@ -1360,15 +1390,76 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
                 page_cupname_filepath = with_page_index_suffix(page_index, cupname_filepath)
                 make_link(cupname_filepath, page_cupname_filepath)
 
-                if not args.skip_cup_names:
+                if not args.skip_cup_names or extender_cup:
+                    if extender_cup:
+                        remove_file(page_cupname_filepath)
+                        generate_bti_image_from_bitmap_font(EXTENDER_CUP_LABEL[language],
+                                                            LABEL_IMAGE_SIZE[0],
+                                                            LABEL_IMAGE_SIZE[1],
+                                                            'IA4', (0, 0, 0, 0),
+                                                            page_cupname_filepath,
+                                                            default_scale=1.0)
                     add_page_number_to_cup_name_image(page_cupname_filepath, page_index + 1,
                                                       page_count)
                 make_link(page_cupname_filepath,
                           page_cupname_filepath.replace('courseselect', 'lanplay'))
 
-            if not args.skip_cup_names:
+            if not args.skip_cup_names or extender_cup:
+                if extender_cup:
+                    remove_file(cupname_filepath)
+                    generate_bti_image_from_bitmap_font(EXTENDER_CUP_LABEL[language],
+                                                        LABEL_IMAGE_SIZE[0],
+                                                        LABEL_IMAGE_SIZE[1],
+                                                        'IA4', (0, 0, 0, 0),
+                                                        cupname_filepath,
+                                                        default_scale=1.0)
                 add_page_number_to_cup_name_image(cupname_filepath, 1, page_count)
             make_link(cupname_filepath, cupname_filepath.replace('courseselect', 'lanplay'))
+
+        if args.extender_cup:
+            convert_png_to_bti(os.path.join(data_dir, 'extender_cup', 'cup_logo.png'),
+                               os.path.join(timg_dir, 'cuppictreverse2.bti'), 'CMPR')
+
+            text = EXTENDER_CUP_PREVIEW_TEXT[language].format(page_count * 16)
+            generate_bti_image_from_bitmap_font(text, *PREVIEW_IMAGE_SIZE, 'CMPR', (0, 0, 0, 255),
+                                                os.path.join(timg_dir, 'extender_cup_preview.bti'))
+
+    if args.extender_cup:
+        cup2d_dir = os.path.join(scenedata_dirpath, 'cup2d')
+        for i, filename in enumerate(('cup_gold.png', 'cup_silver.png', 'cup_bronze.png')):
+            convert_png_to_bti(os.path.join(data_dir, 'extender_cup', filename),
+                               os.path.join(cup2d_dir, f'cupe{i + 1}.bti'), 'CMPR')
+
+        race2d_timg_dir = os.path.join(files_dirpath, 'mram', 'mram_race2d', 'timg')
+        convert_png_to_bti(os.path.join(data_dir, 'extender_cup', 'cup_small_logo.png'),
+                           os.path.join(race2d_timg_dir, 'cup_pict_reverse2.bti'), 'RGB5A3')
+
+        shutil.copy(
+            os.path.join(data_dir, 'extender_cup', 'cup.bmd'),
+            os.path.join(files_dirpath, 'AwardData', 'award_alltour', 'awardallcuptour.bmd'))
+
+        mram_locate_dirpath = os.path.join(files_dirpath, 'MRAM_Locale')
+        for language in LANGUAGES:
+            language_dirpath = os.path.join(mram_locate_dirpath, language)
+            if not os.path.isdir(language_dirpath):
+                continue
+
+            # Stock images do not use the full width of the image. This is fine-tweaked depending on
+            # the language.
+            width_scale = 0.75
+            if language in ('French', 'Italian', 'Spanish'):
+                width_scale = 0.9
+            limited_width = int(LABEL_IMAGE_SIZE[0] * width_scale)
+
+            generate_bti_image_from_bitmap_font(
+                EXTENDER_CUP_LABEL[language],
+                limited_width,
+                LABEL_IMAGE_SIZE[1],
+                'IA4', (0, 0, 0, 0),
+                os.path.join(language_dirpath, 'mramloc', 'timg', 'resultcupname_reverse2_cup.bti'),
+                default_scale=0.75,
+                postprocessing_callback=lambda image, limited_width=limited_width: pad_image_sides(
+                    image, 0, LABEL_IMAGE_SIZE[0] - limited_width))
 
     log.info('Cup names patched.')
 
@@ -2015,6 +2106,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         initial_page_number,
         minimap_data,
         audio_track_data,
+        bool(args.extender_cup),
         bool(args.type_specific_item_boxes),
         dol_path,
         log,
@@ -2270,6 +2362,12 @@ OPTIONAL_ARGUMENTS = {
     ),
     'Code Patches': (
         (
+            'Extender Cup',
+            bool,
+            'If enabled, the All-Cup Tour will be replaced with the Extender Cup, which features '
+            'all the courses included in all the configured course pages.',
+        ),
+        (
             'Type-specific Item Boxes',
             bool,
             'If enabled, support for type-specific item boxes will be added to the game.'
@@ -2427,7 +2525,8 @@ def extend_game(args: argparse.Namespace):
         # Extract the relevant RARC files that will be modified.
         log.info('Extracting RARC files...')
         RARC_FILENAMES = ('courseselect.arc', 'LANPlay.arc', 'titleline.arc')
-        scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData')
+        files_dirpath = os.path.join(iso_tmp_dir, 'files')
+        scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
         scenedata_filenames = os.listdir(scenedata_dirpath)
         rarc_extracted = 0
         for language in LANGUAGES:
@@ -2435,6 +2534,29 @@ def extend_game(args: argparse.Namespace):
                 continue
             for filename in RARC_FILENAMES:
                 filepath = os.path.join(scenedata_dirpath, language, filename)
+                rarc.extract(filepath, os.path.dirname(filepath))
+                rarc_extracted += 1
+        if args.extender_cup:
+            cup2d_filepath = os.path.join(scenedata_dirpath, 'cup2d.arc')
+            rarc.extract(cup2d_filepath, scenedata_dirpath)
+            rarc_extracted += 1
+            mram_filepath = os.path.join(files_dirpath, 'MRAM.arc')
+            rarc.extract(mram_filepath, files_dirpath)
+            rarc_extracted += 1
+            mram_dirpath = os.path.join(files_dirpath, 'mram')
+            race2d_filepath = os.path.join(mram_dirpath, 'race2d.arc')
+            rarc.extract(race2d_filepath, mram_dirpath)
+            rarc_extracted += 1
+            awarddata_dirpath = os.path.join(files_dirpath, 'AwardData')
+            award_alltour_filepath = os.path.join(awarddata_dirpath, 'Award_AllTour.arc')
+            rarc.extract(award_alltour_filepath, awarddata_dirpath)
+            rarc_extracted += 1
+            mram_locale_dirpath = os.path.join(files_dirpath, 'MRAM_Locale')
+            mram_locale_filenames = os.listdir(mram_locale_dirpath)
+            for language in LANGUAGES:
+                if language not in mram_locale_filenames:
+                    continue
+                filepath = os.path.join(mram_locale_dirpath, language, 'MRAMLoc.arc')
                 rarc.extract(filepath, os.path.dirname(filepath))
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
@@ -2460,6 +2582,30 @@ def extend_game(args: argparse.Namespace):
         # Re-pack RARC files, and erase directories.
         log.info('Packing RARC files...')
         rarc_packed = 0
+        if args.extender_cup:
+            for language in LANGUAGES:
+                if language not in mram_locale_filenames:
+                    continue
+                filepath = os.path.join(mram_locale_dirpath, language, 'MRAMLoc.arc')
+                dirpath = os.path.join(mram_locale_dirpath, language, 'mramloc')
+                rarc.pack(dirpath, filepath)
+                shutil.rmtree(dirpath)
+                rarc_packed += 1
+            award_alltour_dirpath = os.path.join(awarddata_dirpath, 'award_alltour')
+            rarc.pack(award_alltour_dirpath, award_alltour_filepath)
+            shutil.rmtree(award_alltour_dirpath)
+            rarc_packed += 1
+            race2d_dirpath = os.path.join(mram_dirpath, 'mram_race2d')
+            rarc.pack(race2d_dirpath, race2d_filepath)
+            shutil.rmtree(race2d_dirpath)
+            rarc_packed += 1
+            rarc.pack(mram_dirpath, mram_filepath)
+            shutil.rmtree(mram_dirpath)
+            rarc_packed += 1
+            cup2d_dirpath = os.path.join(scenedata_dirpath, 'cup2d')
+            rarc.pack(cup2d_dirpath, cup2d_filepath)
+            shutil.rmtree(cup2d_dirpath)
+            rarc_packed += 1
         for language in LANGUAGES:
             if language not in scenedata_filenames:
                 continue

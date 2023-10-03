@@ -111,6 +111,18 @@ Memory address where the currently selected page index is stored. Defined as the
 the spam flag.
 """
 
+GP_INITIAL_PAGE_ADDRESSES = {k: v + 1 for k, v in CURRENT_PAGE_ADDRESSES.items()}
+"""
+Memory address where the initial page in GP mode is stored. Defined as the next byte after the
+current page. Used in the Extender Cup.
+"""
+
+GP_GLOBAL_COURSE_INDEX_ADDRESSES = {k: v + 1 for k, v in GP_INITIAL_PAGE_ADDRESSES.items()}
+"""
+Memory address where the global course index in the Extender Cup code patch is stored. Defined as
+the next byte after the initial page.
+"""
+
 PLAYER_ITEM_ROLLS_ADDRESSES = {
     'GM4E01': 0x802ED64F,
     'GM4P01': 0x802F9D06,
@@ -888,6 +900,114 @@ locate in the debugger if a breakpoint is set, or in Ghidra when looking for ref
 This is one of the `bl` instructions that will be hijacked.
 """
 
+CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES = {
+    'GM4E01': 0x8016BDC0,
+    'GM4P01': 0x8016AC64,
+    'GM4J01': 0x8016BDC0,
+    'GM4E01dbg': 0x80189C4C,
+}
+"""
+Memory address to the first of two non-consecutive instructions in `SceneCourseSelect::setTexture()`
+that load the address to the string array that holds the filenames to the cup name images that are
+shown for the All-Cup Tour. The instructions will be replaced to point to a different array that
+holds the filenames for the Extender Cup.
+"""
+
+PREVIEW_FILENAMES_ARRAY_INSTRUCTIONS_ADDRESSES = {
+    'GM4E01': (0x8016A978, 0x8016AA50, 0x8016AB10, 0x8016BE38),
+    'GM4P01': (0x8016981C, 0x801698F4, 0x801699B4, 0x8016ACDC),
+    'GM4J01': (0x8016A978, 0x8016AA50, 0x8016AB10, 0x8016BE38),
+    'GM4E01dbg': (0x801884B8, 0x80188590, 0x80188650, 0x80189CC4),
+}
+"""
+Memory addresses to four pairs of two consecutive instructions that put in `r4` the filename of the
+preview image that is to be loaded by a `J2DPictureEx::changeTexture()` call in the All-Cup Tour.
+For the Extender cup, these strings are replaced with a single preview image with static text.
+"""
+
+GP_CUP_INDEX_ADDRESSES = {
+    'GM4E01': 0x803B0FC7,
+    'GM4P01': 0x803BADE7,
+    'GM4J01': 0x803CB5E7,
+    'GM4E01dbg': 0x803FBB13,
+}
+"""
+Memory address where the index of the selected cup in GP mode is stored.
+"""
+
+GP_COURSE_INDEX_ADDRESSES = {
+    'GM4E01': 0x803B0FCB,
+    'GM4P01': 0x803BADEB,
+    'GM4J01': 0x803CB5EB,
+    'GM4E01dbg': 0x803FBB17,
+}
+"""
+Memory address where the course index in GP mode is stored.
+"""
+
+GP_TOTAL_COURSE_COUNT_INSTRUCTION_ADDRESSES = {
+    'GM4E01': 0x80154C74,
+    'GM4P01': 0x80153C00,
+    'GM4J01': 0x80154C74,
+    'GM4E01dbg': 0x8016DD6C,
+}
+"""
+The address to the `li` instruction that loads the hardcoded course count in the All-Cup Tour that
+is then shown in the HUD at the start of the race. For the Extender Cup, the hardcoded value is
+multiplied by the number of course pages.
+"""
+
+SEQUENCEINFO_SETCLRGPCOURSE_CALL_ADDRESSES = {
+    'GM4E01': 0x80126088,
+    'GM4P01': 0x801260AC,
+    'GM4J01': 0x80126088,
+    'GM4E01dbg': 0x80133CE0,
+}
+"""
+The address to the one place from where `SequenceInfo::setClrGPCourse()` is called. This `bl`
+instruction will be hijacked to adjust the course index and course page in the Extender Cup at the
+end of each race.
+"""
+
+ON_GP_ABOUR_TO_START_INSERTION_ADDRESSES = {
+    'GM4E01': 0x8016B27C,
+    'GM4P01': 0x8016A120,
+    'GM4J01': 0x8016B27C,
+    'GM4E01dbg': 0x80188E3C,
+}
+"""
+The address to an instruction in `SceneCourseSelect::buttonA()` that is replaced with a function
+call to run a few more extra instructions before the GP starts (e.g. to reset the global course
+index for the Extender Cup). The hijacked instruction is the instruction that resets the local
+course index, so it somewhat pertinent to replace that instruction.
+"""
+
+GET_GP_COURSE_INDEX_INSERTION_ADDRESSES = {
+    'GM4E01': 0x80154D18,
+    'GM4P01': 0x80153CA4,
+    'GM4J01': 0x80154D18,
+    'GM4E01dbg': 0x8016DE10,
+}
+"""
+The address to the instruction in `PreRace2D::setGP()` that loads the course index to be shown in
+the HUD at the start of the race. The instruction is replaced with a function call that returns a
+different value for the Extender Cup, while keeping the original value for the rest of the cups.
+"""
+
+GP_AWARDED_SCORES_ADDRESSES = {
+    'GM4E01': 0x8032C890,
+    'GM4P01': 0x803366D0,
+    'GM4J01': 0x80346EB0,
+    'GM4E01dbg': 0x8036F410,
+}
+"""
+The address to a 8-integer array (`SequenceInfo::RANKPOINT`) that stores the scores that are awarded
+to each player after each race in GP mode. For the Extender Cup, these scores are lowered to limit
+the maximum score that can be achieved by a single player. The game can only show up to 999 points
+in the scoreboard, which is a limit that would be exceeded when there are more than 6 configured
+course pages. If the 999 limit in the scoreboard is ever solved, this logic can be removed.
+"""
+
 ITEMOBJMGR_ISAVAILABLEROLLINGSLOT_CALL_ADDRESSES = {
     'GM4E01': 0x801FBE84,
     'GM4P01': 0x801FBE54,
@@ -943,6 +1063,7 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
         LANSelectMode__calcAnm = 0x801e428c;
+        SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
         ItemObj__getSpecialKind = 0x8021A024;
@@ -953,6 +1074,7 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016a584;
         LANSelectMode__calcAnm = 0x801e4264;
+        SequenceInfo__setClrGPCourse = 0x8013FD14;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
         ItemObj__getSpecialKind = 0x8021A008;
@@ -963,6 +1085,7 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
         LANSelectMode__calcAnm = 0x801e42b4;
+        SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
         ItemObj__getSpecialKind = 0x8021A04C;
@@ -973,6 +1096,7 @@ SYMBOLS_MAP = {
         JAISeMgr__startSound = 0x80089974;
         SceneCourseSelect__calcAnm = 0x80189448;
         LANSelectMode__calcAnm = 0x80216028;
+        SequenceInfo__setClrGPCourse = 0x801517D0;
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
         ItemShuffleMgr__calcSlot = 0x80243508;
         ItemObj__getSpecialKind = 0x802512DC;
@@ -1117,6 +1241,7 @@ def patch_dol_file(
     initial_page_number: int,
     minimap_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
+    extender_cup: bool,
     type_specific_item_boxes: bool,
     dol_path: str,
     log: logging.Logger,
@@ -1223,6 +1348,10 @@ def patch_dol_file(
                                  f'(const unsigned {audio_data_type}*)audio_indexes[(int)page];')
     audio_data_code = '\n'.join(audio_data_code_lines)
 
+    # Addresses to symbols that are only known after the first pass.
+    extender_cup_cup_filenames_address = None
+    extender_cup_preview_filename_address = None
+
     for pass_number in range(2):
         # The project is going to be built twice; the size of the new DOL section needs to be known
         # to determine the OS Arena, which needs too be known to determine the offset required for
@@ -1237,7 +1366,14 @@ def patch_dol_file(
             ('__COURSE_TO_STREAM_FILE_INDEX_ADDRESS__',
              f'0x{COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + offset:08X}'),
             ('__CURRENT_PAGE_ADDRESS__', f'0x{CURRENT_PAGE_ADDRESSES[game_id]:08X}'),
+            ('__EXTENDER_CUP__', str(int(extender_cup))),
             ('__GM4E01_DEBUG_BUILD__', str(int(game_id == 'GM4E01dbg'))),
+            ('__GP_AWARDED_SCORES_ADDRESS__', f'0x{GP_AWARDED_SCORES_ADDRESSES[game_id]:08X}'),
+            ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
+            ('__GP_CUP_INDEX_ADDRESS__', f'0x{GP_CUP_INDEX_ADDRESSES[game_id]:08X}'),
+            ('__GP_GLOBAL_COURSE_INDEX_ADDRESS__',
+             f'0x{GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
+            ('__GP_INITIAL_PAGE_ADDRESS__', f'0x{GP_INITIAL_PAGE_ADDRESSES[game_id]:08X}'),
             ('__LAN_STRUCT_ADDRESS__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][0]:08X}'),
             ('__LAN_STRUCT_OFFSET1__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][1]:04X}'),
             ('__LAN_STRUCT_OFFSET2__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][2]:04X}'),
@@ -1272,6 +1408,8 @@ def patch_dol_file(
                 project.dol.write(b'\0')
                 project.dol.seek(CURRENT_PAGE_ADDRESSES[game_id])
                 project.dol.write(initial_page_index.to_bytes(1, 'big'))
+                project.dol.seek(GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id])
+                project.dol.write(b'\0')
                 project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
                 project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
@@ -1309,6 +1447,36 @@ def patch_dol_file(
                                    'lanselectmode_calcanm_ex')
 
                 # Code extensions.
+                if extender_cup:
+                    project.dol.seek(GP_TOTAL_COURSE_COUNT_INSTRUCTION_ADDRESSES[game_id])
+                    doltools.write_li(project.dol, 24, page_count * 16)
+                    project.branchlink(ON_GP_ABOUR_TO_START_INSERTION_ADDRESSES[game_id],
+                                       'on_gp_about_to_start')
+                    project.branchlink(GET_GP_COURSE_INDEX_INSERTION_ADDRESSES[game_id],
+                                       'get_gp_course_index')
+                    project.branchlink(SEQUENCEINFO_SETCLRGPCOURSE_CALL_ADDRESSES[game_id],
+                                       'sequenceinfo_setclrgpcourse_ex')
+
+                    if pass_number == 1:
+                        project.dol.seek(CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES[game_id])
+                        doltools.write_lis(project.dol,
+                                           3,
+                                           extender_cup_cup_filenames_address >> 16,
+                                           signed=False)
+                        project.dol.seek(CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES[game_id] + 8)
+                        doltools.write_ori(project.dol, 3, 28,
+                                           extender_cup_cup_filenames_address & 0x0000FFFF)
+
+                        for address in PREVIEW_FILENAMES_ARRAY_INSTRUCTIONS_ADDRESSES[game_id]:
+                            project.dol.seek(address)
+                            doltools.write_lis(project.dol,
+                                               4,
+                                               extender_cup_preview_filename_address >> 16,
+                                               signed=False)
+                            project.dol.seek(address + 0x04)
+                            doltools.write_ori(project.dol, 4, 4,
+                                               extender_cup_preview_filename_address & 0x0000FFFF)
+
                 if type_specific_item_boxes:
                     project.branchlink(ITEMOBJMGR_ISAVAILABLEROLLINGSLOT_CALL_ADDRESSES[game_id],
                                        'itemobjmgr_isavailablerollingslot_ex')
@@ -1316,6 +1484,20 @@ def patch_dol_file(
                                        'itemshufflemgr_calcslot_ex')
 
                 project.build('main.dol' if pass_number == 0 else dol_path)
+
+                # Further symbol post-processing once the map is available.
+                if pass_number == 0:
+                    if extender_cup:
+                        with open('project.map', 'r', encoding='ascii') as f:
+                            for line in f:
+                                if 'g_extender_cup_cup_filenames' in line:
+                                    extender_cup_cup_filenames_address = int(line.split()[0],
+                                                                             base=16)
+                                elif 'g_extender_cup_preview_filenames' in line:
+                                    extender_cup_preview_filename_address = int(line.split()[0],
+                                                                                base=16)
+                        assert extender_cup_cup_filenames_address is not None
+                        assert extender_cup_preview_filename_address is not None
 
                 # Diagnosis logging only if enabled on the user end.
                 if pass_number == 1 and debug_output:
