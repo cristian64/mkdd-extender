@@ -271,6 +271,14 @@ def rename(src_path: str, dst_path: str):
     if src_path == dst_path:
         return
 
+    if windows and src_path.lower() == dst_path.lower():
+        src_filename = os.path.basename(src_path)
+        dst_filename = os.path.basename(dst_path)
+        if src_filename != dst_filename:
+            rename(src_path, f'{dst_path}_')
+            rename(f'{dst_path}_', dst_path)
+        return
+
     if os.path.exists(dst_path):
         raise RuntimeError(f'Rename "{src_path}" to "{dst_path}" failed: destination exists.')
 
