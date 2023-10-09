@@ -1030,6 +1030,53 @@ The address to the one place from where `ItemShuffleMgr::calcSlot()` is called. 
 instruction will be hijacked to add support for type-specific item boxes.
 """
 
+RESET_SECTION_COUNT_CALL_ADDRESSES = {
+    'GM4E01': 0x80179298,
+    'GM4P01': 0x8017813C,
+    'GM4J01': 0x80179298,
+    'GM4E01dbg': 0x801996D8,
+}
+"""
+The address to the area in memory where the branch-link to `reset_section_count` will be inserted.
+This is called during `loadCrsData` to reset the section counter.
+"""
+
+COUNT_SECTION_POINT_CALL_ADDRESSES = {
+    'GM4E01': 0x8017C7d4,
+    'GM4P01': 0x8017B678,
+    'GM4J01': 0x8017C7d4,
+    'GM4E01dbg': 0x8019DE28,
+}
+"""
+The address to the area in memory where the branch-link to `count_section_point` will be inserted.
+This is called during `setPointData` and increments the section counter in memory.
+"""
+
+OVERRIDE_TOTAL_LAP_COUNT_CALL_ADDRESSES = {
+    'GM4E01': 0x80187E24,
+    'GM4P01': 0x80186CC8,
+    'GM4J01': 0x80187E24,
+    'GM4E01dbg': 0x801ACB1C,
+}
+"""
+The address to the area in memory where the branch-link to `override_total_lap_count()` will be
+inserted.
+This hijacks assigning r3 to r0 to run a system for forcing lap counts in a section course.
+In the Debug build, the hijacked instruction targets r22 instead of r0.
+"""
+
+CHECK_LAP_EX_CALL_ADDRESSES = {
+    'GM4E01': 0x80186648,
+    'GM4P01': 0x801854EC,
+    'GM4J01': 0x80186648,
+    'GM4E01dbg': 0x801AA9A4,
+}
+"""
+The address to the area in memory where the branch-link to `check_lap_ex` will be inserted.
+This is called directly after the branch to `setPass` and forces a lap-increment depending
+on an unused sector parameter.
+"""
+
 OSARENALO_INSTRUCTIONS_ADDRESSES = {
     'GM4E01': 0x800E5CD4,
     'GM4P01': 0x800E5C98,
@@ -1062,6 +1109,7 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
+        KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801e428c;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
@@ -1073,6 +1121,7 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016a584;
+        KartChecker__setLapTime = 0x8018570c;
         LANSelectMode__calcAnm = 0x801e4264;
         SequenceInfo__setClrGPCourse = 0x8013FD14;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
@@ -1084,6 +1133,7 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
+        KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801e42b4;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
@@ -1095,6 +1145,9 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x80089974;
         SceneCourseSelect__calcAnm = 0x80189448;
+        KartChecker__setLapTime = 0x801AADD0;
+        KartChecker__isGoal = 0x801AACD8;
+        KartChecker__incLap = 0x801AACE0;
         LANSelectMode__calcAnm = 0x80216028;
         SequenceInfo__setClrGPCourse = 0x801517D0;
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
@@ -1243,6 +1296,7 @@ def patch_dol_file(
     audio_track_data: 'tuple[tuple[int]]',
     extender_cup: bool,
     type_specific_item_boxes: bool,
+    sectioned_courses: bool,
     dol_path: str,
     log: logging.Logger,
     debug_output: bool,
@@ -1389,6 +1443,7 @@ def patch_dol_file(
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
+            ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
@@ -1482,6 +1537,15 @@ def patch_dol_file(
                                        'itemobjmgr_isavailablerollingslot_ex')
                     project.branchlink(ITEMSHUFFLEMGR_CALCSLOT_CALL_ADDRESSES[game_id],
                                        'itemshufflemgr_calcslot_ex')
+
+                if sectioned_courses:
+                    project.branchlink(RESET_SECTION_COUNT_CALL_ADDRESSES[game_id],
+                                       'reset_section_count')
+                    project.branchlink(COUNT_SECTION_POINT_CALL_ADDRESSES[game_id],
+                                       'count_section_point')
+                    project.branchlink(OVERRIDE_TOTAL_LAP_COUNT_CALL_ADDRESSES[game_id],
+                                       'override_total_lap_count')
+                    project.branchlink(CHECK_LAP_EX_CALL_ADDRESSES[game_id], 'check_lap_ex')
 
                 project.build('main.dol' if pass_number == 0 else dol_path)
 

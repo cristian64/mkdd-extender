@@ -35,6 +35,7 @@
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
+#define SECTIONED_COURSES __SECTIONED_COURSES__
 
 void change_course_page(const int delta)
 {
@@ -322,4 +323,206 @@ int itemshufflemgr_calcslot_ex(const unsigned int* const itemshufflemgr,
     return player_item_type;
 }
 
+#endif
+
+#if SECTIONED_COURSES
+
+static unsigned short g_section_count = 0;
+
+// Due to the nature of the compiler, portions of the code had to be rewritten in ASM
+// so that the compiler would not ignore it, and thus break this code patch.
+// To compensate, nearly every set of ASM instructions has a description of what it's doing.
+
+// Reset the section counter.
+void reset_section_count()
+{
+    asm("or %r31, %r3, %r3");  // Run hijacked instruction.
+    g_section_count = 0;
+}
+
+// During course load, count each section point.
+// This will be used to jury-rig the "max laps" count to always be the section number.
+void count_section_point()
+{
+#if GM4E01_DEBUG_BUILD
+    asm("stw %r30, 0x8(%r31)");  // Run hijacked instruction.
+
+    register const unsigned int base asm("r30");
+#else
+    asm("stw %r4, 0x8(%r31)");  // Run hijacked instruction.
+
+    register const unsigned int base asm("r4");
+#endif
+
+    const bool shortcut_point = *(const bool*)(base + 0x0018);
+    if (shortcut_point)
+        return;
+
+    const bool lap_checkpoint = *(const bool*)(base + 0x001B);
+    if (!lap_checkpoint)
+        return;
+
+    ++g_section_count;
+}
+
+// Override the lap count in a section course to be the number of section points.
+void override_total_lap_count()
+{
+#if GM4E01_DEBUG_BUILD
+    asm("or %r22, %r3, %r3");  // Run hijacked instruction.
+#else
+    asm("or %r0, %r3, %r3");  // Run hijacked instruction.
+#endif
+
+    register unsigned short reg9 asm("r9") = g_section_count;
+
+    if (reg9 != 0)
+    {
+        // The game will crash on a race finish if more than 9 laps/sections are present.
+        if (reg9 > 9)
+        {
+            asm("li %r9, 0x09");
+        }
+        asm("sth %r9, 0x2e(%r31)");
+    }
+}
+
+#if GM4E01_DEBUG_BUILD
+
+// In the retail builds, these symbols have been inlined. In the debug build the symbols are
+// defined and available in the symbols map, so they can be referenced. Only the function
+// declaration is needed.
+bool KartChecker__isGoal(char*);
+void KartChecker__incLap(char*);
+
+#else
+
+// Vanilla function for incrementing a kart's current lap.
+void KartChecker__incLap(char* const this)
+{
+    if (*(const int*)(this + 0x2c) >= *(const int*)(this + 0xc))
+        return;
+    *(int*)(this + 0x2c) += 1;
+}
+
+// Vanilla function for checking if the player has finished.
+bool KartChecker__isGoal(char* const this)
+{
+    return this[0x29];
+}
+
+#endif
+
+// Retail ASM of `KartChecker::setGoal` and `KartChecker::setGoalTime`
+// Sourced from `KartChecker::checkLap`
+void start_goal_routine()
+{
+#if GM4E01_DEBUG_BUILD
+    asm(R"(
+        li     %r3, 0x00
+        li     %r0, 0x01
+        stb    %r3, 0x78(%r30)
+        stb    %r0, 0x29(%r30)
+        lwz    %r3, 0x0c(%r30)
+        lwz    %r4, 0x18(%r30)
+        subi   %r0, %r3, 0x01
+        rlwinm %r0, %r0, 0x02, 0x00, 0x1d
+        lwzx   %r0, %r4, %r0
+        stw    %r0, 0x84(%r30)
+        lwz    %r0, 0x7c(%r30)
+        stw    %r0, 0x80(%r30)
+    )");
+#else
+    asm(R"(
+        li     %r3, 0x00
+        li     %r0, 0x01
+        stb    %r3, 0x78(%r29)
+        stb    %r0, 0x29(%r29)
+        lwz    %r3, 0x0c(%r29)
+        lwz    %r4, 0x18(%r29)
+        subi   %r0, %r3, 0x01
+        rlwinm %r0, %r0, 0x02, 0x00, 0x1d
+        lwzx   %r0, %r4, %r0
+        stw    %r0, 0x84(%r29)
+        lwz    %r0, 0x7c(%r29)
+        stw    %r0, 0x80(%r29)
+    )");
+#endif
+}
+
+// Lap-forcing routine.
+void force_lap_increment()
+{
+#if GM4E01_DEBUG_BUILD
+    register char* const kartcheck asm("r30");
+#else
+    register char* const kartcheck asm("r29");
+#endif
+
+    const int lap_count = *(const int*)(kartcheck + 0x2c);
+
+    if (lap_count < 0)
+    {
+        KartChecker__incLap(kartcheck);
+    }
+
+    if (KartChecker__isGoal(kartcheck) == 0)
+    {
+        KartChecker__setLapTime(kartcheck);
+    }
+
+    kartcheck[0x28] = 1;
+
+    KartChecker__incLap(kartcheck);
+
+    if (KartChecker__isGoal(kartcheck) == 0)
+    {
+        const int lap_count = *(const int*)(kartcheck + 0x2c);
+        const int total_lap_count = *(const int*)(kartcheck + 0xc);
+
+        if (lap_count >= total_lap_count)
+        {
+            // setGoal and setGoalTime
+            start_goal_routine();
+        }
+    }
+}
+
+// Force a lap increment when hitting a lap checkpoint.
+void check_lap_ex()
+{
+    register char reg0 asm("r0");
+    register char reg9 asm("r9");
+
+    // setPass will have already run by this point.
+    asm("rlwinm %r9, %r3, 0x0, 0x18, 0x1f");  // r9 = (char)r3
+
+    // Compiler skipped the addressing, so let's do it via ASM.
+#if GM4E01_DEBUG_BUILD
+    asm("lwz %r3, 0x0044(%r30)");
+#else
+    asm("lwz %r3, 0x0044(%r29)");
+#endif
+    asm(R"(
+        lwz    %r3, 0x0008 (%r3)          # r3 = *(r3 + 8) (Checkpoint 1).
+        lbz    %r3, 0x001B (%r3)          # r3 = *(r3 + 0x1B) ("Lap Checkpoint" flag).
+        subic  %r0, %r3, 0x01
+        subfe  %r3, %r0, %r3
+        rlwinm %r0, %r3, 0x0, 0x18, 0x1f  # Cast to byte.
+    )");
+
+    const bool passed = (bool)reg9;
+    const bool is_section = (reg0 != '\0');  // Is the "section point" bit set?
+
+    if (passed && is_section)
+    {
+        force_lap_increment();
+    }
+
+#if GM4E01_DEBUG_BUILD
+    asm("lwz %r3, 0x3c(%r30)");  // Hijacked instruction.
+#else
+    asm("lwz %r3, 0x3c(%r29)");  // Hijacked instruction.
+#endif
+}
 #endif

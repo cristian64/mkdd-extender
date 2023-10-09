@@ -2116,6 +2116,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         audio_track_data,
         bool(args.extender_cup),
         bool(args.type_specific_item_boxes),
+        bool(args.sectioned_courses),
         dol_path,
         log,
         bool(args.debug_output),
@@ -2382,6 +2383,16 @@ OPTIONAL_ARGUMENTS = {
             '\n\n'
             'The patch allows custom tracks to include item boxes that have been configured for a '
             'specific item type (i.e. players always get the same item type from the item box).',
+        ),
+        (
+            'Sectioned Courses',
+            bool,
+            'If enabled, support for sectioned courses will be added to the game.'
+            '\n\n'
+            'The patch allows custom tracks to include Lap Checkpoints, checkpoints that have a '
+            'parameter set that causes the corresponding sector to automatically increment '
+            'a lap when passed. This allows for more flexible single-lap courses '
+            'or courses with multiple routes for laps.',
         ),
     ),
     'Expert Options': (
