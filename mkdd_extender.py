@@ -654,6 +654,33 @@ def copy_or_link_bti_image(src_filepath: str, dst_filepath: str):
     zero_bti_wrap_values(dst_filepath)
 
 
+def conform_bti_image(filepath: str, width: int, height: int, image_format: str):
+    assert filepath.endswith('.bti')
+
+    with open(filepath, 'rb') as f:
+        src_image_format, _src_alpha, src_width, src_height = struct.unpack('>bbHH', f.read(6))
+
+    KNOWN_IMAGE_FORMATS = {f.value: f.name for f in bti.ImageFormat}
+    if src_image_format not in KNOWN_IMAGE_FORMATS:
+        raise MKDDExtenderError(f'Unrecognized image format: 0x{src_image_format:02X}')
+    src_image_format = KNOWN_IMAGE_FORMATS[src_image_format]
+
+    if src_image_format == image_format and width == src_width and height == src_height:
+        return
+
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        filename = os.path.basename(filepath)
+        tmp_filepath_png = os.path.join(tmp_dir, filename[:-len('.bti')] + '.png')
+
+        image = convert_bti_to_image(filepath)
+        image = image.resize((width, height), resample=RESAMPLING_FILTER, reducing_gap=3.0)
+        image.save(tmp_filepath_png)
+
+        remove_file(filepath)  # It may be a hard link; unlink early.
+
+        convert_png_to_bti(tmp_filepath_png, filepath, image_format)
+
+
 def crop_image_sides(image: Image.Image) -> Image.Image:
     bbox = list(image.getbbox())
     bbox[1] = 0
@@ -1117,39 +1144,6 @@ def generate_bti_image(text: str, width: int, height: int, image_format: str,
         remove_file(filepath)  # It may be a hard link; unlink early.
 
         convert_png_to_bti(tmp_filepath, filepath, image_format)
-
-
-def downscale_bti_image(image_size: 'tuple[int]', image_format: str, filepath: str):
-    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
-        png_tmp_filepath = os.path.join(tmp_dir,
-                                        os.path.splitext(os.path.basename(filepath))[0] + '.png')
-
-        failed = False
-        try:
-            convert_bti_to_png(filepath, png_tmp_filepath)
-        except Exception:
-            failed = True
-        if not os.path.isfile(png_tmp_filepath):
-            failed = True
-        if failed:
-            # If the attempt fails (unlikely but possible), we won't be able to downscale the BTI
-            # image, and that cannot be allowed, or else the size of the archive would grow too
-            # great. If neither `wimgt`` nor the `bti`` module succeeded on converting the image,
-            # this is considered fatal.
-            raise MKDDExtenderError(f'Unable to convert BTI image to PNG ("{filepath}") Image '
-                                    'cannot be downscaled.')
-
-        with Image.open(png_tmp_filepath) as image:
-            if image.size[0] <= image_size[0] and image.size[1] <= image_size[1]:
-                return
-            downscaled_image = image.resize(image_size,
-                                            resample=RESAMPLING_FILTER,
-                                            reducing_gap=3.0)
-        downscaled_image.save(png_tmp_filepath)
-
-        remove_file(filepath)  # It may be a hard link; unlink early.
-
-        convert_png_to_bti(png_tmp_filepath, filepath, image_format)
 
 
 def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate: int):
@@ -1799,19 +1793,26 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
-            def find_or_generate_image_path(language: str, filename: str, width: int, height: int,
-                                            image_format: str,
-                                            background: 'tuple[int, int, int, int]') -> str:
+            def find_and_conform_or_generate_image_path(
+                language: str,
+                filename: str,
+                width: int,
+                height: int,
+                image_format: str,
+                background: 'tuple[int, int, int, int]',
+            ) -> str:
                 # pylint: disable=cell-var-from-loop
 
                 filepath = os.path.join(course_images_dirpath, language, filename)
                 if os.path.isfile(filepath):
+                    conform_bti_image(filepath, width, height, image_format)
                     return filepath
 
                 if main_language:
                     filepath = os.path.join(course_images_dirpath, main_language, filename)
                     if os.path.isfile(filepath):
                         # No need to generate warning in this case. This is acceptable.
+                        conform_bti_image(filepath, width, height, image_format)
                         return filepath
 
                 for lang in LANGUAGES:
@@ -1820,6 +1821,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         log.warning(
                             f'Unable to locate `{filename}` in "{nodename}" for '
                             f'current language ({language}). Image for {lang} will be used.')
+                        conform_bti_image(filepath, width, height, image_format)
                         return filepath
 
                 log.warning(f'Unable to locate `{filename}` in "{nodename}" for {language}. '
@@ -1837,8 +1839,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 raise MKDDExtenderError(f'Unable to locate language directories in "{nodename}" '
                                         'for course logo.')
             for language in expected_languages:
-                logo_filepath = find_or_generate_image_path(language, 'track_big_logo.bti', 208,
-                                                            104, 'RGB5A3', (0, 0, 0, 0))
+                logo_filepath = find_and_conform_or_generate_image_path(
+                    language, 'track_big_logo.bti', 208, 104, 'RGB5A3', (0, 0, 0, 0))
 
                 page_coursename_language_dirpath = os.path.join(page_coursename_dirpath, language)
                 os.makedirs(page_coursename_language_dirpath, exist_ok=True)
@@ -1883,14 +1885,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                                     'timg')
                 lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
 
-                preview_filepath = find_or_generate_image_path(language, 'track_image.bti',
-                                                               *preview_image_size, 'CMPR',
-                                                               (0, 0, 0, 255))
+                preview_filepath = find_and_conform_or_generate_image_path(
+                    language, 'track_image.bti', *preview_image_size, 'CMPR', (0, 0, 0, 255))
                 page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
                 copy_or_link_bti_image(preview_filepath, page_preview_filepath)
 
-                label_filepath = find_or_generate_image_path(language, 'track_name.bti',
-                                                             *label_image_size, 'IA4', (0, 0, 0, 0))
+                label_filepath = find_and_conform_or_generate_image_path(
+                    language, 'track_name.bti', *label_image_size, 'IA4', (0, 0, 0, 0))
                 page_label_filepath = os.path.join(courseselect_dirpath, page_label_filename)
                 copy_or_link_bti_image(label_filepath, page_label_filepath)
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
@@ -1937,7 +1938,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     for filename in os.listdir(courseselect_dirpath):
                         if filename.startswith('cop_') and filename.endswith('.bti'):
                             filepath = os.path.join(courseselect_dirpath, filename)
-                            downscale_bti_image(preview_image_size, 'CMPR', filepath)
+                            conform_bti_image(filepath, *preview_image_size, 'CMPR')
         if downscale_label_images:
             log.info(f'Downscaling label images to {label_image_size[0]}x{label_image_size[1]}...')
 
@@ -1948,7 +1949,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     for filename in os.listdir(courseselect_dirpath):
                         if filename.startswith('coname_') and filename.endswith('.bti'):
                             filepath = os.path.join(courseselect_dirpath, filename)
-                            downscale_bti_image(label_image_size, 'IA4', filepath)
+                            conform_bti_image(filepath, *label_image_size, 'IA4')
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
