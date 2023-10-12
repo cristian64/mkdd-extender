@@ -757,7 +757,7 @@ def add_controls_to_title_image(filepath: str, language: str):
 
         remove_file(filepath)  # It may be a hard link; unlink early.
 
-        convert_png_to_bti(tmp_filepath, filepath, 'RGB5A3')
+        convert_png_to_bti(tmp_filepath, filepath, 'IA4')
 
 
 def build_page_numbers_image(page_number: int, page_count: int) -> Image.Image:
