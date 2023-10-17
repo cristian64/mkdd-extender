@@ -90,7 +90,11 @@ void refresh_lanselectmode()
     *(int*)(lan_struct_address - __LAN_STRUCT_OFFSET5__) |= 0x00000001;
 }
 
-void process_course_page_change(const bool lanmode)
+#define RACE_MODE 0
+#define BATTLE_MODE 1
+#define LAN_MODE 2
+
+void process_course_page_change(const int mode)
 {
     char next_spam_flag;
     float next_redraw_courseselect_screen;
@@ -106,7 +110,7 @@ void process_course_page_change(const bool lanmode)
 
             change_course_page(buttons & BUTTON_DOWN ? 1 : -1);
 
-            if (lanmode)
+            if (mode == LAN_MODE)
             {
                 refresh_lanselectmode();
             }
@@ -130,21 +134,22 @@ void process_course_page_change(const bool lanmode)
 
     *(char*)SPAM_FLAG_ADDRESS = next_spam_flag;
 
-    // Although technically this value does not need to be set in LAN mode, adding the conditionals
-    // would be more costly in terms of number of instructions.
-    *(float*)REDRAW_COURSESELECT_SCREEN_ADDRESS = next_redraw_courseselect_screen;
+    if (mode == RACE_MODE)
+    {
+        *(float*)REDRAW_COURSESELECT_SCREEN_ADDRESS = next_redraw_courseselect_screen;
+    }
 }
 
 void scenecourseselect_calcanm_ex()
 {
     SceneCourseSelect__calcAnm();
-    process_course_page_change(false);
+    process_course_page_change(RACE_MODE);
 }
 
 void lanselectmode_calcanm_ex()
 {
     LANSelectMode__calcAnm();
-    process_course_page_change(true);
+    process_course_page_change(LAN_MODE);
 }
 
 #if EXTENDER_CUP
