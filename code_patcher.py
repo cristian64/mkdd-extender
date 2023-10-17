@@ -153,6 +153,12 @@ COURSES = (
     'Diddy',
     'Koopa',
     'Rainbow',
+    'Mini7',
+    'Mini2',
+    'Mini3',
+    'Mini8',
+    'Mini1',
+    'Mini5',
 )
 """
 Internal names of the courses, in order of appearance.

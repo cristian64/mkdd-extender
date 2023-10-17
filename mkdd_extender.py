@@ -56,6 +56,12 @@ COURSES = (
     'Diddy',
     'Koopa',
     'Rainbow',
+    'Mini7',
+    'Mini2',
+    'Mini3',
+    'Mini8',
+    'Mini1',
+    'Mini5',
 )
 """
 Internal names of the courses, in order of appearance.
@@ -78,6 +84,12 @@ COURSE_TO_NAME = {
     'Waluigi': 'Waluigi Stadium',
     'Wario': 'Wario Colosseum',
     'Yoshi': 'Yoshi Circuit',
+    'Mini7': 'Cookie Land',
+    'Mini2': 'Nintendo GameCube',
+    'Mini3': 'Block City',
+    'Mini8': 'Pipe Plaza',
+    'Mini1': 'Luigi\'s Mansion',
+    'Mini5': 'Tilt-A-Kart',
 }
 """
 Map from the course internal name to the course natural name.
@@ -100,16 +112,28 @@ COURSE_TO_PREVIEW_IMAGE_NAME = {
     'Waluigi': 'waluigi_stadium',
     'Wario': 'wario_colosseum',
     'Yoshi': 'yoshi_circuit',
+    'Mini7': '1',
+    'Mini2': '3',
+    'Mini3': '2',
+    'Mini8': '4',
+    'Mini1': '6',
+    'Mini5': '5',
 }
 """
 A dictionary to map the internal course name to the [partial] name of the preview images in the
 `SceneData/<language>/courseselect.arc` archive, which is `cop_<partial_name>.bti`.
+
+For battle stages, preview images are stored in the `SceneData/<language>/mapselect.arc` archive,
+and the image name template is `battlemapsnap<partial_name>.bti`.
 """
 
 COURSE_TO_LABEL_IMAGE_NAME = {**dict(COURSE_TO_PREVIEW_IMAGE_NAME), **{'Patapata': 'kinoko_city'}}
 """
 A dictionary to map the internal course name to the [partial] name of the label images in the
 `SceneData/<language>/courseselect.arc` archive, which is `coname_<partial_name>.bti`.
+
+For battle stages, label images are stored in the `SceneData/<language>/mapselect.arc` archive,
+and the image name template is `mozi_map<partial_name>.bti`.
 
 This is identical to `COURSE_TO_PREVIEW_IMAGE_NAME`, except for the `Patapata` entry, which differs.
 """
