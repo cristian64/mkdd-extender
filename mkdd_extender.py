@@ -573,7 +573,7 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
         course_name = new_dirname
         if course_name.endswith('l'):
             course_name = course_name[:-1]
-        if course_name.endswith('2'):
+        if course_name.endswith('2') and not course_name.startswith('mini'):
             course_name = course_name[:-1]
 
         # Files that contain "_" in their names need to be renamed as well to the course name.
