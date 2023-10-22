@@ -409,6 +409,23 @@ DIR_STRINGS = (
     '/StaffGhosts/%s.ght',
 )
 
+BATTLE_STAGES_FILE_STRINGS = (
+    'BattleMapSnap1.bti',
+    'BattleMapSnap2.bti',
+    'BattleMapSnap3.bti',
+    'BattleMapSnap4.bti',
+    'BattleMapSnap5.bti',
+    'BattleMapSnap6.bti',
+    'Mozi_Map1.bti',
+    'Mozi_Map2.bti',
+    'Mozi_Map3.bti',
+    'Mozi_Map4.bti',
+    'Mozi_Map5.bti',
+    'Mozi_Map6.bti',
+    # LAN MODE.
+    'Mozi_Map%d.bti',
+)
+
 FILE_STRINGS = (
     'COP_LUIGI_CIRCUIT.bti',
     'COP_PEACH_BEACH.bti',
@@ -468,6 +485,7 @@ FILE_STRINGS = (
     'CupName_FLOWER_CUP',
     'CupName_STAR_CUP',
     'CupName_SPECIAL_CUP',
+    *BATTLE_STAGES_FILE_STRINGS,
 )
 
 
@@ -571,6 +589,19 @@ STRING_ADDRESSES = {
         'CupName_FLOWER_CUP': 0x8033763C,
         'CupName_STAR_CUP': 0x80337650,
         'CupName_SPECIAL_CUP': 0x80337664,
+        'BattleMapSnap1.bti': 0x803329D0,
+        'BattleMapSnap2.bti': 0x80332A18,
+        'BattleMapSnap3.bti': 0x803329F4,
+        'BattleMapSnap4.bti': 0x80332A3C,
+        'BattleMapSnap5.bti': 0x80332A84,
+        'BattleMapSnap6.bti': 0x80332A60,
+        'Mozi_Map1.bti': 0x803329E4,
+        'Mozi_Map2.bti': 0x80332A2C,
+        'Mozi_Map3.bti': 0x80332A08,
+        'Mozi_Map4.bti': 0x80332A50,
+        'Mozi_Map5.bti': 0x80332A98,
+        'Mozi_Map6.bti': 0x80332A74,
+        'Mozi_Map%d.bti': 0x8033784D,
     },
     'GM4P01': {
         '/Course/%s%s.arc': 0x80340B7C,
@@ -634,6 +665,19 @@ STRING_ADDRESSES = {
         'CupName_FLOWER_CUP': 0x8034147C,
         'CupName_STAR_CUP': 0x80341490,
         'CupName_SPECIAL_CUP': 0x803414A4,
+        'BattleMapSnap1.bti': 0x8033C7A0,
+        'BattleMapSnap2.bti': 0x8033C7E8,
+        'BattleMapSnap3.bti': 0x8033C7C4,
+        'BattleMapSnap4.bti': 0x8033C80C,
+        'BattleMapSnap5.bti': 0x8033C854,
+        'BattleMapSnap6.bti': 0x8033C830,
+        'Mozi_Map1.bti': 0x8033C7B4,
+        'Mozi_Map2.bti': 0x8033C7FC,
+        'Mozi_Map3.bti': 0x8033C7D8,
+        'Mozi_Map4.bti': 0x8033C820,
+        'Mozi_Map5.bti': 0x8033C868,
+        'Mozi_Map6.bti': 0x8033C844,
+        'Mozi_Map%d.bti': 0x8034168D,
     },
     'GM4J01': {
         '/Course/%s%s.arc': 0x8035135C,
@@ -697,6 +741,19 @@ STRING_ADDRESSES = {
         'CupName_FLOWER_CUP': 0x80351C5C,
         'CupName_STAR_CUP': 0x80351C70,
         'CupName_SPECIAL_CUP': 0x80351C84,
+        'BattleMapSnap1.bti': 0x8034CFF0,
+        'BattleMapSnap2.bti': 0x8034D038,
+        'BattleMapSnap3.bti': 0x8034D014,
+        'BattleMapSnap4.bti': 0x8034D05C,
+        'BattleMapSnap5.bti': 0x8034D0A4,
+        'BattleMapSnap6.bti': 0x8034D080,
+        'Mozi_Map1.bti': 0x8034D004,
+        'Mozi_Map2.bti': 0x8034D04C,
+        'Mozi_Map3.bti': 0x8034D028,
+        'Mozi_Map4.bti': 0x8034D070,
+        'Mozi_Map5.bti': 0x8034D0B8,
+        'Mozi_Map6.bti': 0x8034D094,
+        'Mozi_Map%d.bti': 0x80351E6D,
     },
     'GM4E01dbg': {
         '/Course/%s%s.arc': 0x8037D4E0,
@@ -760,6 +817,19 @@ STRING_ADDRESSES = {
         'CupName_FLOWER_CUP': 0x8037E7AC,
         'CupName_STAR_CUP': 0x8037E7C0,
         'CupName_SPECIAL_CUP': 0x8037E7D4,
+        'BattleMapSnap1.bti': 0x80376238,
+        'BattleMapSnap2.bti': 0x80376280,
+        'BattleMapSnap3.bti': 0x8037625C,
+        'BattleMapSnap4.bti': 0x803762A4,
+        'BattleMapSnap5.bti': 0x803762EC,
+        'BattleMapSnap6.bti': 0x803762C8,
+        'Mozi_Map1.bti': 0x8037624C,
+        'Mozi_Map2.bti': 0x80376294,
+        'Mozi_Map3.bti': 0x80376270,
+        'Mozi_Map4.bti': 0x803762B8,
+        'Mozi_Map5.bti': 0x80376300,
+        'Mozi_Map6.bti': 0x803762DC,
+        'Mozi_Map%d.bti': 0x8037E9BD,
     }
 }
 """
@@ -774,6 +844,19 @@ for _game_id, addresses in STRING_ADDRESSES.items():
 for string in DIR_STRINGS + FILE_STRINGS:
     for _game_id, addresses in STRING_ADDRESSES.items():
         assert string in addresses
+
+
+def get_string_addresses(game_id: str, battle_stages_enabled: bool):
+    string_adresses = STRING_ADDRESSES[game_id]
+
+    if battle_stages_enabled:
+        return string_adresses
+
+    return {
+        string: address
+        for string, address in string_adresses.items() if string not in BATTLE_STAGES_FILE_STRINGS
+    }
+
 
 PLAY_SOUND_ADDRESSES = {
     'GM4E01': (0x80500A90, 0x803E2210, 0x803B0758),
@@ -828,6 +911,19 @@ optional 3D position that `JAISeMgr::startSound()` accepts, which is not needed 
 The memory addressed by r4 needs to hold the sound ID (`0x20000` is the sound that is played when
 the player navigates courses or cups; `0x2000c` can be used for a different sound, the one that is
 played when the player accepts a letter in the initialism screen).
+"""
+
+LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES = {
+    'GM4E01': 0x8017C4CC,
+    'GM4P01': 0x8017B370,
+    'GM4J01': 0x8017C4CC,
+    'GM4E01dbg': 0x8019DAB4,
+}
+"""
+The address to the `addi` instruction in `Course::getCourseBGM()` where the audio stream for Luigi's
+Mansion (which reuses the audio stream in Bowser's Castle) is selected. When custom battle stages
+are present, reusing that slot's audio stream is not desirable, so it will be changed to use the
+regular audio stream that is used for the other stock battle stages.
 """
 
 LAN_STRUCT_ADDRESSES_AND_OFFSETS = {
@@ -925,6 +1021,16 @@ invoked. Easy to locate in the debugger if a breakpoint is set, or in Ghidra whe
 references to `SceneCourseSelect::calcAnm()`.
 
 This is one of the `bl` instructions that will be hijacked.
+"""
+
+SCENEMAPSELECT_CALCANM_CALL_ADDRESSES = {
+    'GM4E01': 0x80174614,
+    'GM4P01': 0x801734B8,
+    'GM4J01': 0x80174614,
+    'GM4E01dbg': 0x80193CB4,
+}
+"""
+The address within `SceneMapSelect::map()` from where `SceneMapSelect::calcAnm()` is invoked.
 """
 
 LANSELECTMODE_CALCANM_CALL_ADDRESSES = {
@@ -1150,6 +1256,9 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
+        SceneMapSelect__calcAnm = 0x80174AD0;
+        SceneMapSelect__map_init = 0x801741FC;
+        SceneMapSelect__reset = 0x8017398C;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801e428c;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
@@ -1162,6 +1271,9 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016a584;
+        SceneMapSelect__calcAnm = 0x80173974;
+        SceneMapSelect__map_init = 0x801730A0;
+        SceneMapSelect__reset = 0x80172830;
         KartChecker__setLapTime = 0x8018570c;
         LANSelectMode__calcAnm = 0x801e4264;
         SequenceInfo__setClrGPCourse = 0x8013FD14;
@@ -1174,6 +1286,9 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x8008b3d0;
         SceneCourseSelect__calcAnm = 0x8016b6e0;
+        SceneMapSelect__calcAnm = 0x80174AD0;
+        SceneMapSelect__map_init = 0x801741FC;
+        SceneMapSelect__reset = 0x8017398C;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801e42b4;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
@@ -1186,6 +1301,9 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         JAISeMgr__startSound = 0x80089974;
         SceneCourseSelect__calcAnm = 0x80189448;
+        SceneMapSelect__calcAnm = 0x801943D0;
+        SceneMapSelect__map_init = 0x80193824;
+        SceneMapSelect__reset = 0x80192D44;
         KartChecker__setLapTime = 0x801AADD0;
         KartChecker__isGoal = 0x801AACD8;
         KartChecker__incLap = 0x801AACE0;
@@ -1220,6 +1338,10 @@ def find_char_offset_in_string(string: str) -> int:
         # Find the first slash (/) character (after position 1, as some strings start with a forward
         # slash, but that's not the one we are looking for).
         return string.find('/', 1) - 1
+
+    # Image filenames of the battle stages end with a number; an infix (second character) is used.
+    if any(string.startswith(name) for name in ('BattleMapSnap', 'Mozi_Map', 'Mozi_Battle')):
+        return 1
 
     # The last character before the extension.
     return len(os.path.splitext(string)[0]) - 1
@@ -1260,11 +1382,11 @@ def read_osarena(dol_path, game_id) -> int:
         return value
 
 
-def patch_bti_filenames_in_blo_file(game_id: str, blo_path: str):
+def patch_bti_filenames_in_blo_file(game_id: str, battle_stages_enabled: bool, blo_path: str):
     with open(blo_path, 'rb') as f:
         data = f.read()
 
-    for string in STRING_ADDRESSES[game_id]:
+    for string in get_string_addresses(game_id, battle_stages_enabled):
         char_offset = find_char_offset_in_string(string)
         new_string = bytearray(string, encoding='ascii')
         new_string[char_offset] = ord('0')
@@ -1335,6 +1457,7 @@ def patch_dol_file(
     initial_page_number: int,
     minimap_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
+    battle_stages_enabled: bool,
     extender_cup: bool,
     type_specific_item_boxes: bool,
     sectioned_courses: bool,
@@ -1348,6 +1471,9 @@ def patch_dol_file(
 
     initial_page_index = initial_page_number - 1
     page_count = len(audio_track_data)
+    page_course_count = (mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
+                         if battle_stages_enabled else mkdd_extender.RACE_TRACK_COUNT)
+    string_addresses = get_string_addresses(game_id, battle_stages_enabled)
 
     unaligned_previous_osarena_value = read_osarena(dol_path, game_id)
     dol_section_address = aligned(unaligned_previous_osarena_value)
@@ -1368,7 +1494,7 @@ def patch_dol_file(
     # String data.
     string_data_code_lines = []
     char_addresses = []
-    for string, address in STRING_ADDRESSES[game_id].items():
+    for string, address in string_addresses.items():
         char_offset = find_char_offset_in_string(string)
         char_address = address + char_offset
         char_addresses.append(f'(char*)0x{char_address:08X}')
@@ -1376,29 +1502,42 @@ def patch_dol_file(
     string_data_code_lines.append(f'char* char_addresses[] = {{{char_addresses}}};')
     string_data_code = '\n'.join(string_data_code_lines)
 
-    # Minimap data.
+    # Read initial minimap values.
     initial_minimap_values = read_minimap_values(game_id, dol_path)
+    course_to_minimap_addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id].copy()
+
+    # Pipe Plaza, which in the original game shares minimap coordinates addresses with Tilt-A-Kart,
+    # will be set to use an alternative minimap coordinates array.
+    alternative_already_used = (initial_minimap_values['Mini8 (2)']
+                                != COURSE_TO_MINIMAP_VALUES['Mini8 (2)'])
+    if alternative_already_used:
+        # If the initial values are already custom, those are the initial values for Pipe Plaza.
+        initial_minimap_values['Mini8'] = initial_minimap_values['Mini8 (2)']
+    course_to_minimap_addresses['Mini8'] = course_to_minimap_addresses['Mini8 (2)']
+
+    # Minimap data.
     minimap_data_code_lines = []
-    minimap_data_code_lines.append('float* coordinates_addresses[16 * 4] = {')
-    for track_index in range(16):
+    minimap_data_code_lines.append('float* const coordinates_addresses[] = {')
+    for track_index in range(page_course_count):
         if track_index > 0:
             minimap_data_code_lines.append(',')
-        addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
+        addresses = course_to_minimap_addresses[COURSES[track_index]]
         for i in range(4):
             comma = '' if i == 0 else ', '
             minimap_data_code_lines.append(f'{comma}(float*)0x{addresses[i]:08X}')
     minimap_data_code_lines.append('};')
-    minimap_data_code_lines.append('char* orientations_addresses[16] = {')
-    for track_index in range(16):
+    minimap_data_code_lines.append('char* const orientations_addresses[] = {')
+    for track_index in range(page_course_count):
         if track_index > 0:
             minimap_data_code_lines.append(',')
-        addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
+        addresses = course_to_minimap_addresses[COURSES[track_index]]
         minimap_data_code_lines.append(f'(char*)0x{addresses[4] + 3:08X}')
     minimap_data_code_lines.append('};')
-    minimap_data_code_lines.append('const float coordinates[PAGE_COUNT][16 * 4] = {')
+    minimap_data_code_lines.append(
+        f'const float coordinates[PAGE_COUNT][{page_course_count} * 4] = {{')
     for page_index in range(page_count):
         minimap_data_code_lines.append('{' if page_index == 0 else ', {')
-        for track_index in range(16):
+        for track_index in range(page_course_count):
             if track_index > 0:
                 minimap_data_code_lines.append(',')
             if page_index == 0:
@@ -1410,10 +1549,10 @@ def patch_dol_file(
                 minimap_data_code_lines.append(f'{comma}{values[i]}f')
         minimap_data_code_lines.append('}')
     minimap_data_code_lines.append('};')
-    minimap_data_code_lines.append('const char orientations[PAGE_COUNT][16] = {')
+    minimap_data_code_lines.append(f'const char orientations[PAGE_COUNT][{page_course_count}] = {{')
     for page_index in range(page_count):
         minimap_data_code_lines.append('{' if page_index == 0 else ', {')
-        for track_index in range(16):
+        for track_index in range(page_course_count):
             if track_index > 0:
                 minimap_data_code_lines.append(',')
             if page_index == 0:
@@ -1457,6 +1596,7 @@ def patch_dol_file(
 
         # Load the C file and replace constants and placeholders.
         replacements = (
+            ('__BATTLE_STAGES__', str(int(battle_stages_enabled))),
             ('__BUTTONS_STATE_ADDRESS__', f'0x{BUTTONS_STATE_ADDRESSES[game_id]:08X}'),
             ('__COURSE_TO_STREAM_FILE_INDEX_ADDRESS__',
              f'0x{COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + offset:08X}'),
@@ -1510,22 +1650,44 @@ def patch_dol_file(
                 project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
                 # Initialize the strings with the character of the first page ('0').
-                for string, address in STRING_ADDRESSES[game_id].items():
+                for string, address in string_addresses.items():
                     char_offset = find_char_offset_in_string(string)
                     char_address = address + char_offset
                     project.dol.seek(char_address)
                     project.dol.write(str(initial_page_index).encode('utf-8'))
 
-                if initial_page_index > 0:
-                    # Set up minimap coordinates for the selected initial page.
-                    for track_index in range(16):
-                        addresses = COURSE_TO_MINIMAP_ADDRESSES[game_id][COURSES[track_index]]
+                # Set up minimap coordinates for the selected initial page.
+                for track_index in range(page_course_count):
+                    addresses = course_to_minimap_addresses[COURSES[track_index]]
+                    if initial_page_index == 0:
+                        values = initial_minimap_values[COURSES[track_index]]
+                    else:
                         values = minimap_data[(initial_page_index, track_index)]
-                        for i in range(4):
-                            project.dol.seek(addresses[i])
-                            project.dol.write(struct.pack('>f', values[i]))
-                        project.dol.seek(addresses[4] + 3)
-                        project.dol.write(struct.pack('>B', values[4]))
+                    for i in range(4):
+                        project.dol.seek(addresses[i])
+                        project.dol.write(struct.pack('>f', values[i]))
+                    project.dol.seek(addresses[4] + 3)
+                    project.dol.write(struct.pack('>B', values[4]))
+
+                if battle_stages_enabled:
+                    project.dol.seek(LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES[game_id] + 3)
+                    project.dol.write(b'\x23')
+
+                    # The four offsets to Pipe Plaza's coordinates array can be seen in a number of
+                    # `lfs` instructions near the `li` instruction that defines the orientation.
+                    # These instructions need to be tweaked to point to the unused array. The base
+                    # offset is hardcoded: it's the first offset seen in the `default:` case in the
+                    # `switch` in `Race2D::__ct()`.
+                    pipe_plaza_orientation_address = course_to_minimap_addresses['Mini8'][4]
+                    base_offset = 0x9A70 if game_id != 'GM4E01dbg' else 0xA164
+                    for i, offset_from_li_instruction_address in enumerate((24, 16, 4, -4)):
+                        lfs_instruction_address = \
+                            pipe_plaza_orientation_address + offset_from_li_instruction_address
+                        project.dol.seek(lfs_instruction_address)
+                        lfs_instruction = dolreader.read_uint32(project.dol)
+                        lfs_instruction = (lfs_instruction & 0xFFFF0000) | (base_offset - i * 4)
+                        project.dol.seek(lfs_instruction_address)
+                        dolreader.write_uint32(project.dol, lfs_instruction)
 
                 with open('symbols.txt', 'w', encoding='ascii') as f:
                     f.write(SYMBOLS_MAP[game_id])
@@ -1539,6 +1701,9 @@ def patch_dol_file(
                 # Page selection logic.
                 project.branchlink(SCENECOURSESELECT_CALCANM_CALL_ADDRESSES[game_id],
                                    'scenecourseselect_calcanm_ex')
+                if battle_stages_enabled:
+                    project.branchlink(SCENEMAPSELECT_CALCANM_CALL_ADDRESSES[game_id],
+                                       'scenemapselect_calcanm_ex')
                 project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
                                    'lanselectmode_calcanm_ex')
 

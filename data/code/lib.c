@@ -11,6 +11,7 @@
 #define BUTTON_DOWN 0x00000004
 #define BUTTON_UP 0x00000008
 
+#define BATTLE_STAGES __BATTLE_STAGES__
 #define BUTTONS_STATE_ADDRESS __BUTTONS_STATE_ADDRESS__
 #define COURSE_TO_STREAM_FILE_INDEX_ADDRESS __COURSE_TO_STREAM_FILE_INDEX_ADDRESS__
 #define CURRENT_PAGE_ADDRESS __CURRENT_PAGE_ADDRESS__
@@ -52,12 +53,12 @@ void change_course_page(const int delta)
 
     // __MINIMAP_DATA_PLACEHOLDER__
     const float* const page_coordinates = coordinates[(int)page];
-    for (int i = 0; i < 16 * 4; ++i)
+    for (int i = 0; i < (BATTLE_STAGES ? 22 : 16) * 4; ++i)
     {
         *coordinates_addresses[i] = page_coordinates[i];
     }
     const char* const page_orientations = orientations[(int)page];
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < (BATTLE_STAGES ? 22 : 16); ++i)
     {
         register char* const reg8 asm("r8") = orientations_addresses[i];
         *reg8 = page_orientations[i];
@@ -90,6 +91,24 @@ void refresh_lanselectmode()
     *(int*)(lan_struct_address - __LAN_STRUCT_OFFSET5__) |= 0x00000001;
 }
 
+#if BATTLE_STAGES
+
+int* g_scenemapselect;
+
+void refresh_mapselectmode()
+{
+    SceneMapSelect__reset(g_scenemapselect);
+
+    // Fast-forward the animation, whose duration is 16 frames.
+    for (int i = 0; i < 16; ++i)
+    {
+        g_scenemapselect[150] = i;
+        SceneMapSelect__map_init(g_scenemapselect);
+    }
+}
+
+#endif
+
 #define RACE_MODE 0
 #define BATTLE_MODE 1
 #define LAN_MODE 2
@@ -114,6 +133,12 @@ void process_course_page_change(const int mode)
             {
                 refresh_lanselectmode();
             }
+#if BATTLE_STAGES
+            else if (mode == BATTLE_MODE)
+            {
+                refresh_mapselectmode();
+            }
+#endif
 
             *(int*)PLAY_SOUND_R4 = 0x0002000c;
             JAISeMgr__startSound(
@@ -145,6 +170,17 @@ void scenecourseselect_calcanm_ex()
     SceneCourseSelect__calcAnm();
     process_course_page_change(RACE_MODE);
 }
+
+#if BATTLE_STAGES
+void scenemapselect_calcanm_ex()
+{
+    register int* const this asm("r3");
+    g_scenemapselect = this;
+
+    SceneMapSelect__calcAnm();
+    process_course_page_change(BATTLE_MODE);
+}
+#endif
 
 void lanselectmode_calcanm_ex()
 {

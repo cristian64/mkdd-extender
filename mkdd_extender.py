@@ -168,11 +168,41 @@ The maximum number of extra pages that can be added to the game, to a total of 1
 the first page that features the stock courses.
 """
 
+MAX_PAGES = 1 + MAX_EXTRA_PAGES
+"""
+The maximum number of pages that can be present int the game.
+"""
+
+RACE_TRACK_COUNT = 16
+"""
+Total number of race tracks in the unmodified game.
+"""
+
+BATTLE_STAGE_COUNT = 6
+"""
+Total number of battle stages in the unmodified game.
+"""
+
+RACE_AND_BATTLE_COURSE_COUNT = RACE_TRACK_COUNT + BATTLE_STAGE_COUNT
+"""
+Sum of the total number of race tracks and battle stages in the unmodified game.
+"""
+
 PREFIXES = tuple(f'{chr(ord("A") + page_index)}{i + 1:02}'
                  for page_index, i in itertools.product(range(MAX_EXTRA_PAGES), range(16)))
 """
+A list of the "prefixes" that are used when naming the course archives. First letter states the
+page, and the next two digits indicate the course index in the page (from `01` to `16`, or from `01`
+to `22` if battle stages are present).
+"""
+
+PREFIXES_WITH_BATTLE_STAGES = tuple(
+    f'{chr(ord("A") + page_index)}{i + 1:02}' for page_index, i in itertools.product(
+        range(MAX_EXTRA_PAGES), range(RACE_AND_BATTLE_COURSE_COUNT)))
+"""
 A list of the "prefixes" that are used when naming the track archives. First letter states the page,
-and the next two digits indicate the track index in the page (from `01` to `16`).
+and the next two digits indicate the track index in the page (from `01` to `16`, or from `01` to
+`22` if battle stages are present).
 """
 
 CUP_NAMES = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
@@ -192,7 +222,12 @@ The maximum size that the GCM file format can support.
 
 PREVIEW_IMAGE_SIZE = 256, 184
 """
-Resolution of the course preview images.
+Resolution of the race tracks preview images.
+"""
+
+BATTLE_STAGES_PREVIEW_IMAGE_SIZE = 192, 136
+"""
+Resolution of the battle stages preview images.
 """
 
 LABEL_IMAGE_SIZE = 256, 32
@@ -509,10 +544,11 @@ def course_name_to_course(course_name: str) -> str:
 
 def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
     assert course_filepath.endswith('.arc')
-    assert 0 <= track_index <= 15
+    assert 0 <= track_index < RACE_AND_BATTLE_COURSE_COUNT
 
-    MUSIC_IDS = (36, 34, 33, 50, 40, 37, 35, 42, 51, 41, 38, 45, 43, 44, 47, 49)
-    assert len(MUSIC_IDS) == 16 == len(set(MUSIC_IDS))
+    MUSIC_IDS = (36, 34, 33, 50, 40, 37, 35, 42, 51, 41, 38, 45, 43, 44, 47, 49, 58, 53, 54, 59, 52,
+                 56)
+    assert len(MUSIC_IDS) == RACE_AND_BATTLE_COURSE_COUNT == len(set(MUSIC_IDS))
 
     music_id = MUSIC_IDS[track_index]
 
@@ -1318,7 +1354,7 @@ def patch_bnr_file(iso_tmp_dir: str):
     log.info('Game title tweaked.')
 
 
-def patch_title_lines(iso_tmp_dir: str):
+def patch_title_lines(battle_stages_enabled: bool, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -1333,7 +1369,11 @@ def patch_title_lines(iso_tmp_dir: str):
         timg_dir = os.path.join(titleline_dirpath, 'timg')
         scrn_dir = os.path.join(titleline_dirpath, 'scrn')
 
-        for title_filename in ('selectcourse.bti', 'selectcup.bti'):
+        title_filenames = ['selectcourse.bti', 'selectcup.bti']
+        if battle_stages_enabled:
+            title_filenames.append('selectmap.bti')
+
+        for title_filename in title_filenames:
             title_filepath = os.path.join(timg_dir, title_filename)
             log.info(f'Modifying {title_filepath}...')
             add_controls_to_title_image(title_filepath, language)
@@ -1376,6 +1416,15 @@ def with_page_index_suffix(page_index: int, path: str) -> str:
     stem, ext = os.path.splitext(path)
     stem = stem[:-len(str(page_index))] + str(page_index)
     return stem + ext
+
+
+def with_page_index_infix(page_index: int, path: str) -> str:
+    dirname = os.path.dirname(path)
+    filename = os.path.basename(path)
+    filename = list(filename)
+    filename[1] = str(page_index)
+    filename = ''.join(filename)
+    return os.path.join(dirname, filename)
 
 
 def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str):
@@ -1508,9 +1557,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         paths = tuple(os.path.join(args.tracks, p) for p in sorted(os.listdir(args.tracks)))
         tracks_is_dir = True
     elif isinstance(args.tracks, collections.abc.Sequence) and args.tracks:
-        if len(args.tracks) % 16 != 0:
+        if ((len(args.tracks) % RACE_TRACK_COUNT != 0)
+                and (len(args.tracks) % RACE_AND_BATTLE_COURSE_COUNT != 0)):
             raise MKDDExtenderError(
-                f'Number of items in the `tracks` argument not a multiple of 16: {args.tracks}')
+                f'Number of items in the `tracks` argument not a multiple of {RACE_TRACK_COUNT} or '
+                f'{RACE_AND_BATTLE_COURSE_COUNT}: {args.tracks}')
         paths = args.tracks
         tracks_is_dir = False
     else:
@@ -1527,7 +1578,22 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         processed = 0
         log.info('Preparing custom tracks...')
         if tracks_is_dir:
-            for prefix in PREFIXES:
+            battle_stages_enabled = False
+            for prefix in PREFIXES_WITH_BATTLE_STAGES:
+                track_index = int(prefix[1:3]) - 1
+                if track_index < RACE_TRACK_COUNT:
+                    continue
+                for path in paths:
+                    filename = os.path.basename(path)
+                    if filename.startswith(prefix):
+                        battle_stages_enabled = True
+                        break
+                if battle_stages_enabled:
+                    break
+            page_course_count = (RACE_AND_BATTLE_COURSE_COUNT
+                                 if battle_stages_enabled else RACE_TRACK_COUNT)
+            prefixes = PREFIXES_WITH_BATTLE_STAGES if battle_stages_enabled else PREFIXES
+            for prefix in prefixes:
                 for path in paths:
                     filename = os.path.basename(path)
                     if filename.startswith(prefix):
@@ -1540,13 +1606,20 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         break
                 else:
                     # Check whether full pages have been sourced on the first missing prefix.
-                    if prefix_to_nodename and len(prefix_to_nodename) % 16 == 0:
+                    if prefix_to_nodename and len(prefix_to_nodename) % page_course_count == 0:
                         break
 
                     raise MKDDExtenderError(f'No track assigned to slot {prefix}.')
         else:
+            # Since there is not common multiple, the course count can be used to determine whether
+            # custom battle stages are present.
+            assert MAX_PAGES == 10  # If the number of extra pages grows, this assumption breaks.
+            battle_stages_enabled = len(paths) % RACE_AND_BATTLE_COURSE_COUNT == 0
+            page_course_count = (RACE_AND_BATTLE_COURSE_COUNT
+                                 if battle_stages_enabled else RACE_TRACK_COUNT)
+            prefixes = PREFIXES_WITH_BATTLE_STAGES if battle_stages_enabled else PREFIXES
             for i, path in enumerate(paths):
-                prefix = PREFIXES[i]
+                prefix = prefixes[i]
                 filename = os.path.basename(path)
                 track_dirpath = os.path.join(tracks_tmp_dir, prefix)
                 log.info(f'Extracting and flattening "{path}" into "{track_dirpath}"...')
@@ -1559,31 +1632,45 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         else:
             log.warning('No archive has been processed.')
 
-        extra_page_count = len(prefix_to_nodename) // 16
+        extra_page_count = len(prefix_to_nodename) // page_course_count
         total_page_count = extra_page_count + 1
 
         # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
         # However, if extended memory has been set, the retail dimensions can be used instead.
+        preview_image_factor = 1
+        label_image_factor = 1
         if not args.extended_memory:
             if total_page_count <= 2:
                 preview_image_factor = 1
             else:
                 preview_image_factor = 2 / total_page_count
+                if battle_stages_enabled:
+                    preview_image_factor *= 0.95
             preview_image_size = (round(PREVIEW_IMAGE_SIZE[0] * preview_image_factor),
                                   round(PREVIEW_IMAGE_SIZE[1] * preview_image_factor))
+            battle_stages_preview_image_size = (round(BATTLE_STAGES_PREVIEW_IMAGE_SIZE[0] *
+                                                      preview_image_factor),
+                                                round(BATTLE_STAGES_PREVIEW_IMAGE_SIZE[1] *
+                                                      preview_image_factor))
 
             if total_page_count <= 7:
                 label_image_factor = 1
             else:
                 label_image_factor = 7 / total_page_count
+            if total_page_count >= 7 and battle_stages_enabled:
+                label_image_factor *= 0.95
             label_image_size = (round(LABEL_IMAGE_SIZE[0] * label_image_factor),
                                 round(LABEL_IMAGE_SIZE[1] * label_image_factor))
+            battle_stages_label_image_size = (round(LABEL_IMAGE_SIZE[0] * label_image_factor),
+                                              round(LABEL_IMAGE_SIZE[1] * label_image_factor))
         else:
             preview_image_size = PREVIEW_IMAGE_SIZE
             label_image_size = LABEL_IMAGE_SIZE
+            battle_stages_preview_image_size = BATTLE_STAGES_PREVIEW_IMAGE_SIZE
+            battle_stages_label_image_size = LABEL_IMAGE_SIZE
 
-        downscale_preview_images = tuple(preview_image_size) != PREVIEW_IMAGE_SIZE
-        downscale_label_images = tuple(label_image_size) != LABEL_IMAGE_SIZE
+        downscale_preview_images = preview_image_factor != 1
+        downscale_label_images = label_image_factor != 1
 
         # Populate dictionary with checksums from all the stock AST files.
         audio_tracks_checksums = {}
@@ -1612,7 +1699,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             page_index = ord(prefix[0]) - ord('A')
             page_index += 1
             track_index = int(prefix[1:3]) - 1
-            assert 0 <= track_index <= 15
+            assert 0 <= track_index < RACE_AND_BATTLE_COURSE_COUNT
+            is_battle_stage = RACE_TRACK_COUNT <= track_index
 
             log.info(f'Melding "{nodename}" ("{track_dirpath}")...')
             melded += 1
@@ -1672,10 +1760,11 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
             added_course_names.append(trackname)
 
-            if auxiliary_audio_track:
-                alternative_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
-            elif replaces:
-                alternative_audio_data[prefix] = course_name_to_course(replaces)
+            if not is_battle_stage:
+                if auxiliary_audio_track:
+                    alternative_audio_data[prefix] = course_name_to_course(auxiliary_audio_track)
+                elif replaces:
+                    alternative_audio_data[prefix] = course_name_to_course(replaces)
 
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
@@ -1736,19 +1825,21 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}l')
 
             # Copy GHT file.
-            ght_filepath = os.path.join(track_dirpath, 'staffghost.ght')
-            if os.path.isfile(ght_filepath):
-                page_ght_filepath = os.path.join(page_staffghosts_dirpath,
-                                                 f'{COURSES[track_index]}.ght')
-                make_link(ght_filepath, page_ght_filepath)
-            else:
-                log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
+            if not is_battle_stage:
+                ght_filepath = os.path.join(track_dirpath, 'staffghost.ght')
+                if os.path.isfile(ght_filepath):
+                    page_ght_filepath = os.path.join(page_staffghosts_dirpath,
+                                                     f'{COURSES[track_index]}.ght')
+                    make_link(ght_filepath, page_ght_filepath)
+                else:
+                    log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
 
             # Force use of auxiliary audio track if argument has been provided and the custo track
             # has the field defined.
-            use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
-            use_replacee_audio_track = replaces and args.use_replacee_audio_track
-            use_alternative_audio_track = use_auxiliary_audio_track or use_replacee_audio_track
+            if not is_battle_stage:
+                use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
+                use_replacee_audio_track = replaces and args.use_replacee_audio_track
+                use_alternative_audio_track = use_auxiliary_audio_track or use_replacee_audio_track
 
             def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args):
                 # Before copying a AST file to destination, check whether its checksum already
@@ -1770,50 +1861,52 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 make_link(src_ast_filepath, dst_ast_filepath)
                 conform_audio_file(dst_ast_filepath, args.mix_to_mono, args.sample_rate)
 
-            if not use_alternative_audio_track:
-                # Copy audio files. Unlike with the previous files, audio files are stored in the
-                # stock directory. The names of the audio files strategically start with a "X_"
-                # prefix to ensure they are inserted after the stock audio files.
-                lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_normal.ast')
-                if not os.path.isfile(lap_music_normal_filepath):
-                    # If there is only the fast version (single-lap course?), it will be used for
-                    # both, and no warning is needed.
-                    lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
-                if os.path.isfile(lap_music_normal_filepath):
-                    dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
-                    conform_and_copy_if_not_cached(lap_music_normal_filepath, dst_ast_filepath,
-                                                   args)
-
-                    lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
-                    if os.path.isfile(lap_music_fast_filepath):
-                        dst_ast_filepath = os.path.join(stream_dirpath, f'X_FINALLAP_{prefix}.ast')
-                        conform_and_copy_if_not_cached(lap_music_fast_filepath, dst_ast_filepath,
+            if not is_battle_stage:
+                if not use_alternative_audio_track:
+                    # Copy audio files. Unlike with the previous files, audio files are stored in
+                    # the stock directory. The names of the audio files strategically start with a
+                    # "X_" prefix to ensure they are inserted after the stock audio files.
+                    lap_music_normal_filepath = os.path.join(track_dirpath, 'lap_music_normal.ast')
+                    if not os.path.isfile(lap_music_normal_filepath):
+                        # If there is only the fast version (single-lap course?), it will be used
+                        # for both, and no warning is needed.
+                        lap_music_normal_filepath = os.path.join(track_dirpath,
+                                                                 'lap_music_fast.ast')
+                    if os.path.isfile(lap_music_normal_filepath):
+                        dst_ast_filepath = os.path.join(stream_dirpath, f'X_COURSE_{prefix}.ast')
+                        conform_and_copy_if_not_cached(lap_music_normal_filepath, dst_ast_filepath,
                                                        args)
+
+                        lap_music_fast_filepath = os.path.join(track_dirpath, 'lap_music_fast.ast')
+                        if os.path.isfile(lap_music_fast_filepath):
+                            dst_ast_filepath = os.path.join(stream_dirpath,
+                                                            f'X_FINALLAP_{prefix}.ast')
+                            conform_and_copy_if_not_cached(lap_music_fast_filepath,
+                                                           dst_ast_filepath, args)
+                        else:
+                            log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
+                                        '`lap_music_normal.ast` will be used.')
                     else:
-                        log.warning(f'Unable to locate `lap_music_fast.ast` in "{nodename}". '
-                                    '`lap_music_normal.ast` will be used.')
+                        if auxiliary_audio_track:
+                            course_name = COURSE_TO_NAME[course_name_to_course(
+                                auxiliary_audio_track)]
+                            log.info(f'Unable to locate `lap_music_normal.ast` in "{nodename}". '
+                                     f'Auxiliary audio track ("{course_name}") will be used.')
+                        elif replaces:
+                            course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
+                            log.info(f'Unable to locate `lap_music_normal.ast` in "{nodename}". '
+                                     f'Replacee\'s audio track ("{course_name}") will be used.')
+                        else:
+                            log.warning(
+                                f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
+                                'Circuit\'s sound track will be used.')
                 else:
                     if auxiliary_audio_track:
                         course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
-                        log.info(
-                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Auxiliary '
-                            f'audio track ("{course_name}") will be used.')
-                    elif replaces:
-                        course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
-                        log.info(
-                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Replacee\'s '
-                            f'audio track ("{course_name}") will be used.')
+                        log.info(f'Auxiliary audio track ("{course_name}") will be used.')
                     else:
-                        log.warning(
-                            f'Unable to locate `lap_music_normal.ast` in "{nodename}". Luigi '
-                            'Circuit\'s sound track will be used.')
-            else:
-                if auxiliary_audio_track:
-                    course_name = COURSE_TO_NAME[course_name_to_course(auxiliary_audio_track)]
-                    log.info(f'Auxiliary audio track ("{course_name}") will be used.')
-                else:
-                    course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
-                    log.info(f'Replacee\'s audio track ("{course_name}") will be used.')
+                        course_name = COURSE_TO_NAME[course_name_to_course(replaces)]
+                        log.info(f'Replacee\'s audio track ("{course_name}") will be used.')
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
@@ -1824,6 +1917,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 height: int,
                 image_format: str,
                 background: 'tuple[int, int, int, int]',
+                margin: float = None,
             ) -> str:
                 # pylint: disable=cell-var-from-loop
 
@@ -1851,9 +1945,24 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 log.warning(f'Unable to locate `{filename}` in "{nodename}" for {language}. '
                             'An auto-generated image will be provided.')
 
+                if margin is not None:
+                    padding = int(width * margin)
+                    width -= padding * 2
+
+                    def postprocessing_callback(image: Image.Image) -> Image.Image:
+                        return pad_image_sides(image, padding, padding)
+
+                else:
+                    postprocessing_callback = None
+
                 filepath = os.path.join(course_images_dirpath, language, filename)
-                generate_bti_image_from_bitmap_font(trackname, width, height, image_format,
-                                                    background, filepath)
+                generate_bti_image_from_bitmap_font(trackname,
+                                                    width,
+                                                    height,
+                                                    image_format,
+                                                    background,
+                                                    filepath,
+                                                    postprocessing_callback=postprocessing_callback)
                 return filepath
 
             # Copy course logo.
@@ -1879,45 +1988,72 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 raise MKDDExtenderError('Unable to locate `SceneData/language` directories in '
                                         f'"{nodename}".')
 
-            preview_filename = f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]}.bti'
-            label_filename = f'coname_{COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]}.bti'
+            preview_image_partial_name = COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]
+            label_image_partial_name = COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]
+            if not is_battle_stage:
+                preview_filename = f'cop_{preview_image_partial_name}.bti'
+                label_filename = f'coname_{label_image_partial_name}.bti'
+            else:
+                preview_filename = f'battlemapsnap{preview_image_partial_name}.bti'
+                label_filename = f'mozi_map{label_image_partial_name}.bti'
 
-            # Rename original directories.
-            new_preview_filename = with_page_index_suffix(0, preview_filename)
-            new_label_filename = with_page_index_suffix(0, label_filename)
+            with_page_index_xfix_func = (with_page_index_infix
+                                         if is_battle_stage else with_page_index_suffix)
+
+            new_preview_filename = with_page_index_xfix_func(0, preview_filename)
+            new_label_filename = with_page_index_xfix_func(0, label_filename)
+
+            appselect_dirname = 'mapselect' if is_battle_stage else 'courseselect'
 
             if page_index == 1:
+                # Rename original filenames.
                 for language in expected_languages:
-                    courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
-                                                        'timg')
+                    appselect_dirpath = os.path.join(scenedata_dirpath, language, appselect_dirname,
+                                                     'timg')
                     lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
-                    rename(os.path.join(courseselect_dirpath, preview_filename),
-                           os.path.join(courseselect_dirpath, new_preview_filename))
-                    rename(os.path.join(courseselect_dirpath, label_filename),
-                           os.path.join(courseselect_dirpath, new_label_filename))
+                    rename(os.path.join(appselect_dirpath, preview_filename),
+                           os.path.join(appselect_dirpath, new_preview_filename))
+                    rename(os.path.join(appselect_dirpath, label_filename),
+                           os.path.join(appselect_dirpath, new_label_filename))
                     rename(os.path.join(lanplay_dirpath, label_filename),
                            os.path.join(lanplay_dirpath, new_label_filename))
 
             preview_filename = new_preview_filename
             label_filename = new_label_filename
 
+            if is_battle_stage:
+                course_preview_image_size = battle_stages_preview_image_size
+                course_label_image_size = battle_stages_label_image_size
+            else:
+                course_preview_image_size = preview_image_size
+                course_label_image_size = label_image_size
+
             # Copy preview image and label image.
-            page_preview_filename = with_page_index_suffix(page_index, preview_filename)
-            page_label_filename = with_page_index_suffix(page_index, label_filename)
+            page_preview_filename = with_page_index_xfix_func(page_index, preview_filename)
+            page_label_filename = with_page_index_xfix_func(page_index, label_filename)
             for language in expected_languages:
-                courseselect_dirpath = os.path.join(scenedata_dirpath, language, 'courseselect',
-                                                    'timg')
+                appselect_dirpath = os.path.join(scenedata_dirpath, language, appselect_dirname,
+                                                 'timg')
                 lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
 
                 preview_filepath = find_and_conform_or_generate_image_path(
-                    language, 'track_image.bti', *preview_image_size, 'CMPR', (0, 0, 0, 255))
-                page_preview_filepath = os.path.join(courseselect_dirpath, page_preview_filename)
+                    language, 'track_image.bti', *course_preview_image_size, 'CMPR', (0, 0, 0, 255))
+                page_preview_filepath = os.path.join(appselect_dirpath, page_preview_filename)
                 copy_or_link_bti_image(preview_filepath, page_preview_filepath)
 
                 label_filepath = find_and_conform_or_generate_image_path(
-                    language, 'track_name.bti', *label_image_size, 'IA4', (0, 0, 0, 0))
-                page_label_filepath = os.path.join(courseselect_dirpath, page_label_filename)
+                    language,
+                    'track_name.bti',
+                    *course_label_image_size,
+                    'IA4',
+                    (0, 0, 0, 0),
+                    margin=0.05 if is_battle_stage else 0.0,
+                )
+                page_label_filepath = os.path.join(appselect_dirpath, page_label_filename)
                 copy_or_link_bti_image(label_filepath, page_label_filepath)
+
+                label_filepath = find_and_conform_or_generate_image_path(
+                    language, 'track_name.bti', *course_label_image_size, 'IA4', (0, 0, 0, 0))
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
                 copy_or_link_bti_image(label_filepath, page_label_filepath)
 
@@ -1940,7 +2076,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         # Copy files into the ISO temporary directory.
         log.info('Melding directories...')
 
-        for prefix in PREFIXES[:len(prefix_to_nodename)]:
+        for prefix in prefixes[:len(prefix_to_nodename)]:
             nodename = prefix_to_nodename[prefix]
 
             try:
@@ -1963,6 +2099,22 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         if filename.startswith('cop_') and filename.endswith('.bti'):
                             filepath = os.path.join(courseselect_dirpath, filename)
                             conform_bti_image(filepath, *preview_image_size, 'CMPR')
+
+            if battle_stages_enabled:
+                log.info(
+                    'Downscaling battle stages preview images to '
+                    f'{battle_stages_preview_image_size[0]}x{battle_stages_preview_image_size[1]}'
+                    '...')
+
+                for language in LANGUAGES:
+                    mapselect_dirpath = os.path.join(scenedata_dirpath, language, 'mapselect',
+                                                     'timg')
+                    if os.path.isdir(mapselect_dirpath):
+                        for filename in os.listdir(mapselect_dirpath):
+                            if 'ttlemapsnap' in filename and filename.endswith('.bti'):
+                                filepath = os.path.join(mapselect_dirpath, filename)
+                                conform_bti_image(filepath, *battle_stages_preview_image_size,
+                                                  'CMPR')
         if downscale_label_images:
             log.info(f'Downscaling label images to {label_image_size[0]}x{label_image_size[1]}...')
 
@@ -1975,12 +2127,32 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                             filepath = os.path.join(courseselect_dirpath, filename)
                             conform_bti_image(filepath, *label_image_size, 'IA4')
 
+            if battle_stages_enabled:
+                log.info('Downscaling battle stages label images to '
+                         f'{battle_stages_label_image_size[0]}x{battle_stages_label_image_size[1]}'
+                         '...')
+
+                for language in LANGUAGES:
+                    mapselect_dirpath = os.path.join(scenedata_dirpath, language, 'mapselect',
+                                                     'timg')
+                    if os.path.isdir(mapselect_dirpath):
+                        for filename in os.listdir(mapselect_dirpath):
+                            if 'zi_map' in filename and filename.endswith('.bti'):
+                                filepath = os.path.join(mapselect_dirpath, filename)
+                                conform_bti_image(filepath, *battle_stages_label_image_size, 'IA4')
+
         if melded > 0:
             log.info(f'{melded} directories melded.')
         else:
             log.warning('No directory has been melded.')
 
-    return minimap_data, alternative_audio_data, matching_audio_override_data, added_course_names
+    return (
+        minimap_data,
+        alternative_audio_data,
+        matching_audio_override_data,
+        added_course_names,
+        battle_stages_enabled,
+    )
 
 
 def gather_audio_file_indices(iso_tmp_dir: str, alternative_audio_data: 'dict[str, str]',
@@ -2101,7 +2273,8 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
 
 def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
                    alternative_audio_data: 'dict[str, str]',
-                   matching_audio_override_data: 'dict[str, str]', iso_tmp_dir: str):
+                   matching_audio_override_data: 'dict[str, str]', battle_stages_enabled: bool,
+                   iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
     bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
@@ -2139,6 +2312,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         initial_page_number,
         minimap_data,
         audio_track_data,
+        battle_stages_enabled,
         bool(args.extender_cup),
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
@@ -2153,9 +2327,11 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
             continue
         for blo_path in (os.path.join(scenedata_dirpath, 'courseselect', 'scrn',
                                       'courseselect_under.blo'),
+                         os.path.join(scenedata_dirpath, 'mapselect', 'scrn',
+                                      'selectmaplayout.blo'),
                          os.path.join(scenedata_dirpath, 'lanplay', 'scrn', 'lanselectmode.blo')):
             log.info(f'Patching BLO file ("{blo_path}")...')
-            code_patcher.patch_bti_filenames_in_blo_file(game_id, blo_path)
+            code_patcher.patch_bti_filenames_in_blo_file(game_id, battle_stages_enabled, blo_path)
 
     if args.extended_memory:
         # The simulated memory size in the disk information header needs to be updated to the new
@@ -2263,7 +2439,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
 
 
 def write_description_file(args: argparse.Namespace, added_course_names: 'list[str]',
-                           iso_tmp_dir: str):
+                           battle_stages_enabled: bool, iso_tmp_dir: str):
     lines = []
 
     lines.append('# MKDD Extender - Description File')
@@ -2295,17 +2471,23 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
 
     lines.append('## Custom Tracks')
     lines.append('')
-    extra_page_count = len(added_course_names) // 16
+
+    page_course_count = RACE_AND_BATTLE_COURSE_COUNT if battle_stages_enabled else RACE_TRACK_COUNT
+    extra_page_count = len(added_course_names) // page_course_count
     for page in range(extra_page_count):
         if page != 0:
             lines.append('')
         lines.append(f'### Page {page + 2}/{extra_page_count + 1}')
-        for i in range(16):
-            if i % 4 == 0:
+        for i in range(page_course_count):
+            if i % 4 == 0 and i < RACE_TRACK_COUNT:
                 lines.append('')
                 lines.append(f'#### {CUP_NAMES[i // 4]}')
                 lines.append('')
-            lines.append(f'- {added_course_names[page * 16 + i]}')
+            elif i == RACE_TRACK_COUNT:
+                lines.append('')
+                lines.append('#### Battle Stages')
+                lines.append('')
+            lines.append(f'- {added_course_names[page * page_course_count + i]}')
 
     description_filepath = os.path.join(iso_tmp_dir, 'files', 'DESCRIPTION.md')
     with open(description_filepath, 'w', encoding='utf-8') as f:
@@ -2356,7 +2538,7 @@ OPTIONAL_ARGUMENTS = {
         ),
         (
             'Initial Page Number',
-            ('choices', list(range(1, MAX_EXTRA_PAGES + 2)), 1),
+            ('choices', list(range(1, MAX_PAGES + 1)), 1),
             'Specifies the course page that will be selected from the start. Default is `1`: the '
             'page containing the stock courses in the input ISO file.',
         ),
@@ -2430,7 +2612,8 @@ OPTIONAL_ARGUMENTS = {
             'allowing certain files to grow larger without causing crashes.'
             '\n\n'
             'By default, preview and label images are downscaled due to limited space in the '
-            '`courseselect.arc` file. When `--extended-memory` is provided, the full size is used.'
+            '`courseselect.arc` and `mapselect.arc` files. When `--extended-memory` is provided, '
+            'the full, original image size is used.'
             '\n\n'
             'IMPORTANT: The resulting ISO image will only work in Dolphin, and it is mandatory to '
             'also extend the emulated memory size to 32 MiB. See **Config > Advanced > Memory '
@@ -2488,8 +2671,9 @@ def create_args_parser() -> argparse.ArgumentParser:
         'ZIP archive, or as a directory that contains the relevant files for the custom track.\n\n'
         'Each archive name (or directory name) needs to be prefixed with a letter (A, B, C, ..., '
         'I), and a number in the range `[01, 16]` (one-digit numbers padded with a 0).\n\n'
-        'The number of custom tracks provided must be multiple of 16: "A01...", "A02...", ..., '
-        '"C16...".')
+        'The number of custom tracks provided must be a multiple of 16: "A01...", "A02...", ..., '
+        '"C16...". To also process custom battle stages, the number of items must be a multiple of '
+        '22: "A01...", "A02...", ..., "A22...", "B01...", ..., "C22...".')
     parser.add_argument('output',
                         type=str,
                         help='Path where the modified ISO file will be written.')
@@ -2568,7 +2752,7 @@ def extend_game(args: argparse.Namespace):
 
         # Extract the relevant RARC files that will be modified.
         log.info('Extracting RARC files...')
-        RARC_FILENAMES = ('courseselect.arc', 'LANPlay.arc', 'titleline.arc')
+        RARC_FILENAMES = ('courseselect.arc', 'LANPlay.arc', 'mapselect.arc', 'titleline.arc')
         files_dirpath = os.path.join(iso_tmp_dir, 'files')
         scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
         scenedata_filenames = os.listdir(scenedata_dirpath)
@@ -2607,21 +2791,24 @@ def extend_game(args: argparse.Namespace):
 
         if not args.skip_banner:
             patch_bnr_file(iso_tmp_dir)
-        if not args.skip_menu_titles:
-            patch_title_lines(iso_tmp_dir)
 
         (
             minimap_data,
             alternative_audio_data,
             matching_audio_override_data,
             added_course_names,
+            battle_stages_enabled,
         ) = meld_courses(args, iso_tmp_dir)
 
-        page_count = len(alternative_audio_data) // 16 + 1
+        if not args.skip_menu_titles:
+            patch_title_lines(battle_stages_enabled, iso_tmp_dir)
+
+        page_count = len(added_course_names) // (RACE_AND_BATTLE_COURSE_COUNT
+                                                 if battle_stages_enabled else RACE_TRACK_COUNT) + 1
         patch_cup_names(args, page_count, iso_tmp_dir)
 
         patch_dol_file(args, minimap_data, alternative_audio_data, matching_audio_override_data,
-                       iso_tmp_dir)
+                       battle_stages_enabled, iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info('Packing RARC files...')
@@ -2662,21 +2849,24 @@ def extend_game(args: argparse.Namespace):
                 rarc_packed += 1
         log.info(f'{rarc_packed} files packed.')
 
-        # Verify that the `courseselect.arc` files haven't grown too large.
+        # Verify that the `courseselect.arc` and `mapselect.arc` files haven't grown too large.
+        # These two files are loaded by the game at the same time, even before knowing whether the
+        # player will choose one mode or the other, so the combined sizes cannot be exceeded.
         for language in LANGUAGES:
             if language not in scenedata_filenames:
                 continue
-            filepath = os.path.join(scenedata_dirpath, language, 'courseselect.arc')
-            filesize = os.path.getsize(filepath)
-            COURSESELECT_MAX_FILESIZE = 1792 * 1024
-            courseselect_max_filesize = COURSESELECT_MAX_FILESIZE
+            filepaths = (os.path.join(scenedata_dirpath, language, 'courseselect.arc'),
+                         os.path.join(scenedata_dirpath, language, 'mapselect.arc'))
+            filesizes = sum(os.path.getsize(f) for f in filepaths)
+            COURSEMAPSELECT_MAX_SIZE = 2 * 1024 * 1024
+            coursemapselect_max_size = COURSEMAPSELECT_MAX_SIZE
             if args.extended_memory:
                 # The emulated memory has been extended by 6 MiB. Allow the file to grow a larger.
-                courseselect_max_filesize += 5 * 1024 * 1024
-            if filesize > courseselect_max_filesize:
-                message = (f'Size of the "{filepath}" file ({filesize} bytes) is greater than '
-                           f'the maximum size that is considered safe ({courseselect_max_filesize} '
-                           'bytes).')
+                coursemapselect_max_size += 5 * 1024 * 1024
+            if filesizes > coursemapselect_max_size:
+                message = (f'Size of the "{filepaths[0]}" and "{filepaths[1]}" files combined '
+                           f'({filesizes} bytes) is greater than the maximum size that is '
+                           f'considered safe ({coursemapselect_max_size} bytes).')
                 if args.skip_filesize_check:
                     log.warning(message)
                     continue
@@ -2685,7 +2875,7 @@ def extend_game(args: argparse.Namespace):
 
         # Generate description file.
         if args.add_description_file:
-            write_description_file(args, added_course_names, iso_tmp_dir)
+            write_description_file(args, added_course_names, battle_stages_enabled, iso_tmp_dir)
 
         # Cross-check which files have been added, and then import all files from disk. While it
         # could be more efficient to compare timestamps and import only the ones that have really
