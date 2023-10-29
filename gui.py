@@ -343,6 +343,25 @@ class VerticalLabel(QtWidgets.QWidget):
         painter.drawText(rect, QtCore.Qt.AlignCenter | QtCore.Qt.AlignHCenter, self._text)
 
 
+class CopyableImageWidget(QtWidgets.QLabel):
+
+    def __init__(self, pixmap: QtGui.QPixmap, parent: QtWidgets.QWidget = None):
+        super().__init__(parent=parent)
+
+        self._pixmap = pixmap
+
+        self.setPixmap(pixmap)
+
+        menu = QtWidgets.QMenu(self)
+        copy_action = menu.addAction('Copy to Clipboard')
+        copy_action.triggered.connect(self._on_copy_action_triggered)
+        self.customContextMenuRequested.connect(lambda pos: menu.exec_(self.mapToGlobal(pos)))
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+
+    def _on_copy_action_triggered(self):
+        QtWidgets.QApplication.instance().clipboard().setImage(self._pixmap.toImage())
+
+
 class SpinnableSlider(QtWidgets.QWidget):
 
     value_changed = QtCore.Signal(int)
@@ -1026,8 +1045,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             for checksum in checksums:
                 pixmap = self._pixmap_cache.get(checksum)
                 if pixmap is not None and not pixmap.isNull():
-                    label = QtWidgets.QLabel()
-                    label.setPixmap(pixmap)
+                    label = CopyableImageWidget(pixmap)
                     labels.append(label)
                     at_least_one_image = True
                 else:
@@ -1136,9 +1154,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         checksum = self._checksum_cache[rarc_filepath]
         pixmap = self._minimap_pixmap_cache[checksum]
 
-        minimap_widget = QtWidgets.QLabel()
+        minimap_widget = CopyableImageWidget(pixmap)
         minimap_widget.setAutoFillBackground(True)
-        minimap_widget.setPixmap(pixmap)
         minimap_widget.setFixedSize(pixmap.size())
 
         minimap_box = self.findChild(QtWidgets.QWidget, 'minimap_box')
