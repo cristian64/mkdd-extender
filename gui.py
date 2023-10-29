@@ -496,6 +496,24 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
         self.itemSelectionChanged.connect(self._on_itemSelectionChanged)
 
+        self.setItemDelegate(SelectionStyledItemDelegate(self))
+        self.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.horizontalHeader().setSectionsClickable(False)
+        self.horizontalHeader().setSectionsMovable(False)
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.verticalHeader().hide()
+
+        self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+
+        self.clear_selection_action = QtGui.QAction('Clear', self)
+        self.clear_selection_action.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete))
+        self.clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        self.addAction(self.clear_selection_action)
+
     def add_companion_table(self, table: QtWidgets.QTableWidget):
         self.__companion_tables.append(table)
 
@@ -1617,7 +1635,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         for page_index in range(mkdd_extender.MAX_EXTRA_PAGES):
             page_table = DragDropTableWidget(ROWS, COLUMNS)
             page_table.setFixedHeight(round(font_height * 1.5) * (ROWS + 1))
-            page_table.setItemDelegate(SelectionStyledItemDelegate(page_table))
             self._page_tables.append(page_table)
             page_table.setHorizontalHeaderLabels(HEADER_LABELS)
             if page_index == 0:
@@ -1625,21 +1642,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             else:
                 page_table.setHorizontalHeaderLabels([''] * COLUMNS)
                 page_table.horizontalHeader().setFixedHeight(int(font_height * 0.4))
-            page_table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
-            page_table.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
-            page_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            page_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            page_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-            page_table.horizontalHeader().setSectionsClickable(False)
-            page_table.horizontalHeader().setSectionsMovable(False)
-            page_table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-            page_table.verticalHeader().hide()
-            page_table.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-            clear_selection_action = QtGui.QAction('Clear', page_table)
-            clear_selection_action.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete))
-            clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
-            clear_selection_action.triggered.connect(self._clear_selection)
-            page_table.addAction(clear_selection_action)
+            page_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_label = VerticalLabel()
             self._page_labels.append(page_label)
             page_widget = QtWidgets.QWidget()
