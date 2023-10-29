@@ -414,7 +414,11 @@ def get_custom_track_name(path: str) -> str:
         trackinfo = configparser.ConfigParser()
         try:
             trackinfo.read(trackinfo_filepath)
-            return trackinfo['Config']['trackname']
+            name = trackinfo['Config']['trackname']
+            name = name.strip().lstrip('🎈').strip()
+            course = course_name_to_course(trackinfo['Config']['replaces'])
+            is_battle_stage = course.startswith('Mini')
+            return f'🎈 {name}' if is_battle_stage else name
         except Exception:
             return str()
 
