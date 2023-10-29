@@ -107,6 +107,16 @@ void refresh_mapselectmode()
     }
 }
 
+bool is_tilting_course(const int* const course)
+{
+    const int course_id = *course;
+    const int page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
+
+    // __TILTING_DATA_PLACEHOLDER__
+
+    return false;
+}
+
 #endif
 
 #define RACE_MODE 0

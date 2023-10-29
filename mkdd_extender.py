@@ -1544,6 +1544,7 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
 
 
 def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | list]':
+    replaces_data = {}
     minimap_data = {}
     alternative_audio_data = {}
     matching_audio_override_data = {}
@@ -1744,6 +1745,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 main_language = None
                 replaces = None
                 auxiliary_audio_track = None
+
+            replaces_data[(page_index, track_index)] = course_name_to_course(replaces)
 
             # Verify that a race track has not been assigned to a battle stage slot and viceversa.
             replaces_is_battle_stage = course_name_to_course(replaces).startswith('Mini')
@@ -2161,6 +2164,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             log.warning('No directory has been melded.')
 
     return (
+        replaces_data,
         minimap_data,
         alternative_audio_data,
         matching_audio_override_data,
@@ -2285,7 +2289,7 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
                                     'circumvent this safety measure.')
 
 
-def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
+def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: dict,
                    alternative_audio_data: 'dict[str, str]',
                    matching_audio_override_data: 'dict[str, str]', battle_stages_enabled: bool,
                    iso_tmp_dir: str):
@@ -2324,6 +2328,7 @@ def patch_dol_file(args: argparse.Namespace, minimap_data: dict,
         iso_tmp_dir,
         game_id,
         initial_page_number,
+        replaces_data,
         minimap_data,
         audio_track_data,
         battle_stages_enabled,
@@ -2807,6 +2812,7 @@ def extend_game(args: argparse.Namespace):
             patch_bnr_file(iso_tmp_dir)
 
         (
+            replaces_data,
             minimap_data,
             alternative_audio_data,
             matching_audio_override_data,
@@ -2821,8 +2827,8 @@ def extend_game(args: argparse.Namespace):
                                                  if battle_stages_enabled else RACE_TRACK_COUNT) + 1
         patch_cup_names(args, page_count, iso_tmp_dir)
 
-        patch_dol_file(args, minimap_data, alternative_audio_data, matching_audio_override_data,
-                       battle_stages_enabled, iso_tmp_dir)
+        patch_dol_file(args, replaces_data, minimap_data, alternative_audio_data,
+                       matching_audio_override_data, battle_stages_enabled, iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
         log.info('Packing RARC files...')

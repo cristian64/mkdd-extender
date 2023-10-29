@@ -6,6 +6,7 @@ The GC-C-Kit tool is used for building and extracting the symbols that are then 
 input DOL file.
 """
 
+import collections
 import contextlib
 import logging
 import os
@@ -162,6 +163,34 @@ COURSES = (
 )
 """
 Internal names of the courses, in order of appearance.
+"""
+
+COURSES_TO_COURSE_ID = {
+    'Luigi': 0x24,
+    'Peach': 0x22,
+    'BabyLuigi': 0x21,
+    'Desert': 0x32,
+    'Nokonoko': 0x28,
+    'Mario': 0x25,
+    'Daisy': 0x23,
+    'Waluigi': 0x2A,
+    'Snow': 0x33,
+    'Patapata': 0x29,
+    'Yoshi': 0x26,
+    'Donkey': 0x2D,
+    'Wario': 0x2B,
+    'Diddy': 0x2C,
+    'Koopa': 0x2F,
+    'Rainbow': 0x31,
+    'Mini7': 0x3A,
+    'Mini2': 0x35,
+    'Mini3': 0x36,
+    'Mini8': 0x3B,
+    'Mini1': 0x34,
+    'Mini5': 0x38,
+}
+"""
+Course ID as defined internally in the game.
 """
 
 COURSE_TO_MINIMAP_ADDRESSES = {
@@ -1047,6 +1076,18 @@ locate in the debugger if a breakpoint is set, or in Ghidra when looking for ref
 This is one of the `bl` instructions that will be hijacked.
 """
 
+IS_TILTING_COURSE_CALL_ADDRESSES = {
+    'GM4E01': 0x80178FAC,
+    'GM4P01': 0x80177E50,
+    'GM4J01': 0x80178FAC,
+    'GM4E01dbg': 0x801992A8,
+}
+"""
+The address to a `lwz` instruction in `Course::reset()` that will be replaced with a function call
+that leaves in `r3` whether the course in the current slot and in the current page is a tilting
+course. The next instruction to this address will be replaced, too, to compare whether `r3` is `1`.
+"""
+
 CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES = {
     'GM4E01': 0x8016BDC0,
     'GM4P01': 0x8016AC64,
@@ -1455,6 +1496,7 @@ def patch_dol_file(
     iso_tmp_dir: str,
     game_id: str,
     initial_page_number: int,
+    replaces_data: dict,
     minimap_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
     battle_stages_enabled: bool,
@@ -1582,6 +1624,25 @@ def patch_dol_file(
                                  f'(const unsigned {audio_data_type}*)audio_indexes[(int)page];')
     audio_data_code = '\n'.join(audio_data_code_lines)
 
+    # Tilting courses data.
+    page_tilting_courses = collections.defaultdict(list)
+    page_tilting_courses[0].append(COURSES.index('Mini5'))  # Just Tilt-A-Kart in first page.
+    for page_index in range(page_count):
+        if page_index == 0:  # First page already handled.
+            continue
+        for track_index in range(page_course_count):
+            if replaces_data[(page_index, track_index)] == 'Mini5':
+                page_tilting_courses[page_index].append(track_index)
+    tilting_data_code_lines = []
+    for page_index, track_indexes in page_tilting_courses.items():
+        tilting_data_code_lines.append('else if' if tilting_data_code_lines else 'if')
+        tilting_data_code_lines.append(f' (page == {page_index}) {{')
+        for track_index in track_indexes:
+            course_id = COURSES_TO_COURSE_ID[COURSES[track_index]]
+            tilting_data_code_lines.append(f'if (course_id == {course_id}) {{ return true; }}')
+        tilting_data_code_lines.append('}')
+    tilting_data_code = '\n'.join(tilting_data_code_lines)
+
     # Addresses to symbols that are only known after the first pass.
     extender_cup_cup_filenames_address = None
     extender_cup_preview_filename_address = None
@@ -1628,6 +1689,7 @@ def patch_dol_file(
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
+            ('// __TILTING_DATA_PLACEHOLDER__', tilting_data_code),
         )
         with open(os.path.join(code_dir, 'lib.c'), 'r', encoding='ascii') as f:
             code = f.read()
@@ -1704,6 +1766,10 @@ def patch_dol_file(
                 if battle_stages_enabled:
                     project.branchlink(SCENEMAPSELECT_CALCANM_CALL_ADDRESSES[game_id],
                                        'scenemapselect_calcanm_ex')
+                    project.branchlink(IS_TILTING_COURSE_CALL_ADDRESSES[game_id],
+                                       'is_tilting_course')
+                    project.dol.seek(IS_TILTING_COURSE_CALL_ADDRESSES[game_id] + 4)
+                    project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
                 project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
                                    'lanselectmode_calcanm_ex')
 
