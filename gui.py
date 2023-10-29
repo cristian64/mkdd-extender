@@ -1634,19 +1634,30 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         for page_index in range(mkdd_extender.MAX_EXTRA_PAGES):
             page_table = DragDropTableWidget(ROWS, COLUMNS)
-            page_table.setFixedHeight(round(font_height * 1.5) * (ROWS + 1))
+            page_table.setStyleSheet(
+                textwrap.dedent(f"""\
+                    QHeaderView::section {{
+                        border: 0px;
+                        border-right: 1px solid {self.palette().dark().color().name()};
+                    }}
+                    QHeaderView::section:last {{
+                        border-right: 0px;
+                    }}
+            """))
             self._page_tables.append(page_table)
-            page_table.setHorizontalHeaderLabels(HEADER_LABELS)
+
             if page_index == 0:
                 page_table.setHorizontalHeaderLabels(HEADER_LABELS)
             else:
-                page_table.setHorizontalHeaderLabels([''] * COLUMNS)
-                page_table.horizontalHeader().setFixedHeight(int(font_height * 0.4))
+                page_table.horizontalHeader().hide()
+
             page_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_label = VerticalLabel()
             self._page_labels.append(page_label)
             page_widget = QtWidgets.QWidget()
             page_widget.setContentsMargins(0, 0, 0, 0)
+            page_widget.setFixedHeight(
+                round(font_height * 1.75) * (ROWS + (1 if page_index == 0 else 0)))
             page_widget_layout = QtWidgets.QHBoxLayout(page_widget)
             page_widget_layout.setContentsMargins(0, 0, 0, 0)
             page_widget_layout.setSpacing(0)
@@ -1655,6 +1666,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._page_widgets.append(page_widget)
             pages_layout.addWidget(page_widget)
         pages_layout.addStretch(1)
+        pages_layout.setSpacing(font_height // 5)
         for page_table in self._page_tables:
             for other_page_table in self._page_tables:
                 if page_table != other_page_table:
