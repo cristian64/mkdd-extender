@@ -1606,7 +1606,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         font_height = self.fontMetrics().height()
 
-        HEADER_LABELS = ('Mushroom Cup', 'Flower Cup', 'Star Cup', 'Special Cup')
+        HEADER_LABELS = ('🍄 Mushroom Cup', '🌼 Flower Cup', '🌟 Star Cup', '👑 Special Cup')
         ROWS = 4
         COLUMNS = len(HEADER_LABELS)
 
