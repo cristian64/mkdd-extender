@@ -836,9 +836,11 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             track_name = trackinfo['Config'].get('trackname') or ''
             author = trackinfo['Config'].get('author') or ''
             replaces = trackinfo['Config'].get('replaces') or ''
+            replaces_is_battle_stage = False
             if replaces:
-                replaces = mkdd_extender.COURSE_TO_NAME[mkdd_extender.course_name_to_course(
-                    replaces)]
+                replaces_course = mkdd_extender.course_name_to_course(replaces)
+                replaces_is_battle_stage = replaces_course.startswith('Mini')
+                replaces = mkdd_extender.COURSE_TO_NAME[replaces_course]
             auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track') or ''
             if auxiliary_audio_track:
                 auxiliary_audio_track = mkdd_extender.COURSE_TO_NAME[
@@ -880,18 +882,30 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         info_box = QtWidgets.QGroupBox('Info')
         info_box.setLayout(QtWidgets.QVBoxLayout())
         info_widget = QtWidgets.QLabel()
-        info_widget.setText(
-            textwrap.dedent(f"""\
-            <table>
-            <tr><td><b>Track Name: </b> </td><td>{track_name}</td></tr>
-            <tr><td><b>Author: </b> </td><td>{author}</td></tr>
-            <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
-            <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
-            <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
-            <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
-            <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
-            </table>
-        """))  # noqa: E501
+        if replaces_is_battle_stage:
+            info_widget.setText(
+                textwrap.dedent(f"""\
+                <table>
+                <tr><td><b>Stage Name: </b> </td><td>{track_name}</td></tr>
+                <tr><td><b>Author: </b> </td><td>{author}</td></tr>
+                <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
+                <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
+                <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
+                </table>
+            """))  # noqa: E501
+        else:
+            info_widget.setText(
+                textwrap.dedent(f"""\
+                <table>
+                <tr><td><b>Track Name: </b> </td><td>{track_name}</td></tr>
+                <tr><td><b>Author: </b> </td><td>{author}</td></tr>
+                <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
+                <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
+                <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
+                <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
+                <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
+                </table>
+            """))  # noqa: E501
         info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         info_box.layout().addWidget(info_widget)
         layout.addWidget(info_box)
