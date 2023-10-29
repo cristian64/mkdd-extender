@@ -1745,6 +1745,16 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 replaces = None
                 auxiliary_audio_track = None
 
+            # Verify that a race track has not been assigned to a battle stage slot and viceversa.
+            replaces_is_battle_stage = course_name_to_course(replaces).startswith('Mini')
+            if is_battle_stage != replaces_is_battle_stage:
+                raise MKDDExtenderError(
+                    f'"{nodename}" (a custom '
+                    f'{"battle stage" if replaces_is_battle_stage else "race track"} that replaces '
+                    f'{replaces}) '
+                    f'has been assigned to {COURSE_TO_NAME[COURSES[track_index]]} (a '
+                    f'{"battle stage" if is_battle_stage else "race track"} slot).')
+
             # Verify that the required code patches for the track have been enabled.
             for code_patch in code_patches.replace('"', '').replace("'", '').split(','):
                 code_patch = code_patch.strip().lower().replace(' ', '-')
