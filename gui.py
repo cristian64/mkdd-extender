@@ -309,31 +309,6 @@ class PathEdit(QtWidgets.QWidget):
             self._last_dir = current_dir
 
 
-class IconWidget(QtWidgets.QLabel):
-
-    def __init__(self, icon: QtGui.QIcon, rotation_angle: float, parent: QtWidgets.QWidget = None):
-        super().__init__(parent=parent)
-
-        self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
-
-        self._icon = icon
-        self._rotation_angle = rotation_angle
-
-    def sizeHint(self) -> QtCore.QSize:
-        size = super().sizeHint()
-        return QtCore.QSize(size.height(), size.height())
-
-    def paintEvent(self, event: QtGui.QPaintEvent):
-        super().paintEvent(event)
-
-        size = self.sizeHint()
-        pixmap = self._icon.pixmap(size).transformed(QtGui.QTransform().rotate(
-            self._rotation_angle))
-        painter = QtGui.QPainter(self)
-        painter.drawPixmap(0, 0, size.width(), size.height(), pixmap)
-        del painter
-
-
 class VerticalLabel(QtWidgets.QWidget):
 
     def __init__(self, text: str = '', parent: QtWidgets.QWidget = None):
