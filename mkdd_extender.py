@@ -2098,7 +2098,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             except (AssertionError, Exception) as e:
                 error_message = f': {str(e)}' if str(e) else ''
                 raise type(e)(
-                    f'Unexpected error while processing "{nodename}"{error_message}.') from e
+                    f'Unexpected error while processing "{nodename}"{error_message}') from e
 
         # Downscale images to ensure space limits are met.
         if downscale_preview_images:
