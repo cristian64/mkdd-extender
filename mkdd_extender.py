@@ -1733,12 +1733,12 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 trackinfo.read(trackinfo_filepath)
                 trackname = trackinfo['Config']['trackname'] or 'Unnamed'
                 main_language = trackinfo['Config']['main_language']
-                replaces = trackinfo['Config'].get('replaces')
+                replaces = trackinfo['Config']['replaces']
                 auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
                 code_patches = trackinfo['Config'].get('code_patches', '')
             except Exception:
                 log.warning(f'Unable to locate `trackinfo.ini` in "{nodename}", or it is missing '
-                            'the `trackname` field or `main_language` field.')
+                            'the `trackname` field, `main_language` field, or `replaces` field.')
                 trackinfo = None
                 trackname = prefix
                 main_language = None
