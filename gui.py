@@ -9,6 +9,7 @@ import configparser
 import contextlib
 import datetime
 import gc
+import itertools
 import json
 import logging
 import os
@@ -41,7 +42,8 @@ script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
 tools_dir = os.path.join(script_dir, 'tools')
 data_dir = os.path.join(script_dir, 'data')
-placeholder_course_dir = os.path.join(data_dir, 'courses', 'dstestcircle')
+placeholder_race_track_dir = os.path.join(data_dir, 'courses', 'dstestcircle')
+placeholder_battle_stage_dir = os.path.join(data_dir, 'courses', 'dstestcircle_battlestage')
 
 
 def set_dark_theme(app: QtWidgets.QApplication):
@@ -1634,8 +1636,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         ROWS = 4
         COLUMNS = len(HEADER_LABELS)
 
+        BATTLE_HEADER_LABELS = ('', '🎈 Battle Stages', '')
+        BATTLE_ROWS = 2
+        BATTLE_COLUMNS = 3
+
         self._page_labels = []
         self._page_tables = []
+        self._page_battle_stages_tables = []
         self._page_widgets = []
 
         for page_index in range(mkdd_extender.MAX_EXTRA_PAGES):
@@ -1652,12 +1659,20 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             """))
             self._page_tables.append(page_table)
 
+            page_battle_stages_table = DragDropTableWidget(BATTLE_ROWS, BATTLE_COLUMNS)
+            page_battle_stages_table.setStyleSheet('QHeaderView::section { border: 0px; }')
+            self._page_battle_stages_tables.append(page_battle_stages_table)
+
             if page_index == 0:
                 page_table.setHorizontalHeaderLabels(HEADER_LABELS)
+                page_battle_stages_table.setHorizontalHeaderLabels(BATTLE_HEADER_LABELS)
             else:
                 page_table.horizontalHeader().hide()
+                page_battle_stages_table.horizontalHeader().hide()
 
             page_table.clear_selection_action.triggered.connect(self._clear_selection)
+            page_battle_stages_table.clear_selection_action.triggered.connect(self._clear_selection)
+
             page_label = VerticalLabel()
             self._page_labels.append(page_label)
             page_widget = QtWidgets.QWidget()
@@ -1667,18 +1682,19 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_widget_layout = QtWidgets.QHBoxLayout(page_widget)
             page_widget_layout.setContentsMargins(0, 0, 0, 0)
             page_widget_layout.setSpacing(0)
-            page_widget_layout.addWidget(page_table)
+            page_widget_layout.addWidget(page_table, COLUMNS)
+            page_widget_layout.addWidget(page_battle_stages_table, BATTLE_COLUMNS)
             page_widget_layout.addWidget(page_label)
             self._page_widgets.append(page_widget)
             pages_layout.addWidget(page_widget)
         pages_layout.addStretch(1)
         pages_layout.setSpacing(font_height // 5)
-        for page_table in self._page_tables:
-            for other_page_table in self._page_tables:
+        for page_table in self._page_tables + self._page_battle_stages_tables:
+            for other_page_table in self._page_tables + self._page_battle_stages_tables:
                 if page_table != other_page_table:
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
-        custom_tracks_drop_widget.set_sources(self._page_tables)
+        custom_tracks_drop_widget.set_sources(self._page_tables + self._page_battle_stages_tables)
         pages_scroll_widget = QtWidgets.QScrollArea()
         pages_scroll_widget.setWidgetResizable(True)
         pages_scroll_widget.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -1691,8 +1707,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._extra_pages_count_combobox.currentIndexChanged.connect(
             self._on_extra_pages_count_combobox_currentIndexChanged)
 
+        self._enable_custom_battle_stages = QtWidgets.QCheckBox('Enable Custom Battle Stages')
+        self._enable_custom_battle_stages.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self._update_page_battle_stages_visibility(False)
+        self._enable_custom_battle_stages.toggled.connect(
+            self._on_enable_custom_battle_stages_toggled)
+
         extra_pages_layout = QtWidgets.QHBoxLayout()
         extra_pages_layout.addStretch()
+        extra_pages_layout.addWidget(self._enable_custom_battle_stages)
+        extra_pages_layout.addSpacing(font_height // 2)
         self._total_page_count_label = QtWidgets.QLabel('Total Page Count')
         extra_pages_layout.addWidget(self._total_page_count_label)
         extra_pages_layout.addWidget(self._extra_pages_count_combobox)
@@ -1768,7 +1792,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._input_iso_file_edit.textChanged.connect(self._initialize_output_filepath)
         self._custom_tracks_directory_edit.textChanged.connect(self._load_custom_tracks_directory)
         self._custom_tracks_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
-        for page_table in self._page_tables:
+        for page_table in self._page_tables + self._page_battle_stages_tables:
             page_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
             page_table.itemChanged.connect(self._on_page_table_itemChanged)
 
@@ -1821,9 +1845,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 (f'{custom_tracks_table_header.sortIndicatorSection()} '
                                  f'{sort_indicator_order}'))
 
-        extra_page_count = self._get_configured_extra_page_count()
-        page_item_values = self._get_page_item_values()[:extra_page_count * 16]
-        self._settings.setValue('miscellaneous/page_item_values', json.dumps(page_item_values))
+        page_item_values = self._get_page_item_values_enabled_only()
+        self._settings.setValue('miscellaneous/page_item_combined_values',
+                                json.dumps(page_item_values))
+        # For forward compatibility, values are stored also in the legacy format, at least for a
+        # few versions.
+        page_item_legacy_values = [(i, column, row, value, selected)
+                                   for (i, j, column, row, value, selected) in page_item_values
+                                   if j == 0]
+        self._settings.setValue('miscellaneous/page_item_values',
+                                json.dumps(page_item_legacy_values))
 
         options = []
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
@@ -1885,15 +1916,27 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 order = QtCore.Qt.SortOrder(int(text.split(' ')[1]))
                 custom_tracks_table_header.setSortIndicator(logical_index, order)
 
-        page_item_values = self._settings.value('miscellaneous/page_item_values')
+        page_item_values = self._settings.value('miscellaneous/page_item_combined_values')
+        if not page_item_values:
+            # Attempt to pick up values from the legacy setting.
+            page_item_values = self._settings.value('miscellaneous/page_item_values')
         if page_item_values:
             try:
                 page_item_values = json.loads(page_item_values)
             except json.decoder.JSONDecodeError:
                 pass
             else:
+                if page_item_values:
+                    legacy_format = len(page_item_values[0]) == 5
+                    if legacy_format:
+                        page_item_values = [(i, 0, column, row, value, selected)
+                                            for (i, column, row, value,
+                                                 selected) in page_item_values]
+                extra_page_count = max(i for i, *_ in page_item_values) + 1
+                battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
                 self._set_page_item_values(page_item_values, also_selected_state=False)
-                self._update_page_visibility(len(page_item_values) // 16)
+                self._update_page_visibility(extra_page_count)
+                self._update_page_battle_stages_visibility(battle_stages_enabled)
 
         options = self._settings.value('miscellaneous/options')
         if options:
@@ -1909,7 +1952,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._log_table.set_clear_log_before_each_run(
             self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true')
 
-    def _get_shelf_items(self) -> 'tuple[tuple[str, list[tuple[int, int, int, str, bool]]]]':
+    def _get_shelf_items(self) -> 'tuple[tuple[str, list[tuple[int, int, int, int, str, bool]]]]':
         return tuple(self._settings.value('shelf/items', tuple()))
 
     def _create_shelf_item(self):
@@ -1937,9 +1980,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         def on_create_button_clicked():
             name = name_edit.text()
             shelf_items = list(self._get_shelf_items())
-            extra_page_count = self._get_configured_extra_page_count()
-            course_names = tuple(item[3]
-                                 for item in self._get_page_item_values()[:extra_page_count * 16])
+            course_names = tuple(item[4] for item in self._get_page_item_values_enabled_only())
             shelf_items.append((name, course_names))
             self._settings.setValue('shelf/items', shelf_items)
             dialog.close()
@@ -1981,16 +2022,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     def _load_shelf_item(self, index: int):
         shelf_items = self._get_shelf_items()
         if 0 <= index < len(shelf_items):
-            items = self._get_page_item_values()
             course_names = shelf_items[index][1]
-            for i, course_name in enumerate(course_names):
-                items[i] = list(items[i])
-                items[i][3] = course_name
-                items[i][4] = False
-            extra_page_count = len(course_names) // 16
-            self._set_page_item_values(items[:extra_page_count * 16])
+            battle_stages_enabled = len(course_names) % mkdd_extender.RACE_TRACK_COUNT != 0
+            if battle_stages_enabled:
+                extra_page_count = len(course_names) // mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
+            else:
+                extra_page_count = len(course_names) // mkdd_extender.RACE_TRACK_COUNT
 
             self._update_page_visibility(extra_page_count)
+            self._update_page_battle_stages_visibility(battle_stages_enabled)
+
+            items = self._get_page_item_values_enabled_only()
+            for i, course_name in enumerate(course_names):
+                items[i] = list(items[i])
+                items[i][4] = course_name
+                items[i][5] = False
+
+            self._set_page_item_values(items)
 
             self._sync_emblems()
             self._update_info_view()
@@ -2174,7 +2222,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     @contextlib.contextmanager
     def _blocked_page_signals(self):
         signals_were_blocked_map = {}
-        for page_table in self._page_tables:
+        for page_table in self._page_tables + self._page_battle_stages_tables:
             signals_were_blocked_map[page_table] = page_table.blockSignals(True)
         try:
             yield
@@ -2198,10 +2246,29 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _on_extra_pages_count_combobox_currentIndexChanged(self, index: int):
         extra_page_count = index + 1
-        items = self._get_page_item_values()
-        self._set_page_item_values(items[:extra_page_count * 16])
+        items = self._get_page_item_values_enabled_only()
+        items = [entry for entry in items if entry[0] < extra_page_count]
+        self._set_page_item_values(items)
 
         self._update_page_visibility(index + 1)
+
+        self._sync_emblems()
+        self._update_info_view()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
+    def _update_page_battle_stages_visibility(self, battle_stages_enabled: bool):
+        for page_table in self._page_battle_stages_tables:
+            page_table.setVisible(battle_stages_enabled)
+
+        with blocked_signals(self._enable_custom_battle_stages):
+            self._enable_custom_battle_stages.setChecked(battle_stages_enabled)
+
+    def _on_enable_custom_battle_stages_toggled(self, checked: bool):
+        self._set_page_item_values(self._get_page_item_values_enabled_only())
+
+        self._update_page_battle_stages_visibility(checked)
 
         self._sync_emblems()
         self._update_info_view()
@@ -2219,45 +2286,80 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         items.append(item)
         return items
 
-    def _get_page_item_values(self) -> 'list[tuple[int, int, int, str, bool]]':
-        page_item_values = []
-        for i, page_table in enumerate(self._page_tables):
-            page_table_model = page_table.model()
-            selected_indexes = page_table.selectedIndexes()
+    def _get_page_battle_stages_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+        items = []
+        for page_table in self._page_battle_stages_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
-                    value = item.text() if item is not None else ''
-                    selected = page_table_model.createIndex(row, column) in selected_indexes
-                    page_item_values.append((i, column, row, value, selected))
+                    if item is not None:
+                        items.append(item)
+        return items
+
+    def _get_page_all_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+        items = []
+        for page_table in list(
+                itertools.chain(*zip(self._page_tables, self._page_battle_stages_tables))):
+            for column in range(page_table.columnCount()):
+                for row in range(page_table.rowCount()):
+                    item = page_table.item(row, column)
+                    if item is not None:
+                        items.append(item)
+        return items
+
+    def _get_page_item_values(self) -> 'list[tuple[int, int, int, int, str, bool]]':
+        page_item_values = []
+        for i, page_tables in enumerate(zip(self._page_tables, self._page_battle_stages_tables)):
+            for j, page_table in enumerate(page_tables):
+                page_table_model = page_table.model()
+                selected_indexes = page_table.selectedIndexes()
+                for column in range(page_table.columnCount()):
+                    for row in range(page_table.rowCount()):
+                        item = page_table.item(row, column)
+                        value = item.text() if item is not None else ''
+                        selected = page_table_model.createIndex(row, column) in selected_indexes
+                        page_item_values.append((i, j, column, row, value, selected))
+        return page_item_values
+
+    def _get_page_item_values_enabled_only(self) -> 'list[tuple[int, int, int, int, str, bool]]':
+        extra_page_count = self._get_configured_extra_page_count()
+        battle_stages_enabled = self._enable_custom_battle_stages.isChecked()
+        page_item_values = self._get_page_item_values()
+        page_item_values = [entry for entry in page_item_values if entry[0] < extra_page_count]
+        if not battle_stages_enabled:
+            page_item_values = [entry for entry in page_item_values if entry[1] == 0]
         return page_item_values
 
     def _set_page_item_values(self,
                               page_item_values: 'list[tuple[int, int, int, str]]',
                               also_selected_state: bool = True):
-        assert len(page_item_values) % 16 == 0
-
         # Pad the values with an empty version of the expected tuple.
-        reference_item_values = self._get_page_item_values()
-        if len(reference_item_values) != len(page_item_values):
-            page_item_values = list(page_item_values)
-            for _ in range(len(page_item_values)):
-                reference_item_values.pop(0)
-            for i, column, row, _value, _selected in reference_item_values:
-                page_item_values.append((i, column, row, '', False))
+        new_item_values = []
+        for i, page_tables in enumerate(zip(self._page_tables, self._page_battle_stages_tables)):
+            for j, page_table in enumerate(page_tables):
+                for column in range(page_table.columnCount()):
+                    for row in range(page_table.rowCount()):
+                        new_item_values.append([i, j, column, row, '', False])
+        for i, j, column, row, value, selected in page_item_values:
+            for entry in new_item_values:
+                if (i, j, column, row) == tuple(entry[:4]):
+                    entry[-2] = value
+                    entry[-1] = selected
 
         with self._blocked_page_signals():
             if also_selected_state:
-                for page_table in self._page_tables:
+                for page_table in self._page_tables + self._page_battle_stages_tables:
                     page_table.clearSelection()
 
-            for i, column, row, value, selected in page_item_values:
+            page_table_lists = [self._page_tables, self._page_battle_stages_tables]
+
+            for i, j, column, row, value, selected in new_item_values:
                 item = QtWidgets.QTableWidgetItem(value)
-                self._page_tables[i].setItem(row, column, item)
+                page_table_lists[j][i].setItem(row, column, item)
                 if also_selected_state and selected:
                     item.setSelected(True)
-                    self._page_tables[i].setCurrentCell(row, column,
-                                                        QtCore.QItemSelectionModel.NoUpdate)
+                    page_table_lists[j][i].setCurrentCell(row, column,
+                                                          QtCore.QItemSelectionModel.NoUpdate)
 
     def _get_custom_track_names(self) -> 'set[str]':
         custom_tracks = set()
@@ -2269,7 +2371,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     def _sync_emblems(self):
         with self._blocked_page_signals():
             page_items = self._get_page_items()
-            for page_item in page_items:
+            page_battle_stages_items = self._get_page_battle_stages_items()
+
+            for page_item in page_items + page_battle_stages_items:
                 page_item.setIcon(QtGui.QIcon())
                 page_item.setToolTip(str())
                 page_item.setForeground(QtGui.QBrush())
@@ -2278,7 +2382,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             custom_tracks_maps = collections.defaultdict(list)
 
-            for page_item in page_items:
+            for page_item in page_items + page_battle_stages_items:
                 text = page_item.text()
                 if not text:
                     continue
@@ -2287,8 +2391,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     page_item.setIcon(self._error_icon)
                     page_item.setToolTip('Custom track can no longer be located in the track list.')
                     page_item.setForeground(self._red_color)
-                else:
-                    custom_tracks_maps[text].append(page_item)
+                    continue
+
+                is_battle_stage = text.startswith('🎈')
+                if is_battle_stage and page_item not in page_battle_stages_items:
+                    page_item.setIcon(self._error_icon)
+                    page_item.setToolTip(
+                        'Custom battle stage has been assigned to a race track slot.')
+                    page_item.setForeground(self._red_color)
+                    continue
+                if not is_battle_stage and page_item in page_battle_stages_items:
+                    page_item.setIcon(self._error_icon)
+                    page_item.setToolTip(
+                        'Custom race track has been assigned to a battle stage slot.')
+                    page_item.setForeground(self._red_color)
+                    continue
+
+                custom_tracks_maps[text].append(page_item)
 
             for _custom_track, page_items in custom_tracks_maps.items():
                 if len(page_items) > 1:
@@ -2308,7 +2427,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     def _sync_tables_selection(self):
         sender = self.sender()
         with self._blocked_page_signals():
-            for page_table in self._page_tables:
+            for page_table in self._page_tables + self._page_battle_stages_tables:
                 if sender != page_table:
                     page_table.clearSelection()
                     page_table.clearFocus()
@@ -2326,7 +2445,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if not self._info_view.isVisible():
             return
 
-        for table in list(self._page_tables) + [self._custom_tracks_table]:
+        all_tables = (self._page_tables + self._page_battle_stages_tables +
+                      [self._custom_tracks_table])
+        for table in all_tables:
             for item in reversed(table.selectedItems()):
                 item_text = item.text()
                 if not item_text:
@@ -2364,7 +2485,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _clear_selection(self):
         with self._blocked_page_signals():
-            for item in self._get_page_items():
+            for item in self._get_page_all_items():
                 if item.isSelected():
                     item.setText(str())
         self._sync_emblems()
@@ -2381,16 +2502,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         # Resolve any potential pending event (e.g. item selection changed events).
         QtWidgets.QApplication.instance().processEvents()
 
-        extra_page_count = self._get_configured_extra_page_count()
-        page_item_values = self._get_page_item_values()[:extra_page_count * 16]
+        page_item_values = self._get_page_item_values_enabled_only()
 
         # Undo action is only collected if the values (excluding the selection state) are actually
         # different.
-        page_item_values_texts = [value for _, _, _, value, _ in page_item_values]
+        page_item_values_texts = [(i, j, column, row, value)
+                                  for i, j, column, row, value, _selected in page_item_values]
         if self._undo_history:
             previous_page_item_values = self._undo_history[-1]
             previous_page_item_values_texts = [
-                value for _, _, _, value, _ in previous_page_item_values
+                (i, j, column, row, value)
+                for i, j, column, row, value, _selected in previous_page_item_values
             ]
         else:
             previous_page_item_values_texts = None
@@ -2406,7 +2528,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._redo_history.insert(0, self._undo_history.pop())
             page_item_values = self._undo_history[-1]
             self._set_page_item_values(page_item_values)
-            self._update_page_visibility(len(page_item_values) // 16)
+            extra_page_count = max(i for i, *_ in page_item_values) + 1
+            battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+            self._update_page_visibility(extra_page_count)
+            self._update_page_battle_stages_visibility(battle_stages_enabled)
             self._sync_emblems()
             self._update_info_view()
 
@@ -2417,7 +2542,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_item_values = self._redo_history.pop(0)
             self._undo_history.append(page_item_values)
             self._set_page_item_values(page_item_values)
-            self._update_page_visibility(len(page_item_values) // 16)
+            extra_page_count = max(i for i, *_ in page_item_values) + 1
+            battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+            self._update_page_visibility(extra_page_count)
+            self._update_page_battle_stages_visibility(battle_stages_enabled)
             self._sync_emblems()
             self._update_info_view()
 
@@ -2672,7 +2800,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             extra_page_count = self._get_configured_extra_page_count()
 
             paths = []
-            for item in self._get_page_items()[:extra_page_count * 16]:
+
+            if self._enable_custom_battle_stages.isChecked():
+                page_course_count = mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
+                page_items = self._get_page_all_items()[:extra_page_count * page_course_count]
+            else:
+                page_course_count = mkdd_extender.RACE_TRACK_COUNT
+                page_items = self._get_page_items()[:extra_page_count * page_course_count]
+
+            for item in page_items:
                 path = self._item_text_to_path.get(item.text())
                 if not path:
                     raise mkdd_extender.MKDDExtenderError(
@@ -2697,8 +2833,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if filtered_name.endswith('.zip'):
                     filtered_name = filtered_name[:-len('.zip')]
 
-                page_index = i // 16
-                track_number = i % 16 + 1
+                page_index = i // page_course_count
+                track_number = i % page_course_count + 1
                 letter = chr(ord('A') + page_index)
                 prefix = f'{letter}{track_number:02}'
 
@@ -3287,20 +3423,43 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         font_size = int(font_height * 0.75)
 
         def generate_html(course_names):
-            html = '<table style="white-space: nowrap;">'
-            pages = len(course_names) // 16
+            html = '<table style="white-space: nowrap; vertical-align: middle;">'
+
+            battle_stages_enabled = len(course_names) % mkdd_extender.RACE_TRACK_COUNT != 0
+
+            if battle_stages_enabled:
+                page_course_count = mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
+                columns = 7
+            else:
+                page_course_count = mkdd_extender.RACE_TRACK_COUNT
+                columns = 4
+
+            pages = len(course_names) // page_course_count
+
             for page in range(pages):
+                page_courses_names = course_names[page * page_course_count:(page + 1) *
+                                                  page_course_count]
                 margin = 0.0 if page == 0 else 0.8
                 html += ('<tr>'
-                         f'<td colspan="4" style="text-align: center; padding-top: {margin}em; '
+                         f'<td colspan="{columns}" style="text-align: center; '
+                         f'padding-top: {margin}em; '
                          f'font-size: {header_font_size}px;">'
                          f'<b>Page {page + 2}/{pages + 1}</b></td>'
                          '</tr>')
-                for col in range(4):
+                for row in range(4):
                     html += '<tr>'
-                    for row in range(4):
-                        course_name = course_names[page * 16 + row * 4 + col] or '-'
-                        html += (f'<td style="padding: 0.3em; font-size: {font_size}px;">'
+                    for col in range(columns):
+                        if col >= 4:
+                            if row % 2 != 0:
+                                continue
+                            rowspan = 2
+                            index = 16 + row // 2 * 3 + col - 4
+                        else:
+                            rowspan = 1
+                            index = row * 4 + col
+                        course_name = page_courses_names[index] or '-'
+                        html += (f'<td style="padding: 0.3em; font-size: {font_size}px;" '
+                                 f'rowspan="{rowspan}">'
                                  f'{course_name}</td>')
                     html += '</tr>'
             html += '</table>'
@@ -3310,8 +3469,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         items = self._get_shelf_items()
 
         for i, (name, course_names) in enumerate(items):
-            assert len(course_names) % 16 == 0
-
             shelf_item_widget = QtWidgets.QWidget()
             shelf_item_layout = QtWidgets.QVBoxLayout(shelf_item_widget)
             shelf_item_layout.addWidget(QtWidgets.QLabel(generate_html(course_names)))
@@ -3366,7 +3523,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             extra_page_count = self._get_configured_extra_page_count()
 
-            for item in self._get_page_items()[:extra_page_count * 16]:
+            if self._enable_custom_battle_stages.isChecked():
+                page_course_count = mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
+                page_items = self._get_page_all_items()[:extra_page_count * page_course_count]
+            else:
+                page_course_count = mkdd_extender.RACE_TRACK_COUNT
+                page_items = self._get_page_items()[:extra_page_count * page_course_count]
+
+            for item in page_items:
                 path = self._item_text_to_path.get(item.text())
                 if path:
                     args.tracks.append(path)
@@ -3381,9 +3545,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                           f'slots ({slots_unassigned}) will be provided with a '
                                           'placeholder.')
 
-                args.tracks = [t or placeholder_course_dir for t in args.tracks]
+                for i, path in enumerate(tuple(args.tracks)):
+                    if not path:
+                        track_index = i % page_course_count
+                        is_battle_stage = track_index >= mkdd_extender.RACE_TRACK_COUNT
+                        args.tracks[i] = (placeholder_battle_stage_dir
+                                          if is_battle_stage else placeholder_race_track_dir)
 
-            assert len(args.tracks) % 16 == 0
+            assert len(args.tracks) % page_course_count == 0
 
             for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
                 for option_label, _option_type, _option_help in group_options:
