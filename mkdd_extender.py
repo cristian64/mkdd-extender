@@ -1581,7 +1581,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         # Unpack ZIP archives (or copy directory is pre-unpacked) to their respective directories.
         prefix_to_nodename = {}
         processed = 0
-        log.info('Preparing custom tracks...')
+        log.info('Preparing custom courses...')
         if tracks_is_dir:
             battle_stages_enabled = False
             for prefix in PREFIXES_WITH_BATTLE_STAGES:
@@ -1633,7 +1633,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 prefix_to_nodename[prefix] = filename
                 processed += 1
         if processed > 0:
-            log.info(f'{processed} custom tracks have been processed.')
+            log.info(f'{processed} custom courses have been processed.')
         else:
             log.warning('No archive has been processed.')
 
@@ -1851,8 +1851,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 else:
                     log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
 
-            # Force use of auxiliary audio track if argument has been provided and the custo track
-            # has the field defined.
+            # Force use of auxiliary audio track if argument has been provided and the custom race
+            # track has the field defined.
             if not is_battle_stage:
                 use_auxiliary_audio_track = auxiliary_audio_track and args.use_auxiliary_audio_track
                 use_replacee_audio_track = replaces and args.use_replacee_audio_track
@@ -2415,7 +2415,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
     if not args.skip_minimap_transforms_removal:
         # The game has some logic for modifying the scale and position of the minimaps. This logic
         # uses hardcoded float values for each course, and for each layout (1P, 2P, and 3P/4P).
-        # Obviously, the hardcoded float values will not suit all custom tracks.
+        # Obviously, the hardcoded float values will not suit all custom race tracks.
         #
         # The float values live in static memory, and it's uncertain from which places these values
         # are referenced; they cannot be changed. The MKDD Track Patcher modifies the `lfs`
@@ -2488,7 +2488,7 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
         lines.append('Default options.')
     lines.append('')
 
-    lines.append('## Custom Tracks')
+    lines.append('## Custom Courses')
     lines.append('')
 
     page_course_count = RACE_AND_BATTLE_COURSE_COUNT if battle_stages_enabled else RACE_TRACK_COUNT
@@ -2544,8 +2544,8 @@ OPTIONAL_ARGUMENTS = {
             'By default, minimap transforms are removed.\n\n'
             'These transforms, that depend on hardcoded float values, are used in the game to make '
             'the minimaps in the stock courses look larger and better aligned. However, custom '
-            'tracks will rarely benefit from these specialized transforms; preserving these '
-            'transforms will likely make some minimaps in custom tracks be cut off screen.',
+            'race tracks will rarely benefit from these specialized transforms; preserving these '
+            'transforms will likely make some minimaps in custom race tracks be cut off screen.',
         ),
         (
             'Add Description File',
@@ -2553,7 +2553,7 @@ OPTIONAL_ARGUMENTS = {
             'If specified, a plain text file (`DESCRIPTION.md`) containing the description of the '
             'extended game will be written to the `files` directory in the ISO image.\n\n'
             'The description file includes the application version, the creation time, the options '
-            'that were used to generate the ISO image, and the name of added custom tracks.',
+            'that were used to generate the ISO image, and the name of added custom courses.',
         ),
         (
             'Initial Page Number',
@@ -2573,7 +2573,7 @@ OPTIONAL_ARGUMENTS = {
         (
             'Use Auxiliary Audio Track',
             bool,
-            'If specified, audio files of the custom tracks that provide the '
+            'If specified, audio files of the custom race tracks that provide the '
             '`auxiliary_audio_track` field in their `trackinfo.ini` file will be excluded from the '
             'ISO image. Instead, the audio track of the defined retail course will be used. This '
             'can be used to reduce the size of the ISO image.',
@@ -2607,7 +2607,7 @@ OPTIONAL_ARGUMENTS = {
             bool,
             'If enabled, support for type-specific item boxes will be added to the game.'
             '\n\n'
-            'The patch allows custom tracks to include item boxes that have been configured for a '
+            'The patch allows custom courses to include item boxes that have been configured for a '
             'specific item type (i.e. players always get the same item type from the item box).',
         ),
         (
@@ -2615,8 +2615,8 @@ OPTIONAL_ARGUMENTS = {
             bool,
             'If enabled, support for sectioned courses will be added to the game.'
             '\n\n'
-            'The patch allows custom tracks to include Lap Checkpoints, checkpoints that have a '
-            'parameter set that causes the corresponding sector to automatically increment '
+            'The patch allows custom race tracks to include Lap Checkpoints, checkpoints that have '
+            'a parameter set that causes the corresponding sector to automatically increment '
             'a lap when passed. This allows for more flexible single-lap courses '
             'or courses with multiple routes for laps.',
         ),
@@ -2663,7 +2663,7 @@ OPTIONAL_ARGUMENTS = {
         (
             'Skip Code Patches Check',
             bool,
-            'If specified, missing code patches will not fail the program. Custom tracks that '
+            'If specified, missing code patches will not fail the program. Custom courses that '
             'rely on the missing code patches may present unexpected behavior, or crash the game.',
         ),
     ),
@@ -2684,13 +2684,13 @@ def create_args_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         'tracks',
         type=str,
-        help='Path to the directory containing the files for each of the custom tracks that will '
+        help='Path to the directory containing the files for each of the custom courses that will '
         'be added to the game.\n\n'
-        'Custom tracks must be provided in the MKDD Track Patcher format: either compressed in a '
-        'ZIP archive, or as a directory that contains the relevant files for the custom track.\n\n'
+        'Custom courses must be provided in the MKDD Track Patcher format: either compressed in a '
+        'ZIP archive, or as a directory that contains the relevant files for the custom course.\n\n'
         'Each archive name (or directory name) needs to be prefixed with a letter (A, B, C, ..., '
         'I), and a number in the range `[01, 16]` (one-digit numbers padded with a 0).\n\n'
-        'The number of custom tracks provided must be a multiple of 16: "A01...", "A02...", ..., '
+        'The number of custom courses provided must be a multiple of 16: "A01...", "A02...", ..., '
         '"C16...". To also process custom battle stages, the number of items must be a multiple of '
         '22: "A01...", "A02...", ..., "A22...", "B01...", ..., "C22...".')
     parser.add_argument('output',
@@ -2963,7 +2963,7 @@ def extend_game(args: argparse.Namespace):
             raise MKDDExtenderError(
                 f'ISO file is larger than the absolute maximum file size ({EXTREME_MAX_ISO_SIZE} '
                 'bytes). Possible solutions: remove some audio tracks, downsample audio tracks, or '
-                'remove some custom tracks.') from e
+                'remove some custom courses.') from e
         iso_size = os.path.getsize(args.output)
         human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
         log.info(f'ISO image written ({files_written} files - {human_readable_iso_size} MiB).')
@@ -2972,7 +2972,7 @@ def extend_game(args: argparse.Namespace):
             raise MKDDExtenderError(
                 f'ISO file ({iso_size} bytes) is larger than the absolute maximum file size '
                 f'({EXTREME_MAX_ISO_SIZE} bytes). Possible solutions: remove some audio tracks, '
-                'downsample audio tracks, or remove some custom tracks.')
+                'downsample audio tracks, or remove some custom courses.')
 
         if iso_size > MAX_ISO_SIZE:
             log.warning(f'ISO file ({iso_size} bytes) is larger than the size that GameCube or Wii '

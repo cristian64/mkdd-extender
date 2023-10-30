@@ -1,17 +1,17 @@
 # MKDD Extender
 
-A tool that extends Mario Kart: Double Dash!! with 48 extra courses.
+A tool that extends Mario Kart: Double Dash!! with 144 extra race tracks and 54 extra battle stages.
 
 ## Usage
 
 MKDD Extender needs to be provided with the following items:
 
 - A retail ISO file of the original Mario Kart: Double Dash!! game. All regions are supported.
-- The custom tracks that will be inserted in the game. Custom tracks can be downloaded from the
+- The custom courses that will be inserted in the game. Custom courses can be downloaded from the
   community-powered [Custom Mario Kart: Double Dash Wiki!!](https://mkdd.org).
 
-Once the directory containing the custom tracks is specified, drag & drop the custom tracks from
-the left-hand side pane onto each of the 48 slots in the main area.
+Once the directory containing the custom courses is specified, drag & drop the custom courses from
+the left-hand side pane onto each of the empty slots in the main area.
 
 Screenshot of the graphical user interface:
 

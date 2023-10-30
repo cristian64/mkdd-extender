@@ -772,7 +772,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self._images_loaded.connect(self._on_images_loaded)
 
         # Loading BTI files is somehow expensive. Once an image is loaded, it is cached using its
-        # checksum as key. Very often custom tracks reuse the same images for all languages; this
+        # checksum as key. Very often custom courses reuse the same images for all languages; this
         # helps greatly.
         # To avoid calculating checksums often, another cache is used to map filepaths to checksums.
         self._checksum_cache = {}
@@ -805,10 +805,10 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self._pixmap_cache.clear()
 
     def show_placeholder_message(self):
-        self._build_label('Select a custom track to view its details', QtGui.QColor(100, 100, 100))
+        self._build_label('Select a custom course to view its details', QtGui.QColor(100, 100, 100))
 
     def show_not_valid_message(self):
-        self._build_label('Unable to preview selected custom track', QtGui.QColor(170, 20, 20))
+        self._build_label('Unable to preview selected custom course', QtGui.QColor(170, 20, 20))
 
     def set_path(self, path: str):
         if os.path.isfile(path):
@@ -1025,8 +1025,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             return
         self._pending_image_filepaths_by_language = None
 
-        # Get checksums and group them by language. Most custom tracks share the same images for all
-        # the languages, so they are shown within the same box to save vertical space.
+        # Get checksums and group them by language. Most custom courses share the same images for
+        # all the languages, so they are shown within the same box to save vertical space.
         language_checksums = {}
         for language, image_filepaths in image_filepaths_by_language.items():
             checksums = []
@@ -1575,14 +1575,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                               QtWidgets.QFileDialog.AcceptSave,
                                               QtWidgets.QFileDialog.AnyFile,
                                               ('ISO (*.iso)', 'GCM (*.gcm)'))
-        self._custom_tracks_directory_edit = PathEdit('Select Custom Tracks Directory',
+        self._custom_tracks_directory_edit = PathEdit('Select Custom Courses Directory',
                                                       QtWidgets.QFileDialog.AcceptOpen,
                                                       QtWidgets.QFileDialog.Directory)
         input_form_layout = QtWidgets.QFormLayout()
         input_form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
         input_form_layout.addRow('Input ISO File', self._input_iso_file_edit)
         input_form_layout.addRow('Output ISO File', self._output_iso_file_edit)
-        input_form_layout.addRow('Custom Tracks Directory', self._custom_tracks_directory_edit)
+        input_form_layout.addRow('Custom Courses Directory', self._custom_tracks_directory_edit)
 
         self._custom_tracks_filter_edit = QtWidgets.QLineEdit()
         self._custom_tracks_filter_edit.textChanged.connect(self._update_custom_tracks_filter)
@@ -1613,7 +1613,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             QtWidgets.QHeaderView.ResizeToContents)
         self._custom_tracks_table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self._custom_tracks_table.setWordWrap(False)
-        self._custom_tracks_table_label = 'Custom Tracks'
+        self._custom_tracks_table_label = 'Custom Courses'
         self._custom_tracks_table.setHorizontalHeaderLabels([self._custom_tracks_table_label])
         custom_tracks_drop_widget = DropWidget()
         custom_tracks_drop_widget_layout = QtWidgets.QVBoxLayout(custom_tracks_drop_widget)
@@ -1798,7 +1798,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._update_options_string()
 
-        # Custom tracks (and indirectly emblems) to be updated in the next iteration, to guarantee
+        # Custom courses (and indirectly emblems) to be updated in the next iteration, to guarantee
         # that the main window has been shown before showing a potential progress dialog.
         QtCore.QTimer.singleShot(0, self._load_custom_tracks_directory)
 
@@ -2058,22 +2058,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <p><h3>2. Output ISO file</h3>
             Select the path to the location where the <em>extended</em> ISO file will be written.
             </p>
-            <p><h3>3. Custom tracks directory</h3>
-            Select the path to the directory that contains the custom tracks.
+            <p><h3>3. Custom courses directory</h3>
+            Select the path to the directory that contains the custom courses (race tracks and
+            battle stages).
             <br/>
             <br/>
-            MKDD Extender follows the custom track format that the
+            MKDD Extender follows the custom course format that the
             <a href="https://github.com/RenolY2/mkdd-track-patcher"
                style="white-space: nowrap;">MKDD Track Patcher</a> defines.
             <br/>
             <br/>
-            Custom tracks can be downloaded from the community-powered
+            Custom courses can be downloaded from the community-powered
             <a href="https://mkdd.org">Custom Mario Kart: Double Dash Wiki!!</a>.
             </p>
-            <p><h3>4. Assign custom tracks</h3>
-            Once the custom tracks directory has been selected, the
+            <p><h3>4. Assign custom courses</h3>
+            Once the custom courses directory has been selected, the
             <b>{self._custom_tracks_table_label}</b> list on the left-hand side will be populated.
-            Drag & drop the custom tracks onto the slots on each of the course pages on the
+            Drag & drop the custom courses onto the slots on each of the course pages on the
             right-hand side.
             <br/>
             <br/>
@@ -2165,7 +2166,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         if dirpath:
             progress_dialog = ProgressDialog(
-                'Scanning custom tracks directory...',
+                'Scanning custom courses directory...',
                 lambda: mkdd_extender.scan_custom_tracks_directory(dirpath), self)
             paths_to_track_name = progress_dialog.execute_and_wait()
 
@@ -2174,7 +2175,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     label = 'Directory not accessible.'
                     color = self._red_color
                 else:
-                    label = 'No custom track found in directory.'
+                    label = 'No custom course found in directory.'
                     color = self._yellow_color
                 item = QtWidgets.QTableWidgetItem(label)
                 item.setForeground(color)
@@ -2389,7 +2390,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                 if text not in custom_tracks:
                     page_item.setIcon(self._error_icon)
-                    page_item.setToolTip('Custom track can no longer be located in the track list.')
+                    page_item.setToolTip(
+                        'Custom course can no longer be located in the course list.')
                     page_item.setForeground(self._red_color)
                     continue
 
@@ -2414,7 +2416,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     for page_item in page_items:
                         page_item.setIcon(self._warning_icon)
                         page_item.setToolTip(
-                            'Custom track has been assigned to more than one slot.')
+                            'Custom course has been assigned to more than one slot.')
                         page_item.setForeground(self._yellow_color)
 
         if self._custom_tracks_table.isEnabled():
@@ -2750,11 +2752,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         description_label = QtWidgets.QLabel()
         description_label.setWordWrap(True)
         description_label.setText(
-            'This is a helper tool that copies, extracts, and flattens the custom tracks that are '
+            'This is a helper tool that copies, extracts, and flattens the custom courses that are '
             'currently mapped to each of the slots.'
             '\n\n'
-            'Its main purpose is to provide a directory of custom tracks that can be used with the '
-            'MKDD Extender in command-line mode.')
+            'Its main purpose is to provide a directory of custom courses that can be used with '
+            'the MKDD Extender in command-line mode.')
         layout.addWidget(description_label)
         layout.addSpacing(dialog.fontMetrics().height())
         output_directory_layout = QtWidgets.QFormLayout()
@@ -2813,7 +2815,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if not path:
                     raise mkdd_extender.MKDDExtenderError(
                         'Please make sure that all slots have been assigned to a valid custom '
-                        'track.')
+                        'course.')
                 paths.append(path)
 
             LETTER_RANGE = f'A-{chr(ord("A") + mkdd_extender.MAX_EXTRA_PAGES - 1)}'
@@ -2848,7 +2850,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             exception_info = None
 
             try:
-                progress_dialog = ProgressDialog('Processing custom tracks...', generate_pack, self)
+                progress_dialog = ProgressDialog('Processing custom courses...', generate_pack,
+                                                 self)
                 progress_dialog.execute_and_wait()
 
             except mkdd_extender.MKDDExtenderError as e:
@@ -2870,7 +2873,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             else:
                 icon_name = 'success'
                 title = 'Success!!'
-                text = 'Custom tracks processed successfully.'
+                text = 'Custom courses processed successfully.'
                 detailed_text = ''
 
             show_message(icon_name, title, text, detailed_text, self)
@@ -3603,7 +3606,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         '<li>Lower the sample rate in the <b>Sample Rate</b> option (e.g. to '
                         '<code>24000 Hz</code>)</li>'
                         '<li>Mark the <b>Use Auxiliary Audio Track</b> option to reuse stock audio '
-                        'tracks for custom tracks<br/>that define the '
+                        'tracks for custom race tracks<br/>that define the '
                         '<code>auxiliary_audio_track</code> field.</li>'
                         '<li>Mark the <b>Use Replacee Audio Track</b> option to use the stock '
                         'audio tracks for all tracks.</li>'
