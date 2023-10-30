@@ -1665,7 +1665,40 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if page_index == 0:
                 page_table.setHorizontalHeaderLabels(HEADER_LABELS)
+                for i in range(COLUMNS):
+                    page_table.horizontalHeaderItem(i).setToolTip(
+                        textwrap.dedent(f"""\
+                        <h3>{HEADER_LABELS[i]}</h3>
+                        <p>Race tracks in the stock game:</p>
+                        <p><ul>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 0]]}</li>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 1]]}</li>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 2]]}</li>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 3]]}</li>
+                        </ul></p>
+                    """))
+
                 page_battle_stages_table.setHorizontalHeaderLabels(BATTLE_HEADER_LABELS)
+                for i in range(BATTLE_COLUMNS):
+                    page_battle_stages_table.horizontalHeaderItem(i).setToolTip(
+                        textwrap.dedent(f"""\
+                        <h3>{BATTLE_HEADER_LABELS[1]}</h3>
+                        <p>Battle stages in the stock game:</p>
+                        <p><table style="white-space: nowrap;"><tr>
+                        <td><ul>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 0]]}</li>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 1]]}</li>
+                        </ul></td>
+                        <td><ul>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 2]]}</li>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 3]]}</li>
+                        </ul></td>
+                        <td><ul>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 4]]}</li>
+                        <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 5]]}</li>
+                        </ul></td>
+                        </tr></table></p>
+                    """))
             else:
                 page_table.horizontalHeader().hide()
                 page_battle_stages_table.horizontalHeader().hide()
