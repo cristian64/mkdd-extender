@@ -345,6 +345,61 @@ class VerticalLabel(QtWidgets.QWidget):
         painter.drawText(rect, QtCore.Qt.AlignCenter | QtCore.Qt.AlignHCenter, self._text)
 
 
+class CollapsibleGroupBox(QtWidgets.QWidget):
+
+    toggled = QtCore.Signal(bool)
+
+    _arrow_tip_down_icon_path = os.path.join(data_dir, 'gui',
+                                             'arrow_tip_down.svg').replace('\\', '/')
+    _arrow_tip_right_icon_path = os.path.join(data_dir, 'gui',
+                                              'arrow_tip_right.svg').replace('\\', '/')
+
+    def __init__(self, title: str = '', parent: QtWidgets.QWidget = None):
+        super().__init__(parent=parent)
+
+        self._checkbox = QtWidgets.QCheckBox(title)
+        self._checkbox.setChecked(True)
+
+        indicator_height = self.fontMetrics().height()
+        self._checkbox.setStyleSheet(
+            textwrap.dedent(f"""\
+            QCheckBox::indicator {{
+                width: {indicator_height}px;
+                height: {indicator_height}px;
+            }}
+            QCheckBox::indicator:checked {{
+                image: url("{self._arrow_tip_down_icon_path}");
+            }}
+            QCheckBox::indicator:unchecked {{
+                image: url("{self._arrow_tip_right_icon_path}");
+            }}
+            QCheckBox::indicator:checked:pressed,
+            QCheckBox::indicator:unchecked:pressed {{
+                background-color: {self.palette().base().color().name()};
+            }}
+        """))
+
+        self._widget = QtWidgets.QGroupBox()
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self._checkbox)
+        layout.addWidget(self._widget)
+
+        self._checkbox.toggled.connect(self._widget.setVisible)
+        self._checkbox.toggled.connect(self.toggled)
+
+    def setLayout(self, layout: QtWidgets.QLayout):
+        self._widget.setLayout(layout)
+
+    def layout(self) -> QtWidgets.QLayout:
+        return self._widget.layout()
+
+    def set_expanded(self, expanded: bool):
+        self._checkbox.setChecked(expanded)
+
+
 class CopyableImageWidget(QtWidgets.QLabel):
 
     def __init__(self, pixmap: QtGui.QPixmap, parent: QtWidgets.QWidget = None):
@@ -763,6 +818,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self.setPalette(palette)
         self.setWidgetResizable(True)
 
+        self._expansion_states = {}
+
         self._ast_metadata_cache = {}
 
         self._pending_minimap_filepath = None
@@ -797,6 +854,13 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         super().showEvent(event)
 
         self.shown.emit()
+
+    def get_expansion_states(self):
+        return self._expansion_states.copy()
+
+    def set_expansion_states(self, expansion_states: 'dict[str, bool]'):
+        self._expansion_states.clear()
+        self._expansion_states.update(expansion_states)
 
     def purge_caches(self):
         self._ast_metadata_cache.clear()
@@ -875,7 +939,9 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         widget.setPalette(self.palette())  # To inherit background color from parent.
         layout = QtWidgets.QVBoxLayout(widget)
 
-        info_box = QtWidgets.QGroupBox('Info')
+        info_box = CollapsibleGroupBox('Info')
+        info_box.set_expanded(self._expansion_states.get('info', True))
+        info_box.toggled.connect(lambda expanded: self._expansion_states.update({'info': expanded}))
         info_box.setLayout(QtWidgets.QVBoxLayout())
         info_widget = QtWidgets.QLabel()
         if replaces_is_battle_stage:
@@ -907,7 +973,10 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         layout.addWidget(info_box)
 
         if audio_filepaths:
-            audio_box = QtWidgets.QGroupBox('Audio Tracks')
+            audio_box = CollapsibleGroupBox('Audio Tracks')
+            audio_box.set_expanded(self._expansion_states.get('audio_tracks', True))
+            audio_box.toggled.connect(
+                lambda expanded: self._expansion_states.update({'audio_tracks': expanded}))
             audio_box.setLayout(QtWidgets.QFormLayout())
             for audio_filepath in audio_filepaths:
                 text = 'Normal' if 'normal' in audio_filepath else 'Fast'
@@ -919,7 +988,10 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 audio_box.layout().addRow(label, ast_player)
             layout.addWidget(audio_box)
 
-        minimap_box = QtWidgets.QGroupBox('Minimap', self)
+        minimap_box = CollapsibleGroupBox('Minimap', self)
+        minimap_box.set_expanded(self._expansion_states.get('minimap', True))
+        minimap_box.toggled.connect(
+            lambda expanded: self._expansion_states.update({'minimap': expanded}))
         minimap_box.setObjectName('minimap_box')
         minimap_box.setLayout(QtWidgets.QHBoxLayout())
         minimap_info_widget = QtWidgets.QLabel()
@@ -1056,7 +1128,10 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             if not at_least_one_image:
                 continue
 
-            language_box = QtWidgets.QGroupBox(f'{"/".join(languages)} Images')
+            language_box = CollapsibleGroupBox(f'{"/".join(languages)} Images')
+            language_box.set_expanded(self._expansion_states.get(languages[0].lower(), True))
+            language_box.toggled.connect(lambda expanded, language=languages[0].lower(): self.
+                                         _expansion_states.update({language: expanded}))
             language_box.setLayout(QtWidgets.QHBoxLayout())
 
             assert len(labels) == 4
@@ -1878,6 +1953,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 (f'{custom_tracks_table_header.sortIndicatorSection()} '
                                  f'{sort_indicator_order}'))
 
+        self._settings.setValue('miscellaneous/info_view_expansion_states',
+                                self._info_view.get_expansion_states())
+
         page_item_values = self._get_page_item_values_enabled_only()
         self._settings.setValue('miscellaneous/page_item_combined_values',
                                 json.dumps(page_item_values))
@@ -1948,6 +2026,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             if logical_index >= 0:
                 order = QtCore.Qt.SortOrder(int(text.split(' ')[1]))
                 custom_tracks_table_header.setSortIndicator(logical_index, order)
+
+        self._info_view.set_expansion_states(
+            self._settings.value('miscellaneous/info_view_expansion_states') or {})
 
         page_item_values = self._settings.value('miscellaneous/page_item_combined_values')
         if not page_item_values:
