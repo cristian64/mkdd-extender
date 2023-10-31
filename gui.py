@@ -91,7 +91,7 @@ def set_dark_theme(app: QtWidgets.QApplication):
     QtWidgets.QToolTip.setPalette(palette)
 
     # Further global customization for the tool tips.
-    padding = app.fontMetrics().height() // 2
+    padding = QtGui.QFontMetrics(QtGui.QFont()).height() // 2
     app.setStyleSheet(f'QToolTip {{ padding: {padding}px; }}')
 
 
