@@ -1498,11 +1498,13 @@ def patch_dol_file(
     initial_page_number: int,
     replaces_data: dict,
     minimap_data: dict,
+    tilt_setting_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
     battle_stages_enabled: bool,
     extender_cup: bool,
     type_specific_item_boxes: bool,
     sectioned_courses: bool,
+    tilting_courses: bool,
     dol_path: str,
     log: logging.Logger,
     debug_output: bool,
@@ -1631,7 +1633,12 @@ def patch_dol_file(
         if page_index == 0:  # First page already handled.
             continue
         for track_index in range(page_course_count):
-            if replaces_data[(page_index, track_index)] == 'Mini5':
+            key = (page_index, track_index)
+            # Tilting courses are those that replace Tilt-A-Kart, or, if the Tilting Courses code
+            # patch has been enabled, those whose tilt setting in the BOL header has been set to
+            # "entire course".
+            if (replaces_data[key] == 'Mini5'
+                    or (tilting_courses and tilt_setting_data[key] == 0x02)):
                 page_tilting_courses[page_index].append(track_index)
     tilting_data_code_lines = []
     for page_index, track_indexes in page_tilting_courses.items():
@@ -1684,6 +1691,7 @@ def patch_dol_file(
             ('__REDRAW_COURSESELECT_SCREEN_ADDRESS__',
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
+            ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
@@ -1766,6 +1774,7 @@ def patch_dol_file(
                 if battle_stages_enabled:
                     project.branchlink(SCENEMAPSELECT_CALCANM_CALL_ADDRESSES[game_id],
                                        'scenemapselect_calcanm_ex')
+                if battle_stages_enabled or tilting_courses:
                     project.branchlink(IS_TILTING_COURSE_CALL_ADDRESSES[game_id],
                                        'is_tilting_course')
                     project.dol.seek(IS_TILTING_COURSE_CALL_ADDRESSES[game_id] + 4)

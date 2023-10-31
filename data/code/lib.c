@@ -35,6 +35,7 @@
 #define PLAYER_ITEM_ROLLS_ADDRESS __PLAYER_ITEM_ROLLS_ADDRESS__
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
+#define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 #define SECTIONED_COURSES __SECTIONED_COURSES__
 
@@ -106,6 +107,10 @@ void refresh_mapselectmode()
         SceneMapSelect__map_init(g_scenemapselect);
     }
 }
+
+#endif
+
+#if BATTLE_STAGES || TILTING_COURSES
 
 bool is_tilting_course(const int* const course)
 {

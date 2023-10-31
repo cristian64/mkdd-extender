@@ -546,6 +546,38 @@ def course_name_to_course(course_name: str) -> str:
     return sorted(courses_weight, key=lambda e: e[1])[-1][0]
 
 
+def get_tilt_setting_from_bol_file(course_filepath: str) -> int:
+    BOL_MAGIC = b'0015'
+    TILT_SETTING_OFFSET = 0x04
+
+    with open(course_filepath, 'rb') as f:
+        data = f.read()
+
+    # If the start of the BOL file can be located [once] in the RARC archive, the BOL file can be
+    # read directly without having to extract the archive first, which would be slower. This
+    # shortcut only possible if the RARC file is uncompressed.
+    if data[:4] == b'RARC':
+        bol_offset = data.find(BOL_MAGIC)
+        if bol_offset > 0:
+            if data.find(BOL_MAGIC, bol_offset + len(BOL_MAGIC)) < 0:
+                with open(course_filepath, 'r+b') as f:
+                    f.seek(bol_offset + TILT_SETTING_OFFSET)
+                    return f.read(1)[0]
+
+    # Otherwise, extract the RARC file, and locate the BOL file in the directory.
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        rarc.extract(course_filepath, tmp_dir)
+
+        course_dirpath = os.path.join(tmp_dir, os.listdir(tmp_dir)[0])
+        bol_filepath = os.path.join(
+            course_dirpath,
+            tuple(p for p in os.listdir(course_dirpath) if p.endswith('.bol'))[0])
+
+        with open(bol_filepath, 'r+b') as f:
+            f.seek(TILT_SETTING_OFFSET)
+            return f.read(1)[0]
+
+
 def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
     assert course_filepath.endswith('.arc')
     assert 0 <= track_index < RACE_AND_BATTLE_COURSE_COUNT
@@ -1546,6 +1578,7 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
 def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | list]':
     replaces_data = {}
     minimap_data = {}
+    tilt_setting_data = {}
     alternative_audio_data = {}
     matching_audio_override_data = {}
     added_course_names = []
@@ -1840,6 +1873,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
                 repack_course_arc_file(page_track_filepath, f'{COURSES[track_index].lower()}')
                 repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}l')
+
+            tilt_setting_data[(page_index, track_index)] = \
+                get_tilt_setting_from_bol_file(page_track_filepath)
 
             # Copy GHT file.
             if not is_battle_stage:
@@ -2166,6 +2202,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
     return (
         replaces_data,
         minimap_data,
+        tilt_setting_data,
         alternative_audio_data,
         matching_audio_override_data,
         added_course_names,
@@ -2290,7 +2327,7 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
 
 
 def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: dict,
-                   alternative_audio_data: 'dict[str, str]',
+                   tilt_setting_data: dict, alternative_audio_data: 'dict[str, str]',
                    matching_audio_override_data: 'dict[str, str]', battle_stages_enabled: bool,
                    iso_tmp_dir: str):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
@@ -2330,11 +2367,13 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         initial_page_number,
         replaces_data,
         minimap_data,
+        tilt_setting_data,
         audio_track_data,
         battle_stages_enabled,
         bool(args.extender_cup),
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
+        bool(args.tilting_courses),
         dol_path,
         log,
         bool(args.debug_output),
@@ -2620,6 +2659,17 @@ OPTIONAL_ARGUMENTS = {
             'a lap when passed. This allows for more flexible single-lap courses '
             'or courses with multiple routes for laps.',
         ),
+        ('Tilting Courses', bool,
+         'If enabled, general support for tilting courses will be added to the game.'
+         '\n\n'
+         'The patch allows custom courses to set the tilt setting in the BOL header (located at '
+         '`0x04`) to "entire course" (value `0x02`) to receive the same handling that Tilt-A-Kart '
+         'receives.'
+         '\n\n'
+         'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects in '
+         'the BOL file have a base height of `10000` units. Custom courses that use the tilt '
+         'functionality should follow the same structure; the game will apply the 10000 offset to '
+         'the models\' geometry after the tilt rotation is applied.'),
     ),
     'Expert Options': (
         (
@@ -2814,6 +2864,7 @@ def extend_game(args: argparse.Namespace):
         (
             replaces_data,
             minimap_data,
+            tilt_setting_data,
             alternative_audio_data,
             matching_audio_override_data,
             added_course_names,
@@ -2827,7 +2878,7 @@ def extend_game(args: argparse.Namespace):
                                                  if battle_stages_enabled else RACE_TRACK_COUNT) + 1
         patch_cup_names(args, page_count, iso_tmp_dir)
 
-        patch_dol_file(args, replaces_data, minimap_data, alternative_audio_data,
+        patch_dol_file(args, replaces_data, minimap_data, tilt_setting_data, alternative_audio_data,
                        matching_audio_override_data, battle_stages_enabled, iso_tmp_dir)
 
         # Re-pack RARC files, and erase directories.
