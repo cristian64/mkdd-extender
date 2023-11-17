@@ -1805,8 +1805,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 if args.skip_code_patches_check:
                     log.warning(message)
                 else:
-                    raise MKDDExtenderError(f'{message} Re-run with --skip-code-patches-check to '
-                                            'circumvent this safety measure.')
+                    if supported:
+                        raise MKDDExtenderError(f'{message} Enable the code patch, or re-run with '
+                                                '--skip-code-patches-check to circumvent this '
+                                                'safety measure.')
+                    else:
+                        raise MKDDExtenderError(f'{message} Re-run with --skip-code-patches-check '
+                                                'to circumvent this safety measure.')
 
             added_course_names.append(trackname)
 
