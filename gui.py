@@ -902,6 +902,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             track_name = trackinfo['Config'].get('trackname') or ''
             author = trackinfo['Config'].get('author') or ''
             replaces = trackinfo['Config'].get('replaces') or ''
+            code_patches = trackinfo['Config'].get('code_patches') or ''
             replaces_is_battle_stage = False
             if replaces:
                 replaces_course = mkdd_extender.course_name_to_course(replaces)
@@ -959,6 +960,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 <tr><td><b>Directory Name: </b> </td><td>{dirname}</td></tr>
                 <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
                 <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
+                <tr><td><b>Code Patches: </b> </td><td>{code_patches}</td></tr>
                 </table>
             """))  # noqa: E501
         else:
@@ -971,6 +973,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 <tr><td><b>Parent Directory: </b> </td><td><code>{parent_dirpath}</code></td></tr>
                 <tr><td><b>Staff Ghost: </b> </td><td>{'Yes' if staffghost_present else ''}</td></tr>
                 <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
+                <tr><td><b>Code Patches: </b> </td><td>{code_patches}</td></tr>
                 <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
                 </table>
             """))  # noqa: E501
