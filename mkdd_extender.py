@@ -906,6 +906,32 @@ def add_page_number_to_cup_name_image(filepath: str, page_number: int, page_coun
         convert_png_to_bti(tmp_filepath, filepath, 'IA4')
 
 
+def add_page_number_to_preview_image(filepath: str, page_number: int, page_count: int):
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        cupname_filename = os.path.basename(filepath)
+        tmp_filepath = os.path.join(tmp_dir, cupname_filename[:-len('.bti')] + '.png')
+
+        convert_bti_to_png(filepath, tmp_filepath)
+
+        preview_image = Image.open(tmp_filepath)
+        original_mode = preview_image.mode
+        preview_image = preview_image.convert('RGBA')
+        canvas_width = preview_image.width
+        canvas_height = preview_image.height
+
+        numbers_image = build_page_numbers_image(page_number, page_count)
+
+        image = Image.new('RGBA', (canvas_width, canvas_height))
+        image.paste(preview_image, (0, 0))
+        image.alpha_composite(numbers_image, dest=(canvas_width - numbers_image.width, 3))
+        image = image.convert(original_mode)
+        image.save(tmp_filepath)
+
+        remove_file(filepath)  # It may be a hard link; unlink early.
+
+        convert_png_to_bti(tmp_filepath, filepath, 'CMPR')
+
+
 CHARACTERS = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', ':', '!', '.', '?', '/',
               'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
               'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', "'", '"', '&', 'Ä', 'Ë', 'Ï', 'Ö', 'Ü',
@@ -2198,6 +2224,22 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                             if 'zi_map' in filename and filename.endswith('.bti'):
                                 filepath = os.path.join(mapselect_dirpath, filename)
                                 conform_bti_image(filepath, *battle_stages_label_image_size, 'IA4')
+
+        # Embed page number and page count in the preview image of the first battle stage in every
+        # page.
+        if battle_stages_enabled:
+            for language in LANGUAGES:
+                mapselect_dirpath = os.path.join(scenedata_dirpath, language, 'mapselect', 'timg')
+                if not os.path.isdir(mapselect_dirpath):
+                    continue
+                for filename in os.listdir(mapselect_dirpath):
+                    if not filename.endswith('ttlemapsnap1.bti'):
+                        continue
+                    page_index = ord(filename[1]) - ord('0')
+                    assert 0 <= page_index < total_page_count
+                    page_number = page_index + 1
+                    image_filepath = os.path.join(mapselect_dirpath, filename)
+                    add_page_number_to_preview_image(image_filepath, page_number, total_page_count)
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
