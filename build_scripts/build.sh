@@ -19,5 +19,8 @@ pyinstaller mkdd_extender.spec
 cd dist
 python3 -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, 'data', 'extender_cup', 'model'))"
 python3 -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, 'data', 'extender_cup', 'cup_logo.svg'))"
+cd mkdd-extender*
+rm libgdk*  # Remove to ensure the system's are used.
+cd -
 python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'xztar', '.', d)"
 cp *.tar.xz /output
