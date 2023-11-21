@@ -1423,6 +1423,8 @@ class LogTable(QtWidgets.QTableWidget):
     def __init__(self, parent: QtWidgets.QWidget = None):
         super().__init__(parent)
 
+        self._last_log_filepath = ''
+
         font_size = round(self.font().pointSize() * 0.80)
         self.setStyleSheet(
             f'QTableWidget {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
@@ -1443,14 +1445,20 @@ class LogTable(QtWidgets.QTableWidget):
         self.setWordWrap(False)
 
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-        clear_log_action = QtGui.QAction('Clear Log', self)
-        clear_log_action.triggered.connect(lambda: self.setRowCount(0))
+        save_log_action = QtGui.QAction('Save Log', self)
+        save_log_action.triggered.connect(self._on_save_log_triggered)
         self._clear_log_before_each_run_action = QtGui.QAction('Clear Log Before Each Run', self)
         self._clear_log_before_each_run_action.setCheckable(True)
         self._clear_log_before_each_run_action.setChecked(True)
         self._clear_log_before_each_run_action.triggered.connect(lambda: self.setRowCount(0))
-        self.addAction(clear_log_action)
+        clear_log_action = QtGui.QAction('Clear Log', self)
+        clear_log_action.triggered.connect(lambda: self.setRowCount(0))
+        self.addAction(save_log_action)
+        separator = QtGui.QAction(self)
+        separator.setSeparator(True)
+        self.addAction(separator)
         self.addAction(self._clear_log_before_each_run_action)
+        self.addAction(clear_log_action)
 
         self.log_message_received.connect(self._on_log_handler_log_message_received,
                                           QtCore.Qt.QueuedConnection)
@@ -1467,6 +1475,12 @@ class LogTable(QtWidgets.QTableWidget):
 
         self._log_handler = LogHandler()
         mkdd_extender.log.addHandler(self._log_handler)
+
+    def get_last_log_path(self) -> str:
+        return self._last_log_filepath
+
+    def set_last_log_path(self, last_log_filepath: str):
+        self._last_log_filepath = last_log_filepath
 
     def get_clear_log_before_each_run(self) -> bool:
         return self._clear_log_before_each_run_action.isChecked()
@@ -1498,6 +1512,39 @@ class LogTable(QtWidgets.QTableWidget):
 
         scroll_bar = self.verticalScrollBar()
         QtCore.QTimer.singleShot(0, lambda: scroll_bar.setSliderPosition(scroll_bar.maximum()))
+
+    def _on_save_log_triggered(self, checked: bool):
+        _ = checked
+
+        file_dialog = QtWidgets.QFileDialog(self, 'Select Output Log File',
+                                            os.path.dirname(self._last_log_filepath))
+        file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, not mkdd_extender.windows)
+        file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
+        file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
+        file_dialog.setNameFilters(('Log (*.log)', ))
+        file_dialog.selectFile(
+            os.path.basename(self._last_log_filepath) or 'mkdd_extender_build.log')
+        dialog_code = file_dialog.exec_()
+        if dialog_code != QtWidgets.QDialog.Accepted or not file_dialog.selectedFiles():
+            return
+        filepath = file_dialog.selectedFiles()[0]
+        if not filepath:
+            return
+
+        self._last_log_filepath = filepath
+
+        lines = []
+        for i in range(self.rowCount()):
+            timestamp = self.item(i, 0).text()
+            level = self.item(i, 1).text()
+            system = self.item(i, 2).text()
+            message = self.item(i, 3).text()
+            line = f'{timestamp: <23}   {level: <7}   {system: <15}   {message}'
+            lines.append(line)
+
+        text = '\n'.join(lines + [''])
+        with open(filepath, 'w', encoding='utf8') as f:
+            f.write(text)
 
 
 class DelayedDirectoryWatcher(QtCore.QObject):
@@ -1987,6 +2034,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     options.append((option_variable_name, option_value))
         self._settings.setValue('miscellaneous/options', json.dumps(options))
 
+        self._settings.setValue('miscellaneous/last_log_path', self._log_table.get_last_log_path())
         self._settings.setValue('miscellaneous/clear_log_before_each_run',
                                 self._log_table.get_clear_log_before_each_run())
 
@@ -2073,6 +2121,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_member_name = f'_{option_variable_name}'
                     setattr(self, option_member_name, option_value)
 
+        self._log_table.set_last_log_path(self._settings.value('miscellaneous/last_log_path', ''))
         self._log_table.set_clear_log_before_each_run(
             self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true')
 
