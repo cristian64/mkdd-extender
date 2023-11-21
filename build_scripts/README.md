@@ -10,7 +10,7 @@ cd /path/to/mkdd-extender/build_scripts
 docker system prune -a
 
 # Create the image.
-docker build -t mkddextender -f Dockerfile.ubuntu22.04 .
+docker build -t mkddextender -f Dockerfile.ubuntu20.04 .
 
 # Spawn the container and run the build script.
 docker run -ti -v $PWD:/build_scripts -v ~/Downloads:/output mkddextender /bin/bash /build_scripts/build.sh
