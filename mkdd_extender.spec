@@ -26,7 +26,10 @@ for line in data.splitlines():
 else:
     raise RuntimeError('Unable to parse product version.')
 
-collection_name = f'mkdd-extender-{version}-{platform.system().lower()}'
+system = platform.system().lower()
+arch = platform.machine().lower()
+
+collection_name = f'mkdd-extender-{version}-{system}-{arch}'
 
 # Data files that will be copied verbatim.
 datas = [
