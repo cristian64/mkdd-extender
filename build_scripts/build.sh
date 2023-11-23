@@ -27,14 +27,15 @@ pyinstaller mkdd_extender.spec
 
 # Remove unnecessary files.
 cd dist
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, 'data', 'extender_cup', 'model'))"
-python3 -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, 'data', 'extender_cup', 'cup_logo.svg'))"
-cd mkdd-extender*
+bundle_name=$(ls)
+cd "$bundle_name"
+rm -r "data/extender_cup/model"
+rm "data/extender_cup/cup_logo.svg"
 rm libgdk*  # Remove to ensure the system's are used.
 cd -
 
 # Create tarball.
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'xztar', '.', d)"
+python3 -c "import shutil; d = '$bundle_name'; shutil.make_archive(d, 'xztar', '.', d)"
 
 # Save artifacts.
-cp *.tar.xz /output
+cp "$bundle_name.tar.xz" /output
