@@ -4,23 +4,37 @@
 # mapped in advance before spawning the container.
 
 ls /output || exit 1
+
+# Prepare working directory.
 cd /tmp
 rm -rf MKDDEXT_BUNDLE_TMP
 mkdir MKDDEXT_BUNDLE_TMP
 cd MKDDEXT_BUNDLE_TMP
+
+# Check out code.
 git clone https://github.com/cristian64/mkdd-extender.git --depth=1
 cd mkdd-extender
+
+# Install dependencies.
 python3 -m venv venv
 source venv/bin/activate
 export PYTHONNOUSERSITE=1
 python3 -m pip install -r requirements.txt
 python3 -m pip install altgraph==0.17.3 pyinstaller==5.13.2 pyinstaller-hooks-contrib==2023.8
+
+# Create standalone Python application.
 pyinstaller mkdd_extender.spec
+
+# Remove unnecessary files.
 cd dist
 python3 -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, 'data', 'extender_cup', 'model'))"
 python3 -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, 'data', 'extender_cup', 'cup_logo.svg'))"
 cd mkdd-extender*
 rm libgdk*  # Remove to ensure the system's are used.
 cd -
+
+# Create tarball.
 python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'xztar', '.', d)"
+
+# Save artifacts.
 cp *.tar.xz /output
