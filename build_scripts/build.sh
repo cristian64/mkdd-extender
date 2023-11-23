@@ -37,5 +37,17 @@ cd -
 # Create tarball.
 python3 -c "import shutil; d = '$bundle_name'; shutil.make_archive(d, 'xztar', '.', d)"
 
+# Create AppImage.
+mkdir -p "$bundle_name.AppDir/usr"
+cp -R "$bundle_name" "$bundle_name.AppDir/usr/bin"
+cp ../build_scripts/mkdd-extender.desktop "$bundle_name.AppDir"
+cp ../data/gui/logo256x256.png "$bundle_name.AppDir/mkdd-extender.png"
+ln -sr "$bundle_name.AppDir/usr/bin/mkdd-extender" "$bundle_name.AppDir/AppRun"
+curl -sSfL https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+chmod +x appimagetool
+./appimagetool --appimage-extract
+./squashfs-root/AppRun "$bundle_name.AppDir" "$bundle_name.AppImage"
+
 # Save artifacts.
 cp "$bundle_name.tar.xz" /output
+cp "$bundle_name.AppImage" /output

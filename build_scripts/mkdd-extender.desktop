@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=MKDD Extender
+Exec=AppRun
+Type=Application
+Icon=mkdd-extender
+TryExec=mkdd-extender
+Comment=A tool that extends Mario Kart: Double Dash!!
+Categories=Game;
