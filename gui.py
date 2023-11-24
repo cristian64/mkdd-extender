@@ -2294,8 +2294,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <small><a href="https://github.com/cristian64/mkdd-extender">
                 github.com/cristian64/mkdd-extender
             </a></small>
-            <br/><br/>
-            {mkdd_extender.__doc__}
+            <p>{mkdd_extender.__doc__}</p>
+            <br/>
             <br/>
             <br/>
             <small>
