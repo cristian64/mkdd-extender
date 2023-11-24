@@ -2238,7 +2238,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             <br/>
             MKDD Extender follows the custom course format that the
             <a href="https://github.com/RenolY2/mkdd-track-patcher"
-               style="white-space: nowrap;">MKDD Track Patcher</a> defines.
+                style="white-space: nowrap;">MKDD Patcher</a> defines.
             <br/>
             <br/>
             Custom courses can be downloaded from the community-powered
@@ -2259,6 +2259,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             {mkdd_extender.MAX_EXTRA_PAGES + 1} pages). The first page is reserved for the stock
             courses in the input ISO file; it does not appear in the list, which starts counting at
             2.
+            <br/>
+            <br/>
+            By default, only custom race tracks can be assigned. Check the
+            <b>{self._enable_custom_battle_stages.text()}</b> box to also enable custom battle
+            stages.
             </p>
             <p><h3>5. Build ISO file</h3>
             When ready, press the <b>{self._build_button.text()}</b> button to generate the extended
@@ -2268,8 +2273,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             Start the game in GameCube, Wii, or Dolphin.
             </p>
             <p><h3>7. In-game course page selection</h3>
-            Use <code>D-pad Up</code> and <code>D-pad Down</code> while in the <b>SELECT COURSE</b>
-            or b>SELECT CUP</b> screens to increment or decrement course page number.
+            Use <code>D-pad Up</code> and <code>D-pad Down</code> while in the <b>SELECT COURSE</b>,
+            <b>SELECT CUP</b>, or <b>SELECT STAGE</b> screens to increment or decrement the course
+            page number.
             </p>
         """)
         show_long_message('info', 'Instructions', text, self)
