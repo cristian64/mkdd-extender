@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-MKDD Extender is a tool that extends Mario Kart: Double Dash!! with up to 144 extra courses.
+MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 144 extra custom race tracks and
+54 extra custom battle stages.
 """
 import argparse
 import audioop
