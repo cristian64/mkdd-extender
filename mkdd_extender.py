@@ -298,6 +298,10 @@ class MKDDExtenderError(Exception):
     pass
 
 
+class MKDDExtenderCanceled(Exception):
+    pass
+
+
 @contextlib.contextmanager
 def current_directory(dirpath):
     cwd = os.getcwd()
@@ -1601,7 +1605,8 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
     log.info('Cup names patched.')
 
 
-def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | list]':
+def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
+                 iso_tmp_dir: str) -> 'tuple[dict | list]':
     replaces_data = {}
     minimap_data = {}
     tilt_setting_data = {}
@@ -1636,6 +1641,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
     enabled_code_patches = tuple(name for name in SUPPORTED_CODE_PATCHES
                                  if getattr(args, name.replace('-', '_')))
 
+    raise_if_canceled()
+
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tracks_tmp_dir:
         # Unpack ZIP archives (or copy directory is pre-unpacked) to their respective directories.
         prefix_to_nodename = {}
@@ -1667,6 +1674,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         unwrap_custom_track(track_dirpath)
                         prefix_to_nodename[prefix] = filename
                         processed += 1
+                        raise_if_canceled()
                         break
                 else:
                     # Check whether full pages have been sourced on the first missing prefix.
@@ -1691,10 +1699,13 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 unwrap_custom_track(track_dirpath)
                 prefix_to_nodename[prefix] = filename
                 processed += 1
+                raise_if_canceled()
         if processed > 0:
             log.info(f'{processed} custom courses have been processed.')
         else:
             log.warning('No archive has been processed.')
+
+        raise_if_canceled()
 
         extra_page_count = len(prefix_to_nodename) // page_course_count
         total_page_count = extra_page_count + 1
@@ -1743,6 +1754,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             checksum = md5sum(ast_filepath)
             audio_tracks_checksums[checksum] = filename
 
+            raise_if_canceled()
+
         # Rename original directories.
         new_course_dirpath = with_page_index_suffix(0, course_dirpath)
         new_coursename_dirpath = with_page_index_suffix(0, coursename_dirpath)
@@ -1755,6 +1768,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
         staffghosts_dirpath = new_staffghosts_dirpath
 
         melded = 0
+
+        raise_if_canceled()
 
         def meld_course(prefix: str, nodename: str):
             nonlocal melded
@@ -1786,6 +1801,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                 page_staffghosts_dirpath,
                                 copy_function=make_link)
 
+            raise_if_canceled()
+
             # Parse INI file.
             try:
                 trackinfo_filepath = os.path.join(track_dirpath, 'trackinfo.ini')
@@ -1804,6 +1821,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 main_language = None
                 replaces = None
                 auxiliary_audio_track = None
+
+            raise_if_canceled()
 
             replaces_data[(page_index, track_index)] = course_name_to_course(replaces)
 
@@ -1838,6 +1857,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     else:
                         raise MKDDExtenderError(f'{message} Re-run with --skip-code-patches-check '
                                                 'to circumvent this safety measure.')
+
+            raise_if_canceled()
 
             added_course_names.append(trackname)
 
@@ -1886,6 +1907,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 patch_music_id_in_bol_file(page_track_50cc_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_mp_50cc_filepath, track_index)
 
+                raise_if_canceled()
+
                 repack_course_arc_file(page_track_filepath, f'{COURSES[track_index].lower()}2')
                 repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}2l')
                 repack_course_arc_file(page_track_50cc_filepath, f'{COURSES[track_index].lower()}')
@@ -1902,11 +1925,15 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 patch_music_id_in_bol_file(page_track_filepath, track_index)
                 patch_music_id_in_bol_file(page_track_mp_filepath, track_index)
 
+                raise_if_canceled()
+
                 repack_course_arc_file(page_track_filepath, f'{COURSES[track_index].lower()}')
                 repack_course_arc_file(page_track_mp_filepath, f'{COURSES[track_index].lower()}l')
 
             tilt_setting_data[(page_index, track_index)] = \
                 get_tilt_setting_from_bol_file(page_track_filepath)
+
+            raise_if_canceled()
 
             # Copy GHT file.
             if not is_battle_stage:
@@ -1917,6 +1944,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     make_link(ght_filepath, page_ght_filepath)
                 else:
                     log.warning(f'Unable to locate `staffghost.ght` file in "{nodename}".')
+
+            raise_if_canceled()
 
             # Force use of auxiliary audio track if argument has been provided and the custom race
             # track has the field defined.
@@ -1994,6 +2023,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
             course_images_dirpath = os.path.join(track_dirpath, 'course_images')
 
+            raise_if_canceled()
+
             def find_and_conform_or_generate_image_path(
                 language: str,
                 filename: str,
@@ -2049,6 +2080,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                                     postprocessing_callback=postprocessing_callback)
                 return filepath
 
+            raise_if_canceled()
+
             # Copy course logo.
             expected_languages = os.listdir(page_coursename_dirpath)
             expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
@@ -2058,6 +2091,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
             for language in expected_languages:
                 logo_filepath = find_and_conform_or_generate_image_path(
                     language, 'track_big_logo.bti', 208, 104, 'RGB5A3', (0, 0, 0, 0))
+
+                raise_if_canceled()
 
                 page_coursename_language_dirpath = os.path.join(page_coursename_dirpath, language)
                 os.makedirs(page_coursename_language_dirpath, exist_ok=True)
@@ -2102,6 +2137,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     rename(os.path.join(lanplay_dirpath, label_filename),
                            os.path.join(lanplay_dirpath, new_label_filename))
 
+                    raise_if_canceled()
+
             preview_filename = new_preview_filename
             label_filename = new_label_filename
 
@@ -2112,6 +2149,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 course_preview_image_size = preview_image_size
                 course_label_image_size = label_image_size
 
+            raise_if_canceled()
+
             # Copy preview image and label image.
             page_preview_filename = with_page_index_xfix_func(page_index, preview_filename)
             page_label_filename = with_page_index_xfix_func(page_index, label_filename)
@@ -2120,10 +2159,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                                  'timg')
                 lanplay_dirpath = os.path.join(scenedata_dirpath, language, 'lanplay', 'timg')
 
+                raise_if_canceled()
+
                 preview_filepath = find_and_conform_or_generate_image_path(
                     language, 'track_image.bti', *course_preview_image_size, 'CMPR', (0, 0, 0, 255))
                 page_preview_filepath = os.path.join(appselect_dirpath, page_preview_filename)
                 copy_or_link_bti_image(preview_filepath, page_preview_filepath)
+
+                raise_if_canceled()
 
                 label_filepath = find_and_conform_or_generate_image_path(
                     language,
@@ -2136,10 +2179,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 page_label_filepath = os.path.join(appselect_dirpath, page_label_filename)
                 copy_or_link_bti_image(label_filepath, page_label_filepath)
 
+                raise_if_canceled()
+
                 label_filepath = find_and_conform_or_generate_image_path(
                     language, 'track_name.bti', *course_label_image_size, 'IA4', (0, 0, 0, 0))
                 page_label_filepath = os.path.join(lanplay_dirpath, page_label_filename)
                 copy_or_link_bti_image(label_filepath, page_label_filepath)
+
+            raise_if_canceled()
 
             # Gather minimap values.
             minimap_filepath = os.path.join(track_dirpath, 'minimap.json')
@@ -2157,6 +2204,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                 raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": '
                                         f'{str(e)}.') from e
 
+        raise_if_canceled()
+
         # Copy files into the ISO temporary directory.
         log.info('Melding directories...')
 
@@ -2165,10 +2214,14 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
 
             try:
                 meld_course(prefix, nodename)
+            except MKDDExtenderCanceled:
+                raise
             except (AssertionError, Exception) as e:
                 error_message = f': {str(e)}' if str(e) else ''
                 raise type(e)(
                     f'Unexpected error while processing "{nodename}"{error_message}') from e
+
+        raise_if_canceled()
 
         # Downscale images to ensure space limits are met.
         if downscale_preview_images:
@@ -2183,6 +2236,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         if filename.startswith('cop_') and filename.endswith('.bti'):
                             filepath = os.path.join(courseselect_dirpath, filename)
                             conform_bti_image(filepath, *preview_image_size, 'CMPR')
+
+                raise_if_canceled()
 
             if battle_stages_enabled:
                 log.info(
@@ -2199,6 +2254,9 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                                 filepath = os.path.join(mapselect_dirpath, filename)
                                 conform_bti_image(filepath, *battle_stages_preview_image_size,
                                                   'CMPR')
+
+                    raise_if_canceled()
+
         if downscale_label_images:
             log.info(f'Downscaling label images to {label_image_size[0]}x{label_image_size[1]}...')
 
@@ -2210,6 +2268,8 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                         if filename.startswith('coname_') and filename.endswith('.bti'):
                             filepath = os.path.join(courseselect_dirpath, filename)
                             conform_bti_image(filepath, *label_image_size, 'IA4')
+
+                raise_if_canceled()
 
             if battle_stages_enabled:
                 log.info('Downscaling battle stages label images to '
@@ -2224,6 +2284,10 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                             if 'zi_map' in filename and filename.endswith('.bti'):
                                 filepath = os.path.join(mapselect_dirpath, filename)
                                 conform_bti_image(filepath, *battle_stages_label_image_size, 'IA4')
+
+                raise_if_canceled()
+
+        raise_if_canceled()
 
         # Embed page number and page count in the preview image of the first battle stage in every
         # page.
@@ -2240,6 +2304,7 @@ def meld_courses(args: argparse.Namespace, iso_tmp_dir: str) -> 'tuple[dict | li
                     page_number = page_index + 1
                     image_filepath = os.path.join(mapselect_dirpath, filename)
                     add_page_number_to_preview_image(image_filepath, page_number, total_page_count)
+                    raise_if_canceled()
 
         if melded > 0:
             log.info(f'{melded} directories melded.')
@@ -2830,7 +2895,7 @@ def create_args_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def extend_game(args: argparse.Namespace):
+def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: None):
     start_time = time.monotonic()
 
     if not args.input:
@@ -2858,13 +2923,19 @@ def extend_game(args: argparse.Namespace):
                 files_extracted = files_done
         log.info(f'Image extracted ({files_extracted} files).')
 
+        raise_if_canceled()
+
         # Verify whether the DOL file is authentic or has been externally modified already.
         verify_dol_checksum(args, iso_tmp_dir)
+
+        raise_if_canceled()
 
         # To determine which have been added, build the initial list now.
         log.info('Building initial file list...')
         initial_file_list = build_file_list(iso_tmp_dir)
         log.info(f'File list built ({len(initial_file_list)} entries).')
+
+        raise_if_canceled()
 
         # Extract the relevant RARC files that will be modified.
         log.info('Extracting RARC files...')
@@ -2905,8 +2976,12 @@ def extend_game(args: argparse.Namespace):
                 rarc_extracted += 1
         log.info(f'{rarc_extracted} files extracted.')
 
+        raise_if_canceled()
+
         if not args.skip_banner:
             patch_bnr_file(iso_tmp_dir)
+
+        raise_if_canceled()
 
         (
             replaces_data,
@@ -2916,17 +2991,25 @@ def extend_game(args: argparse.Namespace):
             matching_audio_override_data,
             added_course_names,
             battle_stages_enabled,
-        ) = meld_courses(args, iso_tmp_dir)
+        ) = meld_courses(args, raise_if_canceled, iso_tmp_dir)
+
+        raise_if_canceled()
 
         if not args.skip_menu_titles:
             patch_title_lines(battle_stages_enabled, iso_tmp_dir)
+
+        raise_if_canceled()
 
         page_count = len(added_course_names) // (RACE_AND_BATTLE_COURSE_COUNT
                                                  if battle_stages_enabled else RACE_TRACK_COUNT) + 1
         patch_cup_names(args, page_count, iso_tmp_dir)
 
+        raise_if_canceled()
+
         patch_dol_file(args, replaces_data, minimap_data, tilt_setting_data, alternative_audio_data,
                        matching_audio_override_data, battle_stages_enabled, iso_tmp_dir)
+
+        raise_if_canceled()
 
         # Re-pack RARC files, and erase directories.
         log.info('Packing RARC files...')
@@ -2967,6 +3050,8 @@ def extend_game(args: argparse.Namespace):
                 rarc_packed += 1
         log.info(f'{rarc_packed} files packed.')
 
+        raise_if_canceled()
+
         # Verify that the `courseselect.arc` and `mapselect.arc` files haven't grown too large.
         # These two files are loaded by the game at the same time, even before knowing whether the
         # player will choose one mode or the other, so the combined sizes cannot be exceeded.
@@ -2991,9 +3076,13 @@ def extend_game(args: argparse.Namespace):
                 raise MKDDExtenderError(f'{message}. Re-run with --skip-filesize-check to '
                                         'circumvent this safety measure.')
 
+        raise_if_canceled()
+
         # Generate description file.
         if args.add_description_file:
             write_description_file(args, added_course_names, battle_stages_enabled, iso_tmp_dir)
+
+        raise_if_canceled()
 
         # Cross-check which files have been added, and then import all files from disk. While it
         # could be more efficient to compare timestamps and import only the ones that have really
@@ -3019,6 +3108,8 @@ def extend_game(args: argparse.Namespace):
                     gcm_file.add_new_directory(path)
         gcm_file.import_all_files_from_disk(iso_tmp_dir)
         log.info('ISO image prepared.')
+
+        raise_if_canceled()
 
         # It is paramount that the file list is sorted in the same order that has been used to
         # compute file indexes of the AST files in the Stream folder. Stock ISO files are sorted in
@@ -3049,6 +3140,8 @@ def extend_game(args: argparse.Namespace):
             for k in sorted(gcm_file.dirs_by_path_lowercase.keys())
         }
 
+        raise_if_canceled()
+
         # Write the extended ISO file to the final location.
         log.info(f'Writing extended ISO image to "{args.output}"...')
         try:
@@ -3057,6 +3150,7 @@ def extend_game(args: argparse.Namespace):
                     args.output):
                 if files_done > 0:
                     files_written = files_done
+                raise_if_canceled()
         except gcm.MaxFileSizeError as e:
             raise MKDDExtenderError(
                 f'ISO file is larger than the absolute maximum file size ({EXTREME_MAX_ISO_SIZE} '
@@ -3065,6 +3159,8 @@ def extend_game(args: argparse.Namespace):
         iso_size = os.path.getsize(args.output)
         human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
         log.info(f'ISO image written ({files_written} files - {human_readable_iso_size} MiB).')
+
+        raise_if_canceled()
 
         if iso_size > EXTREME_MAX_ISO_SIZE:
             raise MKDDExtenderError(

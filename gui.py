@@ -3739,10 +3739,28 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_value = getattr(self, option_member_name) or None
                     setattr(args, option_variable_name, option_value)
 
-            progress_dialog = ProgressDialog('Building ISO file...',
-                                             lambda: mkdd_extender.extend_game(args), self)
+            cancel_button = QtWidgets.QPushButton('Cancel')
+            cancel_button.setAutoDefault(False)
+            cancel_button.setCheckable(True)
+            cancel_button.toggled.connect(cancel_button.setDisabled)
+
+            def raise_if_canceled():
+                if cancel_button.isChecked():
+                    raise mkdd_extender.MKDDExtenderCanceled('Canceled by user.')
+
+            progress_dialog = ProgressDialog(
+                'Building ISO file...', lambda: mkdd_extender.extend_game(args, raise_if_canceled),
+                self)
+
+            progress_dialog.setCancelButton(cancel_button)
+            progress_dialog.canceled.disconnect()
+            cancel_button.clicked.disconnect()
+
             progress_dialog.execute_and_wait()
 
+        except mkdd_extender.MKDDExtenderCanceled as e:
+            mkdd_extender.log.warning(str(e))
+            return
         except mkdd_extender.MKDDExtenderError as e:
             error_message = str(e)
             mkdd_extender.log.error(error_message)
