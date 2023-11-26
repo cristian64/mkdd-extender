@@ -1,10 +1,11 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt update && apt install \
     curl \
     git \
+    libxcb-cursor0 \
     python3-pip \
     python3-venv \
     ubuntu-gnome-desktop \
