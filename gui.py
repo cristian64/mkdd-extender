@@ -255,6 +255,8 @@ def open_directory(dirpath: str):
 
 class PathEdit(QtWidgets.QWidget):
 
+    path_changed = QtCore.Signal(str)
+
     def __init__(self,
                  caption: str,
                  accept_mode: QtWidgets.QFileDialog.AcceptMode,
@@ -271,7 +273,6 @@ class PathEdit(QtWidgets.QWidget):
         self._last_dir = ''
 
         self._line_edit = QtWidgets.QLineEdit()
-        self.textChanged = self._line_edit.textChanged
         browse_button = QtWidgets.QPushButton('Browse')
         browse_button.setAutoDefault(False)
         browse_button.clicked.connect(self._show_file_dialog)
@@ -281,10 +282,11 @@ class PathEdit(QtWidgets.QWidget):
         layout.addWidget(self._line_edit)
         layout.addWidget(browse_button)
 
-        self._line_edit.textChanged.connect(self._update_last_dir)
+        self._line_edit.textChanged.connect(self._on_line_edit_textChanged)
 
     def get_path(self) -> str:
-        return self._line_edit.text()
+        text = self._line_edit.text()
+        return os.path.normpath(text) if text else text
 
     def get_last_dir(self) -> str:
         return self._last_dir
@@ -293,7 +295,7 @@ class PathEdit(QtWidgets.QWidget):
         self._line_edit.setText(path)
 
     def set_last_dir(self, last_dir: str):
-        self._last_dir = last_dir
+        self._last_dir = os.path.normpath(last_dir) if last_dir else last_dir
 
     def _show_file_dialog(self):
         path = self._line_edit.text()
@@ -309,12 +311,17 @@ class PathEdit(QtWidgets.QWidget):
             with blocked_signals(self._line_edit):
                 # Clear to force a value change, even if wasn't really changed from the file dialog.
                 self._line_edit.setText(str())
-            self._line_edit.setText(file_dialog.selectedFiles()[0])
+                path = file_dialog.selectedFiles()[0]
+            self._line_edit.setText(os.path.normpath(path) if path else path)
 
-    def _update_last_dir(self, text: str):
+    def _on_line_edit_textChanged(self, text: str):
+        text = os.path.normpath(text) if text else text
+
         current_dir = os.path.dirname(text)
         if current_dir and os.path.isdir(current_dir):
             self._last_dir = current_dir
+
+        self.path_changed.emit(text)
 
 
 class VerticalLabel(QtWidgets.QWidget):
@@ -1952,8 +1959,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._restore_settings()
 
-        self._input_iso_file_edit.textChanged.connect(self._initialize_output_filepath)
-        self._custom_tracks_directory_edit.textChanged.connect(self._load_custom_tracks_directory)
+        self._input_iso_file_edit.path_changed.connect(self._initialize_output_filepath)
+        self._custom_tracks_directory_edit.path_changed.connect(self._load_custom_tracks_directory)
         self._custom_tracks_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
         for page_table in self._page_tables + self._page_battle_stages_tables:
             page_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
@@ -2948,14 +2955,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if path:
             output_directory_edit.set_last_dir(path)
 
-        def on_output_directory_textChanged(dirpath: str):
+        def on_output_directory_path_changed(dirpath: str):
             _ = dirpath
             self._settings.setValue('miscellaneous/pack_generator_path',
                                     output_directory_edit.get_path())
             self._settings.setValue('miscellaneous/pack_generator_last_dir',
                                     output_directory_edit.get_last_dir())
 
-        output_directory_edit.textChanged.connect(on_output_directory_textChanged)
+        output_directory_edit.path_changed.connect(on_output_directory_path_changed)
         output_directory_layout.addRow('Output Directory', output_directory_edit)
         layout.addLayout(output_directory_layout)
         layout.addStretch()
@@ -3573,7 +3580,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         update_ast_form()
 
-        input_file_edit.textChanged.connect(lambda _text: update_info())
+        input_file_edit.path_changed.connect(lambda _text: update_info())
         looped_box.toggled.connect(lambda _checked: update_ast_form())
         loop_start_slider.value_changed.connect(lambda _value: update_ast_form())
         reset_button.clicked.connect(reset)
