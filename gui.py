@@ -13,6 +13,7 @@ import itertools
 import json
 import logging
 import os
+import platform
 import queue
 import re
 import shutil
@@ -2301,6 +2302,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             </a></small>
             <p>{mkdd_extender.__doc__}</p>
             <br/>
+            <br/>
+            <small>
+            Python {platform.python_version()}
+            <br/>
+            Qt {QtCore.__version__}
+            </small>
             <br/>
             <br/>
             <small>
