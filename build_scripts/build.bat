@@ -15,15 +15,17 @@ python3 -m venv venv
 call venv/Scripts/activate.bat
 set PYTHONNOUSERSITE=1
 python3 -m pip install -r requirements.txt
-python3 -m pip install altgraph==0.17.3 pefile==2023.2.7 pyinstaller==5.13.2 pyinstaller-hooks-contrib==2023.8 pywin32-ctypes==0.2.2
+python3 -m pip install altgraph==0.17.4 packaging==23.2 pefile==2023.2.7 pyinstaller==6.2.0 pyinstaller-hooks-contrib==2023.10 pywin32-ctypes==0.2.2
 
 @REM Create standalone Python application.
 pyinstaller mkdd_extender.spec
 
-@REM Remove unnecessary files.
+@REM Remove unnecessary files and copy license.
 cd dist
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, 'data', 'extender_cup', 'model'))"
-python3 -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, 'data', 'extender_cup', 'cup_logo.svg'))"
+python3 -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, '_internal', 'data', 'extender_cup', 'model'))"
+python3 -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, '_internal', 'data', 'extender_cup', 'cup_logo.svg'))"
+python3 -c "import os, shutil; d = os.listdir()[0]; shutil.copyfile(os.path.join(d, '_internal', 'COPYING'), os.path.join(d, 'COPYING'))"
+python3 -c "import os, shutil; d = os.listdir()[0]; shutil.copyfile(os.path.join(d, '_internal', 'README.md'), os.path.join(d, 'README.md'))"
 
 @REM Create tarball.
 python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'zip', '.', d)"

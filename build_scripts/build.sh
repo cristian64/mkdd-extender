@@ -20,18 +20,19 @@ python3 -m venv venv
 source venv/bin/activate
 export PYTHONNOUSERSITE=1
 python3 -m pip install -r requirements.txt
-python3 -m pip install altgraph==0.17.3 pyinstaller==5.13.2 pyinstaller-hooks-contrib==2023.8
+python3 -m pip install altgraph==0.17.4 packaging==23.2 pyinstaller==6.2.0 pyinstaller-hooks-contrib==2023.10
 
 # Create standalone Python application.
 pyinstaller mkdd_extender.spec
 
-# Remove unnecessary files.
+# Remove unnecessary files and copy license.
 cd dist
 bundle_name=$(ls)
-cd "$bundle_name"
+cd "$bundle_name/_internal"
 rm -r "data/extender_cup/model"
 rm "data/extender_cup/cup_logo.svg"
 rm libgdk*  # Remove to ensure the system's are used.
+cp COPYING README.md ..
 cd -
 
 # Create tarball.
