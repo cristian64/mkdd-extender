@@ -732,11 +732,11 @@ class ASTPlayer(QtWidgets.QWidget):
         self._audio_output = QtMultimedia.QAudioOutput()
         self._audio_output.setVolume(0.5)
         self._media_player.setAudioOutput(self._audio_output)
-        self._media_player.setSource(QtCore.QUrl.fromLocalFile(self._wav_filepath))
         self._media_player.playbackStateChanged.connect(self._on_media_player_playbackStateChanged)
         self._media_player.seekableChanged.connect(self._on_media_player_seekableChanged)
         self._media_player.durationChanged.connect(self._on_media_player_durationChanged)
         self._media_player.positionChanged.connect(self._on_media_player_positionChanged)
+        self._media_player.setSource(QtCore.QUrl.fromLocalFile(self._wav_filepath))
 
         self._timeline_slider.valueChanged.connect(self._on_timeline_slider_valueChanged)
 
