@@ -300,7 +300,6 @@ class PathEdit(QtWidgets.QWidget):
         name = os.path.basename(path)
         dirpath = os.path.dirname(path) or self._last_dir or os.path.expanduser('~')
         file_dialog = QtWidgets.QFileDialog(self, self._caption, dirpath)
-        file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, not mkdd_extender.windows)
         file_dialog.setAcceptMode(self._accept_mode)
         file_dialog.setFileMode(self._file_mode)
         file_dialog.setNameFilters(self._name_filters)
@@ -1518,7 +1517,6 @@ class LogTable(QtWidgets.QTableWidget):
 
         file_dialog = QtWidgets.QFileDialog(self, 'Select Output Log File',
                                             os.path.dirname(self._last_log_filepath))
-        file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, not mkdd_extender.windows)
         file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
         file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
         file_dialog.setNameFilters(('Log (*.log)', ))
@@ -3140,8 +3138,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             file_dialog = QtWidgets.QFileDialog(self, f'Save text image as {file_type.upper()}',
                                                 dirpath)
-            file_dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog,
-                                  not mkdd_extender.windows)
             file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
             file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
             file_dialog.setNameFilters((f'{file_type.upper()} (*.{file_type})', ))

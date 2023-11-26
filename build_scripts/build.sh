@@ -31,7 +31,6 @@ bundle_name=$(ls)
 cd "$bundle_name/_internal"
 rm -r "data/extender_cup/model"
 rm "data/extender_cup/cup_logo.svg"
-rm libgdk*  # Remove to ensure the system's are used.
 cp COPYING README.md ..
 cd -
 
