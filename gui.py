@@ -545,6 +545,65 @@ class DragTableWidget(QtWidgets.QTableWidget):
         return super().supportedDropActions() & ~QtCore.Qt.MoveAction
 
 
+class DragDropTableHeaderWidget(QtWidgets.QWidget):
+
+    _MARGIN = 0.25
+
+    def __init__(self, parent: QtWidgets.QWidget = None):
+        super().__init__(parent=parent)
+
+        self._columns = []
+
+        palette = self.palette()
+        palette.setBrush(self.backgroundRole(), palette.button())
+        self.setPalette(palette)
+        self.setAutoFillBackground(True)
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+    def add_column(self, emoji: str, label: str, tool_tip: str):
+        widget = QtWidgets.QLabel(f'{emoji} {label}')
+        widget.setAlignment(QtCore.Qt.AlignCenter)
+        widget.setToolTip(tool_tip)
+        widget.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Maximum)
+
+        margin = int(self.fontMetrics().height() * self._MARGIN)
+        color = self.palette().dark().color().name()
+        first = not self.layout().count()
+        widget.setStyleSheet(
+            textwrap.dedent(f"""\
+            QLabel {{
+                padding: {margin}px;
+                border: 0px;
+                border-top: 1px solid {color};
+                border-right: 1px solid {color};
+                border-left: {1 if first else 0}px solid {color};
+            }}
+        """))
+
+        self._columns.append((emoji, label, widget))
+        self.layout().addWidget(widget)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent):
+        super().resizeEvent(event)
+
+        font_metrics = self.fontMetrics()
+        margin = int(font_metrics.height() * self._MARGIN)
+        available_width = self.width() / len(self._columns)
+
+        overflow = False
+        for emoji, label, _widget in self._columns:
+            width = font_metrics.horizontalAdvance(f'{emoji} {label}')
+            if width + margin * 4 >= available_width:
+                overflow = True
+                break
+
+        for emoji, label, widget in self._columns:
+            widget.setText(emoji if overflow else f'{emoji} {label}')
+
+
 class DragDropTableWidget(QtWidgets.QTableWidget):
 
     def __init__(self, rows: int, columns: int, parent: QtWidgets.QWidget = None):
@@ -567,8 +626,8 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.horizontalHeader().setSectionsClickable(False)
-        self.horizontalHeader().setSectionsMovable(False)
+        self.horizontalHeader().setMinimumSectionSize(0)
+        self.horizontalHeader().hide()
         self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.verticalHeader().hide()
 
@@ -1770,11 +1829,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         font_height = self.fontMetrics().height()
 
-        HEADER_LABELS = ('🍄 Mushroom Cup', '🌼 Flower Cup', '🌟 Star Cup', '👑 Special Cup')
+        HEADER_LABELS = {
+            '🍄': 'Mushroom Cup',
+            '🌼': 'Flower Cup',
+            '🌟': 'Star Cup',
+            '👑': 'Special Cup',
+        }
         ROWS = 4
         COLUMNS = len(HEADER_LABELS)
 
-        BATTLE_HEADER_LABELS = ('', '🎈 Battle Stages', '')
+        BATTLE_HEADER_LABELS = {'🎈': 'Battle Stages'}
         BATTLE_ROWS = 2
         BATTLE_COLUMNS = 3
 
@@ -1784,29 +1848,29 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._page_widgets = []
 
         for page_index in range(mkdd_extender.MAX_EXTRA_PAGES):
+            page_table_container = QtWidgets.QWidget()
+            page_table_container_layout = QtWidgets.QVBoxLayout(page_table_container)
+            page_table_container_layout.setContentsMargins(0, 0, 0, 0)
+            page_table_container_layout.setSpacing(0)
             page_table = DragDropTableWidget(ROWS, COLUMNS)
-            page_table.setStyleSheet(
-                textwrap.dedent(f"""\
-                    QHeaderView::section {{
-                        border: 0px;
-                        border-right: 1px solid {self.palette().dark().color().name()};
-                    }}
-                    QHeaderView::section:last {{
-                        border-right: 0px;
-                    }}
-            """))
             self._page_tables.append(page_table)
 
+            page_battle_stages_table_container = QtWidgets.QWidget()
+            page_battle_stages_table_container_layout = QtWidgets.QVBoxLayout(
+                page_battle_stages_table_container)
+            page_battle_stages_table_container_layout.setContentsMargins(0, 0, 0, 0)
+            page_battle_stages_table_container_layout.setSpacing(0)
             page_battle_stages_table = DragDropTableWidget(BATTLE_ROWS, BATTLE_COLUMNS)
-            page_battle_stages_table.setStyleSheet('QHeaderView::section { border: 0px; }')
             self._page_battle_stages_tables.append(page_battle_stages_table)
 
             if page_index == 0:
-                page_table.setHorizontalHeaderLabels(HEADER_LABELS)
-                for i in range(COLUMNS):
-                    page_table.horizontalHeaderItem(i).setToolTip(
+                page_table_header = DragDropTableHeaderWidget()
+                page_table_container_layout.addWidget(page_table_header)
+                for i, (header_emoji, header_label) in enumerate(HEADER_LABELS.items()):
+                    page_table_header.add_column(
+                        header_emoji, header_label,
                         textwrap.dedent(f"""\
-                        <h3>{HEADER_LABELS[i]}</h3>
+                        <h3>{header_emoji} {header_label}</h3>
                         <p>Race tracks in the stock game:</p>
                         <p><ul>
                         <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 0]]}</li>
@@ -1816,11 +1880,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         </ul></p>
                     """))
 
-                page_battle_stages_table.setHorizontalHeaderLabels(BATTLE_HEADER_LABELS)
-                for i in range(BATTLE_COLUMNS):
-                    page_battle_stages_table.horizontalHeaderItem(i).setToolTip(
+                page_battle_stages_table_header = DragDropTableHeaderWidget()
+                page_battle_stages_table.header_buddy = page_battle_stages_table_header
+                page_battle_stages_table_container_layout.addWidget(page_battle_stages_table_header)
+                for i, (header_emoji, header_label) in enumerate(BATTLE_HEADER_LABELS.items()):
+                    page_battle_stages_table_header.add_column(
+                        header_emoji, header_label,
                         textwrap.dedent(f"""\
-                        <h3>{BATTLE_HEADER_LABELS[1]}</h3>
+                        <h3>{header_emoji} {header_label}</h3>
                         <p>Battle stages in the stock game:</p>
                         <p><table style="white-space: nowrap;"><tr>
                         <td><ul>
@@ -1837,9 +1904,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         </ul></td>
                         </tr></table></p>
                     """))
-            else:
-                page_table.horizontalHeader().hide()
-                page_battle_stages_table.horizontalHeader().hide()
+
+            page_table_container_layout.addWidget(page_table)
+            page_battle_stages_table_container_layout.addWidget(page_battle_stages_table)
 
             page_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_battle_stages_table.clear_selection_action.triggered.connect(self._clear_selection)
@@ -1853,8 +1920,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_widget_layout = QtWidgets.QHBoxLayout(page_widget)
             page_widget_layout.setContentsMargins(0, 0, 0, 0)
             page_widget_layout.setSpacing(0)
-            page_widget_layout.addWidget(page_table, COLUMNS)
-            page_widget_layout.addWidget(page_battle_stages_table, BATTLE_COLUMNS)
+            page_widget_layout.addWidget(page_table_container, COLUMNS)
+            page_widget_layout.addWidget(page_battle_stages_table_container, BATTLE_COLUMNS)
             page_widget_layout.addWidget(page_label)
             self._page_widgets.append(page_widget)
             pages_layout.addWidget(page_widget)
@@ -2452,7 +2519,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _update_page_battle_stages_visibility(self, battle_stages_enabled: bool):
         for page_table in self._page_battle_stages_tables:
-            page_table.setVisible(battle_stages_enabled)
+            page_table.parent().setVisible(battle_stages_enabled)
 
         with blocked_signals(self._enable_custom_battle_stages):
             self._enable_custom_battle_stages.setChecked(battle_stages_enabled)
