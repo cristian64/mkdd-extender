@@ -35,6 +35,7 @@ __FILE_FORMAT_VERSION = 0x0100
 
 __FILE_TYPE = 0x1100
 __DIR_TYPE = 0x0200
+__YAZ0_COMPRESSED_FILE_TYPE = 0x9500
 
 __ALIGNMENT = 0x20
 
@@ -273,10 +274,10 @@ def extract(src_filepath: str, dst_dirpath: str):
             padding,
         ) = struct.unpack('>HHHHLLL', data[entry_offset:entry_offset + __ENTRY_SIZE])
 
-        assert entry_type in (__FILE_TYPE, __DIR_TYPE)
+        assert entry_type in (__FILE_TYPE, __DIR_TYPE, __YAZ0_COMPRESSED_FILE_TYPE)
 
         if __debug__:
-            if entry_type == __FILE_TYPE:
+            if entry_type in (__FILE_TYPE, __YAZ0_COMPRESSED_FILE_TYPE):
                 if entry_index != i:
                     # NOTE: It seems some RARC archives in the wild set the index in the header
                     # wrong, but ignoring this issue doesn't cause problems, meaning that apending
@@ -300,7 +301,7 @@ def extract(src_filepath: str, dst_dirpath: str):
             if name in (b'.', b'..'):
                 assert entry_type == __DIR_TYPE
 
-        if entry_type == __FILE_TYPE:
+        if entry_type in (__FILE_TYPE, __YAZ0_COMPRESSED_FILE_TYPE):
             entry_data = entry_data_section[entry_data_offset:entry_data_offset + entry_data_size]
             entries.append((entry_type, name, entry_data))
         else:
@@ -337,7 +338,7 @@ def extract(src_filepath: str, dst_dirpath: str):
         for entry in entries[first_child_index:first_child_index + child_count]:
             entry_type, *args = entry
 
-            if entry_type == __FILE_TYPE:
+            if entry_type in (__FILE_TYPE, __YAZ0_COMPRESSED_FILE_TYPE):
                 filename, entry_data = args
 
                 with open(os.path.join(current_dirpath, filename.decode('ascii')), 'wb') as f:
@@ -544,7 +545,7 @@ def pack(src_dirpath: str, dst_filepath: str):
         f.write(b'\x00' * (entry_data_section_offset - f.tell()))
 
         for i, (entry_type, *args) in enumerate(entries):
-            if entry_type != __FILE_TYPE:
+            if entry_type not in (__FILE_TYPE, __YAZ0_COMPRESSED_FILE_TYPE):
                 continue
             filepath, _string_offset, _string_hash, entry_data_size, entry_data_offset = args
 
