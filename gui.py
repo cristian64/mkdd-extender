@@ -1753,6 +1753,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         ast_converter_action = tools_menu.addAction('AST Converter')
         ast_converter_action.triggered.connect(self._on_ast_converter_action_triggered)
         view_menu = menu.addMenu('View')
+        self._fullscreen = view_menu.addAction('Fullscreen')
+        self._fullscreen.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F11))
+        self._fullscreen.setCheckable(True)
+        self._fullscreen.triggered.connect(self._on_fullscreen_action_triggered)
         purge_preview_caches_action = view_menu.addAction('Purge Preview Caches')
         purge_preview_caches_action.triggered.connect(
             self._on_purge_preview_caches_action_triggered)
@@ -2026,6 +2030,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self._log_splitter)
 
         self._restore_settings()
+
+        self._fullscreen.setChecked(bool(QtCore.Qt.WindowFullScreen & self.windowState()))
 
         self._input_iso_file_edit.path_changed.connect(self._initialize_output_filepath)
         self._custom_tracks_directory_edit.path_changed.connect(self._load_custom_tracks_directory)
@@ -3669,6 +3675,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('ast_converter/volume', volume_slider.get_value())
         self._settings.setValue('ast_converter/looped', looped_box.isChecked())
         self._settings.setValue('ast_converter/loop_start', loop_start_slider.get_value())
+
+    def _on_fullscreen_action_triggered(self, checked: bool):
+        if checked:
+            self.setWindowState(self.windowState() | QtCore.Qt.WindowFullScreen)
+        else:
+            self.setWindowState(self.windowState() & ~QtCore.Qt.WindowFullScreen)
 
     def _on_purge_preview_caches_action_triggered(self):
         self._info_view.purge_caches()
