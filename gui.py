@@ -2183,11 +2183,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         page_item_values = [(i, 0, column, row, value, selected)
                                             for (i, column, row, value,
                                                  selected) in page_item_values]
-                extra_page_count = max(i for i, *_ in page_item_values) + 1
-                battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
-                self._set_page_item_values(page_item_values, also_selected_state=False)
-                self._update_page_visibility(extra_page_count)
-                self._update_page_battle_stages_visibility(battle_stages_enabled)
+                    extra_page_count = max(i for i, *_ in page_item_values) + 1
+                    battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+                    self._set_page_item_values(page_item_values, also_selected_state=False)
+                    self._update_page_visibility(extra_page_count)
+                    self._update_page_battle_stages_visibility(battle_stages_enabled)
 
         options = self._settings.value('miscellaneous/options')
         if options:
