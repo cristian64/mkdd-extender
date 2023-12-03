@@ -2952,21 +2952,26 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 filepath = os.path.join(scenedata_dirpath, language, filename)
                 rarc.extract(filepath, os.path.dirname(filepath))
                 rarc_extracted += 1
+                raise_if_canceled()
         if args.extender_cup:
             cup2d_filepath = os.path.join(scenedata_dirpath, 'cup2d.arc')
             rarc.extract(cup2d_filepath, scenedata_dirpath)
             rarc_extracted += 1
+            raise_if_canceled()
             mram_filepath = os.path.join(files_dirpath, 'MRAM.arc')
             rarc.extract(mram_filepath, files_dirpath)
             rarc_extracted += 1
+            raise_if_canceled()
             mram_dirpath = os.path.join(files_dirpath, 'mram')
             race2d_filepath = os.path.join(mram_dirpath, 'race2d.arc')
             rarc.extract(race2d_filepath, mram_dirpath)
             rarc_extracted += 1
+            raise_if_canceled()
             awarddata_dirpath = os.path.join(files_dirpath, 'AwardData')
             award_alltour_filepath = os.path.join(awarddata_dirpath, 'Award_AllTour.arc')
             rarc.extract(award_alltour_filepath, awarddata_dirpath)
             rarc_extracted += 1
+            raise_if_canceled()
             mram_locale_dirpath = os.path.join(files_dirpath, 'MRAM_Locale')
             mram_locale_filenames = os.listdir(mram_locale_dirpath)
             for language in LANGUAGES:
@@ -2975,6 +2980,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 filepath = os.path.join(mram_locale_dirpath, language, 'MRAMLoc.arc')
                 rarc.extract(filepath, os.path.dirname(filepath))
                 rarc_extracted += 1
+                raise_if_canceled()
         log.info(f'{rarc_extracted} files extracted.')
 
         raise_if_canceled()
@@ -3024,21 +3030,26 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 rarc.pack(dirpath, filepath)
                 shutil.rmtree(dirpath)
                 rarc_packed += 1
+                raise_if_canceled()
             award_alltour_dirpath = os.path.join(awarddata_dirpath, 'award_alltour')
             rarc.pack(award_alltour_dirpath, award_alltour_filepath)
             shutil.rmtree(award_alltour_dirpath)
             rarc_packed += 1
+            raise_if_canceled()
             race2d_dirpath = os.path.join(mram_dirpath, 'mram_race2d')
             rarc.pack(race2d_dirpath, race2d_filepath)
             shutil.rmtree(race2d_dirpath)
             rarc_packed += 1
+            raise_if_canceled()
             rarc.pack(mram_dirpath, mram_filepath)
             shutil.rmtree(mram_dirpath)
             rarc_packed += 1
+            raise_if_canceled()
             cup2d_dirpath = os.path.join(scenedata_dirpath, 'cup2d')
             rarc.pack(cup2d_dirpath, cup2d_filepath)
             shutil.rmtree(cup2d_dirpath)
             rarc_packed += 1
+            raise_if_canceled()
         for language in LANGUAGES:
             if language not in scenedata_filenames:
                 continue
@@ -3049,6 +3060,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 rarc.pack(dirpath, filepath)
                 shutil.rmtree(dirpath)
                 rarc_packed += 1
+                raise_if_canceled()
         log.info(f'{rarc_packed} files packed.')
 
         raise_if_canceled()
