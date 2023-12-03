@@ -468,7 +468,7 @@ def scan_custom_tracks_directory(dirpath: str) -> 'dict[str, str]':
     for name in names:
         path = os.path.join(dirpath, name)
 
-        if os.path.isdir(path):
+        if os.path.isdir(path) and not os.path.isfile(os.path.join(path, 'track.arc')):
             nested_paths_to_track_name = scan_custom_tracks_directory(path)
             if nested_paths_to_track_name:
                 paths_to_track_name.update(nested_paths_to_track_name)

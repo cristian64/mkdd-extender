@@ -1666,6 +1666,10 @@ class DelayedDirectoryWatcher(QtCore.QObject):
 
             paths = [os.path.join(dirpath, name) for name in os.listdir(dirpath)]
             dirpaths = [path for path in paths if os.path.isdir(path)]
+            dirpaths = [
+                dirpath for dirpath in dirpaths
+                if not os.path.isfile(os.path.join(dirpath, 'track.arc'))
+            ]
             pending.extend(dirpaths)
 
     def _verify_existence(self):
