@@ -1377,13 +1377,16 @@ class ProgressDialog(QtWidgets.QProgressDialog):
     def __init__(self, text: str, func: callable, parent: QtWidgets.QWidget = None):
         super().__init__(parent)
 
+        self.setWindowTitle(text)
         self.setMinimum(0)
         self.setMaximum(0)
         self.setValue(0)
         self.setCancelButton(None)
-        self.setLabelText(text)
+        self.setLabelText('Please wait...')
+        self.setMinimumWidth(int(self.fontMetrics().horizontalAdvance(text) * 1.25))
 
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowTitleHint
+                            | QtCore.Qt.CustomizeWindowHint)
 
         self._func = func
         self._finished = False
