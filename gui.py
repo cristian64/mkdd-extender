@@ -2500,7 +2500,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     page_table.blockSignals(False)
 
     def _get_configured_extra_page_count(self):
-        return sum(int(page_widget.isVisible()) for page_widget in self._page_widgets)
+        return sum(
+            int(page_widget.isVisibleTo(page_widget.parent()))
+            for page_widget in self._page_widgets)
 
     def _update_page_visibility(self, extra_page_count: int):
         for page_widget in self._page_widgets[:extra_page_count]:
