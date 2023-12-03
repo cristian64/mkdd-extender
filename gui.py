@@ -2029,7 +2029,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self.setCentralWidget(self._log_splitter)
 
-        self._restore_settings()
+        try:
+            self._restore_settings()
+        except Exception as e:
+            mkdd_extender.log.error(f'Error while restoring settings: {str(e)}')
 
         self._fullscreen.setChecked(bool(QtCore.Qt.WindowFullScreen & self.windowState()))
 
