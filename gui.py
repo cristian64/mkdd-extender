@@ -20,8 +20,8 @@ import shutil
 import signal
 import subprocess
 import sys
-import textwrap
 import tempfile
+import textwrap
 import threading
 import time
 import traceback
