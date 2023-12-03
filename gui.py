@@ -1640,21 +1640,33 @@ class DelayedDirectoryWatcher(QtCore.QObject):
         self._watcher.directoryChanged.connect(self._on_watcher_directoryChanged)
 
     def set_directory(self, dirpath: str):
-        directories = self._watcher.directories()
-        if directories:
-            self._watcher.removePaths(directories)
-
         self._directory = dirpath
         try:
             self._exists = os.path.isdir(self._directory)
         except Exception:
             self._exists = False
 
-        if dirpath and os.path.isdir(dirpath):
-            self._watcher.addPath(dirpath)
+        self._watch_directories()
 
     def get_directory(self) -> str:
         return self._directory
+
+    def _watch_directories(self):
+        directories = self._watcher.directories()
+        if directories:
+            self._watcher.removePaths(directories)
+
+        if not self._directory or not os.path.isdir(self._directory):
+            return
+
+        pending = [self._directory]
+        while pending:
+            dirpath = pending.pop(0)
+            self._watcher.addPath(dirpath)
+
+            paths = [os.path.join(dirpath, name) for name in os.listdir(dirpath)]
+            dirpaths = [path for path in paths if os.path.isdir(path)]
+            pending.extend(dirpaths)
 
     def _verify_existence(self):
         try:
@@ -1670,6 +1682,7 @@ class DelayedDirectoryWatcher(QtCore.QObject):
 
     def _notify_change(self):
         self._notification_scheduled = False
+        self._watch_directories()
         self.changed.emit()
 
     def _on_watcher_directoryChanged(self, dirpath: str):
