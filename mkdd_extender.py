@@ -1711,6 +1711,12 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
         extra_page_count = len(prefix_to_nodename) // page_course_count
         total_page_count = extra_page_count + 1
 
+        initial_page_number = max(1, args.initial_page_number or 0)
+        if initial_page_number > total_page_count:
+            raise MKDDExtenderError(
+                f'Initial page number has been set to {initial_page_number}, but only '
+                f'{total_page_count} pages have been configured.')
+
         # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
         # However, if extended memory has been set, the retail dimensions can be used instead.
         preview_image_factor = 1
