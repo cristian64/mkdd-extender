@@ -4,7 +4,6 @@ MKDD Extender is a tool that extends Mario Kart: Double Dash!! with 144 extra cu
 54 extra custom battle stages.
 """
 import argparse
-import audioop
 import collections
 import configparser
 import contextlib
@@ -23,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import warnings
 import wave
 import zipfile
 
@@ -32,6 +32,10 @@ import ast_converter
 import code_patcher
 import rarc
 from tools import bti, gcm
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    import audioop  # Deprecated in Python 3.11.
 
 __version__ = '1.6.1'
 
