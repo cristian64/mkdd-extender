@@ -8,9 +8,10 @@
 #define false 0
 #define true 1
 
-#define BUTTON_DOWN 0x00000004
-#define BUTTON_UP 0x00000008
+#define BUTTON_DOWN 0x00000004  // D-pad Down (or X in alternative buttons)
+#define BUTTON_UP 0x00000008    // D-pad Up (or Y in alternative buttons)
 
+#define ALT_BUTTONS_STATE_ADDRESS __ALT_BUTTONS_STATE_ADDRESS__
 #define BATTLE_STAGES __BATTLE_STAGES__
 #define BUTTONS_STATE_ADDRESS __BUTTONS_STATE_ADDRESS__
 #define COURSE_TO_STREAM_FILE_INDEX_ADDRESS __COURSE_TO_STREAM_FILE_INDEX_ADDRESS__
@@ -35,6 +36,7 @@
 #define PLAYER_ITEM_ROLLS_ADDRESS __PLAYER_ITEM_ROLLS_ADDRESS__
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
+#define USE_ALT_BUTTONS __USE_ALT_BUTTONS__
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 #define SECTIONED_COURSES __SECTIONED_COURSES__
@@ -133,7 +135,12 @@ void process_course_page_change(const int mode)
     char next_spam_flag;
     float next_redraw_courseselect_screen;
 
+#if USE_ALT_BUTTONS
+    const char buttons =
+        *(const char*)(mode == LAN_MODE ? ALT_BUTTONS_STATE_ADDRESS : BUTTONS_STATE_ADDRESS);
+#else
     const unsigned short buttons = *(const unsigned short*)(BUTTONS_STATE_ADDRESS);
+#endif
     if (buttons & (BUTTON_UP | BUTTON_DOWN))
     {
         // The spam flag is used to time how soon the course page can be changed again.

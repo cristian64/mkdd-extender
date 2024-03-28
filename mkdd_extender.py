@@ -812,14 +812,14 @@ def split_image(image: Image.Image) -> 'list[Image.Image]':
     return [image]
 
 
-def add_controls_to_title_image(filepath: str, language: str):
+def add_controls_to_title_image(filepath: str, language: str, use_alternative_buttons: bool):
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         title_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, title_filename[:-len('.bti')] + '.png')
 
         convert_bti_to_png(filepath, tmp_filepath)
 
-        controls_filename = 'dpad_up_down.png'
+        controls_filename = 'yx_buttons.png' if use_alternative_buttons else 'dpad_up_down.png'
         controls_filepath = os.path.join(data_dir, 'controls', controls_filename)
         controls_image = Image.open(controls_filepath)
         slash_filepath = os.path.join(data_dir, 'controls', 'slash.png')
@@ -1425,7 +1425,7 @@ def patch_bnr_file(iso_tmp_dir: str):
     log.info('Game title tweaked.')
 
 
-def patch_title_lines(battle_stages_enabled: bool, iso_tmp_dir: str):
+def patch_title_lines(use_alternative_buttons: bool, battle_stages_enabled: bool, iso_tmp_dir: str):
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -1447,7 +1447,7 @@ def patch_title_lines(battle_stages_enabled: bool, iso_tmp_dir: str):
         for title_filename in title_filenames:
             title_filepath = os.path.join(timg_dir, title_filename)
             log.info(f'Modifying {title_filepath}...')
-            add_controls_to_title_image(title_filepath, language)
+            add_controls_to_title_image(title_filepath, language, use_alternative_buttons)
 
         # Gradient colors are specified in the BLO file, which we want to avoid in the controls
         # icons. Also, avoid the game blurrying the images.
@@ -2488,6 +2488,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         iso_tmp_dir,
         game_id,
         initial_page_number,
+        bool(args.use_alternative_buttons),
         replaces_data,
         minimap_data,
         tilt_setting_data,
@@ -2722,6 +2723,15 @@ OPTIONAL_ARGUMENTS = {
             ('choices', list(range(1, MAX_PAGES + 1)), 1),
             'Specifies the course page that will be selected from the start. Default is `1`: the '
             'page containing the stock courses in the input ISO file.',
+        ),
+        (
+            'Use Alternative Buttons',
+            bool,
+            'By default, `D-pad Up` and `D-pad Down` are used to switch course pages in the game. '
+            'If this option is enabled, then `Y` and `X` will be used instead.\n\n'
+            'The use of `Y` and `X` permits automatic synchronization of course pages in LAN mode: '
+            'only the host needs to switch pages; the rest of the consoles will switch '
+            'automatically.',
         ),
     ),
     'Audio Options': (
@@ -3013,7 +3023,8 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         raise_if_canceled()
 
         if not args.skip_menu_titles:
-            patch_title_lines(battle_stages_enabled, iso_tmp_dir)
+            patch_title_lines(bool(args.use_alternative_buttons), battle_stages_enabled,
+                              iso_tmp_dir)
 
         raise_if_canceled()
 

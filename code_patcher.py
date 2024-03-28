@@ -52,6 +52,20 @@ searching first for the byte `0x11` (Z + D-pad Left), and then for `0x12` (Z + D
 that these buttons are actually in the second byte.
 """
 
+ALT_BUTTONS_STATE_ADDRESSES = {
+    'GM4E01': 0x8036B053,
+    'GM4P01': 0x80374E93,
+    'GM4J01': 0x80385673,
+    'GM4E01dbg': 0x803B5353,
+}
+"""
+These addresses point to a 1-byte structure that stores the state of all buttons in the game pad
+(excluding the joystick). This is a reduced structure that is only used in LAN mode.
+
+To find these addresses in all regions, a LAN session is started; then the Dolphin Memory Engine
+is used to find the very first address that reacts to button presses (`A` is `1`, `B` is `2`, etc.).
+"""
+
 REDRAW_COURSESELECT_SCREEN_ADDRESSES = {
     'GM4E01': 0x803CE5B4,
     'GM4P01': 0x803D83D4,
@@ -1496,6 +1510,7 @@ def patch_dol_file(
     iso_tmp_dir: str,
     game_id: str,
     initial_page_number: int,
+    use_alternative_buttons: bool,
     replaces_data: dict,
     minimap_data: dict,
     tilt_setting_data: dict,
@@ -1664,6 +1679,7 @@ def patch_dol_file(
 
         # Load the C file and replace constants and placeholders.
         replacements = (
+            ('__ALT_BUTTONS_STATE_ADDRESS__', f'0x{ALT_BUTTONS_STATE_ADDRESSES[game_id]:08X}'),
             ('__BATTLE_STAGES__', str(int(battle_stages_enabled))),
             ('__BUTTONS_STATE_ADDRESS__', f'0x{BUTTONS_STATE_ADDRESSES[game_id]:08X}'),
             ('__COURSE_TO_STREAM_FILE_INDEX_ADDRESS__',
@@ -1691,6 +1707,7 @@ def patch_dol_file(
             ('__REDRAW_COURSESELECT_SCREEN_ADDRESS__',
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
+            ('__USE_ALT_BUTTONS__', str(int(use_alternative_buttons))),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
