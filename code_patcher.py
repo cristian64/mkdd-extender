@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import textwrap
 
+import baa
 from tools.gc_c_kit import devkit_tools
 from tools.gc_c_kit import dolreader
 from tools.gc_c_kit import doltools
@@ -1452,60 +1453,6 @@ def patch_bti_filenames_in_blo_file(game_id: str, battle_stages_enabled: bool, b
         f.write(data)
 
 
-def read_bsft_file_from_baa_file(filepath: str) -> 'tuple[str]':
-    paths = []
-
-    with open(filepath, 'rb') as f:
-        data = f.read()
-    bsft_offset_offset = data.find(b'bsft') + 4
-    bsft_offset = struct.unpack('>I', data[bsft_offset_offset:bsft_offset_offset + 4])[0]
-
-    with open(filepath, 'rb') as f:
-        f.seek(bsft_offset)
-        magic = f.read(4)
-        assert magic == b'bsft'
-        path_count = struct.unpack('>I', f.read(4))[0]
-        offsets = []
-        for _ in range(path_count):
-            offsets.append(struct.unpack('>I', f.read(4))[0] + bsft_offset)
-        for offset in offsets:
-            f.seek(offset)
-            string = bytearray()
-            while (value := f.read(1)) != b'\0':
-                string += value
-            paths.append(bytes(string).decode(encoding='ascii'))
-
-    return tuple(paths)
-
-
-def update_bsft_file_in_baa_file(paths: 'tuple[str]', filepath: str):
-    with open(filepath, 'rb') as f:
-        data = f.read()
-    bsft_offset_offset = data.find(b'bsft') + 4
-    bsft_offset = len(data)
-
-    with open(filepath, 'r+b') as f:
-        f.seek(bsft_offset_offset)
-        f.write(struct.pack('>I', bsft_offset))
-        f.seek(bsft_offset)
-        f.write(b'bsft')
-        f.write(struct.pack('>I', len(paths)))
-        f.write(b'\0' * len(paths) * 4)  # Placeholder. Offsets to each path.
-        offsets = []
-        offsets_map = {}
-        for path in paths:
-            offset = offsets_map.get(path)
-            if offset is None:
-                offset = f.tell() - bsft_offset
-                offsets_map[path] = offset
-                f.write(path.encode(encoding='ascii'))
-                f.write(b'\0')
-            offsets.append(offset)
-        f.seek(8 + bsft_offset)
-        for offset in offsets:
-            f.write(struct.pack('>I', offset))
-
-
 def patch_dol_file(
     iso_tmp_dir: str,
     game_id: str,
@@ -1899,16 +1846,33 @@ def patch_dol_file(
         # directory. This makes the game load the audio indexes of the selected initial page.
 
         files_dirpath = os.path.join(iso_tmp_dir, 'files')
-        baa_file = os.path.join(files_dirpath, 'AudioRes', 'GCKart.baa')
+        baa_filepath = os.path.join(files_dirpath, 'AudioRes', 'GCKart.baa')
 
-        paths = list(read_bsft_file_from_baa_file(baa_file))
+        with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:
+            baa.unpack_baa(baa_filepath, tmp_dir)
 
-        audio_indexes = audio_track_data[initial_page_index]
-        file_list = mkdd_extender.build_file_list(iso_tmp_dir)
-        for i, audio_index in enumerate(audio_indexes):
-            paths[i] = file_list[audio_index].lstrip('files/')
+            for name in os.listdir(tmp_dir):
+                if name.endswith('.bsft'):
+                    bsft_filepath = os.path.join(tmp_dir, name)
+                    break
+            else:
+                raise RuntimeError('Unable to locate BSFT file in GCKart.baa.')
 
-        update_bsft_file_in_baa_file(paths, baa_file)
+            paths = [path for _offset, path in baa.read_bsft(bsft_filepath)]
+
+            audio_indexes = audio_track_data[initial_page_index]
+            file_list = mkdd_extender.build_file_list(iso_tmp_dir)
+            for i, audio_index in enumerate(audio_indexes):
+                paths[i] = file_list[audio_index].lstrip('files/')
+
+            baa.write_bsft(paths, bsft_filepath)
+
+            # Although the standalone GCKart.bsft file (next to the GCKart.baa file) is not accessed
+            # in the game, it will be updated too for correctness.
+            standlone_bsft_filepath = os.path.join(f'{os.path.splitext(baa_filepath)[0]}.bsft')
+            shutil.copy2(bsft_filepath, standlone_bsft_filepath)
+
+            baa.pack_baa(tmp_dir, baa_filepath)
 
     log.info(f'Injected {injected_code_size} bytes of new code. '
              f'OS Arena: 0x{aligned(unaligned_previous_osarena_value):08X} (previous) -> '
