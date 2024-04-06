@@ -152,6 +152,30 @@ be temporarily stored. 8 bytes are used (one for each kart in the race).
 This is the address to the second "This is padding" string in the game.
 """
 
+SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES = {
+    'GM4E01': (0x801B0D58, 0x801B10AC, 0x8012E1EC),
+    'GM4P01': (0x801AFBE8, 0x801AFF3C, 0x8012E210),
+    'GM4J01': (0x801B0D58, 0x801B10AC, 0x8012E1EC),
+    'GM4E01dbg': (0x801D7C94, 0x801D8024, 0x8013D588, (0x801D8298, 0x801D83C4)),
+}
+"""
+A set of instructions that will be replaced in the game to skip the movie trailer:
+
+- First instruction, located in `MovieApp::calc()`, is replaced with a `li` instruction to set `3`
+  in `r0`, forcing the execution of `MovieApp::doEnding()`.
+- Second instruction, located in `MovidApp::doEnding()`, is turned into a no-op so that the ending
+  is not delayed for 119 frames.
+- Third instruction, located in `SceneTitle::demo()`, is changed so that it writes `1` instead of
+  `0`. The address where it writes to holds the information for the next thing that will be demoed
+  in the title screen if the player continues to remain idle. When set to `0`, it ends up loading
+  the `MovieApp`, which we are aiming to avoid; `1`, `2`, and `3` will load the `RaceApp` demo, in
+  1P, 2P, or 4P mode respectively. With this change, when the value reaches `3`, it jumps back to
+  `1`; avoiding `0`.
+- (Debug only) The other two instructions, located in `MoviePlayer::MoviePlayer()` and in
+  `MoviePlayer::reset()`, are changed from `bne` to `b`, to avoid hitting assertions when the game
+  cannot find the now-removed movie trailer files.
+"""
+
 COURSES = (
     'Luigi',
     'Peach',
@@ -1463,6 +1487,7 @@ def patch_dol_file(
     tilt_setting_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
     battle_stages_enabled: bool,
+    remove_movie_trailer: bool,
     extender_cup: bool,
     type_specific_item_boxes: bool,
     sectioned_courses: bool,
@@ -1745,6 +1770,18 @@ def patch_dol_file(
                     project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
                 project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
                                    'lanselectmode_calcanm_ex')
+
+                if remove_movie_trailer:
+                    project.dol.seek(SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES[game_id][0])
+                    doltools.write_li(project.dol, 0, 3)
+                    project.dol.seek(SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES[game_id][1])
+                    doltools.write_nop(project.dol)
+                    project.dol.seek(SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES[game_id][2])
+                    doltools.write_li(project.dol, 0, 1)
+                    if game_id == 'GM4E01dbg':
+                        for address in SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES[game_id][3]:
+                            project.dol.seek(address)
+                            dolreader.write_uint32(project.dol, 0x48000038)  # b +14
 
                 # Code extensions.
                 if extender_cup:

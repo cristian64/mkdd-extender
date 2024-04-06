@@ -2494,6 +2494,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         tilt_setting_data,
         audio_track_data,
         battle_stages_enabled,
+        bool(args.remove_movie_trailer),
         bool(args.extender_cup),
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
@@ -2732,6 +2733,16 @@ OPTIONAL_ARGUMENTS = {
             'The use of `Y` and `X` permits automatic synchronization of course pages in LAN mode: '
             'only the host needs to switch pages; the rest of the consoles will switch '
             'automatically.',
+        ),
+        (
+            'Remove Movie Trailer',
+            bool,
+            'If enabled, the game trailer will be removed from the ISO file. The trailer is '
+            'normally played when the game is first booted, or when the game is idling in the '
+            'title screen.'
+            '\n\n'
+            'This option can be used to reduce the ISO file size by `73 MiB` in NTSC-U and NTSC-J, '
+            'or by `133 MiB` in PAL, as it includes an extra variant for 50 Hz mode.',
         ),
     ),
     'Audio Options': (
@@ -3109,6 +3120,11 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                     continue
                 raise MKDDExtenderError(f'{message}. Re-run with --skip-filesize-check to '
                                         'circumvent this safety measure.')
+
+        raise_if_canceled()
+
+        if args.remove_movie_trailer:
+            shutil.rmtree(os.path.join(iso_tmp_dir, 'files', 'Movie'))
 
         raise_if_canceled()
 
