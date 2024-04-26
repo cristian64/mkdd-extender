@@ -2803,17 +2803,20 @@ OPTIONAL_ARGUMENTS = {
             'a lap when passed. This allows for more flexible single-lap courses '
             'or courses with multiple routes for laps.',
         ),
-        ('Tilting Courses', bool,
-         'If enabled, general support for tilting courses will be added to the game.'
-         '\n\n'
-         'The patch allows custom courses to set the tilt setting in the BOL header (located at '
-         '`0x04`) to "entire course" (value `0x02`) to receive the same handling that Tilt-A-Kart '
-         'receives.'
-         '\n\n'
-         'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects in '
-         'the BOL file have a base height of `10000` units. Custom courses that use the tilt '
-         'functionality should follow the same structure; the game will apply the 10000 offset to '
-         'the models\' geometry after the tilt rotation is applied.'),
+        (
+            'Tilting Courses',
+            bool,
+            'If enabled, general support for tilting courses will be added to the game.'
+            '\n\n'
+            'The patch allows custom courses to set the tilt setting in the BOL header (located at '
+            '`0x04`) to "entire course" (value `0x02`) to receive the same handling that '
+            'Tilt-A-Kart receives.'
+            '\n\n'
+            'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects '
+            'in the BOL file have a base height of `10000` units. Custom courses that use the tilt '
+            'functionality should follow the same structure; the game will apply the 10000 offset '
+            'to the models\' geometry after the tilt rotation is applied.',
+        ),
     ),
     'Expert Options': (
         (
