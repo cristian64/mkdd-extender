@@ -2499,6 +2499,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
         bool(args.tilting_courses),
+        bool(args.bouncy_material),
         dol_path,
         log,
         bool(args.debug_output),
@@ -2803,17 +2804,29 @@ OPTIONAL_ARGUMENTS = {
             'a lap when passed. This allows for more flexible single-lap courses '
             'or courses with multiple routes for laps.',
         ),
-        ('Tilting Courses', bool,
-         'If enabled, general support for tilting courses will be added to the game.'
-         '\n\n'
-         'The patch allows custom courses to set the tilt setting in the BOL header (located at '
-         '`0x04`) to "entire course" (value `0x02`) to receive the same handling that Tilt-A-Kart '
-         'receives.'
-         '\n\n'
-         'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects in '
-         'the BOL file have a base height of `10000` units. Custom courses that use the tilt '
-         'functionality should follow the same structure; the game will apply the 10000 offset to '
-         'the models\' geometry after the tilt rotation is applied.'),
+        (   'Tilting Courses', bool,
+            'If enabled, general support for tilting courses will be added to the game.'
+            '\n\n'
+            'The patch allows custom courses to set the tilt setting in the BOL header (located at '
+            '`0x04`) to "entire course" (value `0x02`) to receive the same handling that Tilt-A-Kart '
+            'receives.'
+            '\n\n'
+            'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects in '
+            'the BOL file have a base height of `10000` units. Custom courses that use the tilt '
+            'functionality should follow the same structure; the game will apply the 10000 offset to '
+            'the models\' geometry after the tilt rotation is applied.'
+        ),
+        (   'Bouncy Material', bool,
+            'If enabled, logic for a bouncy ground material collision flag will be added to the game.'
+            '\n\n'
+            'The patch will apply a bounce effect to any custom course material with its collision '
+            'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
+            '\n\n'
+            'The patch will apply a bounce effect to any custom course material with its collision '
+            'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
+            '\n\n'
+            'NOTE: This patch does not support the NTSC-U Debug version.'
+         ),
     ),
     'Expert Options': (
         (

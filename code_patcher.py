@@ -1327,6 +1327,89 @@ retail ISO images when the instruction sequence (see `OSARENALO_INSTRUCTIONS_ADD
 executed.
 """
 
+KART_BOUNCE_FLAG_ADRESSES = {
+    'GM4E01': 0x80005230,
+    'GM4P01': 0x80005230,
+    'GM4J01': 0x80005230,
+    'GM4E01dbg': 0x80005230,
+}
+"""
+Free space used to store a Char that functions as a flag for every Kart in the race.
+This space is sometimes used by Ralf codes to write ASM into them - though, not this
+location specifically.
+"""
+
+KART_BOUNCE_DEFAULT_READ_ADDRESSES = {
+    'GM4E01': 0x8000523c,
+    'GM4P01': 0x8000523c,
+    'GM4J01': 0x8000523c,
+    'GM4E01dbg': 0x8000523c,
+}
+"""
+Free space used by bouce logic to read movement vector data from if nothing was set up for the
+material in the .BCO file. Very useful for developing a CT with bounce materials if you don't know
+how much force you require. Unused, otherwise.
+"""
+
+KART_LAST_MOMENTUM_ADRESSES = {
+    'GM4E01': 0x80005240,
+    'GM4P01': 0x80005240,
+    'GM4J01': 0x80005240,
+    'GM4E01dbg': 0x80005240,
+}
+"""
+Free space used by bouce logic to store previous XZ movement. This allows XZ movement to accelerate
+and not move jaggedly.
+"""
+
+DO_SPD_CTRL_CALL_HIJACK_ADDRESSES = {
+    'GM4E01': 0x802aa8c8,
+    'GM4P01': 0x802aa8a4,
+    'GM4J01': 0x802aa8f0,
+    'GM4E01dbg': 0x802ec054,
+}
+"""
+A call to the function DoSpeedCtrl, done after the game calculates the Kart's status.
+This call is from the default case, which encompasses any driving state where the kart is not
+incapacitated/unable to move. This is hijacked to stop the Kart's Momentum from being clamped.
+"""
+
+GET_SPLASH_HEIGHT_INLINE_ADDRESSES = {
+    'GM4E01': 0x8018160c,
+    'GM4P01': 0x801804B0,
+    'GM4J01': 0x8018160c,
+    'GM4E01dbg': 0x801a33b0,
+}
+"""
+A lwz instruction in the function getSplashHeight. This occurs before the material's splash code,
+which I refer to as the material's hash, is read. It ordinarily loads the location of the hash
+into r3, but r3 is set to 0 instead if the ground material is one used by mods.
+"""
+
+GET_SPLASH_ID_INLINE_ADDRESSES = {
+    'GM4E01': 0x801816A8,
+    'GM4P01': 0x8018054C,
+    'GM4J01': 0x801816A8,
+    'GM4E01dbg': 0x801a33b0,
+}
+"""
+A lwz instruction in the function getSplashId. This occurs before the material's splash code,
+which I refer to as the material's hash, is read. It ordinarily loads the location of the hash
+into r3, but r3 is set to 0 instead if the ground material is one used by mods.
+"""
+
+IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES ={
+    'GM4E01': 0x8021857c,
+    'GM4P01': 0x80218558,
+    'GM4J01': 0x802185a4,
+    'GM4E01dbg': 0x8024f714,
+}
+"""
+A call to the function isItemInvalGround, which ordinarily returns false when it reads vanilla
+ground material used by the game. When it reads custom materials, it may return true. It is
+hijacked to nullify this behaviour, so that items may collide with custom materials.
+"""
+
 for address in OSARENALO_ADDRESSES.values():
     assert address % 32 == 0
 
@@ -1345,6 +1428,9 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
         ItemObj__getSpecialKind = 0x8021A024;
+        ObjUtility__getKartZdir = 0x80225864;
+        KartStrat__DoSpeedCrl = 0x802a77f4;
+        CrsGround__isItemInvalGround = 0x80181524;
         """),
     'GM4P01':
     textwrap.dedent("""\
@@ -1360,6 +1446,9 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
         ItemObj__getSpecialKind = 0x8021A008;
+        ObjUtility__getKartZdir = 0x80225848;
+        KartStrat__DoSpeedCrl = 0x802a77d0;
+        CrsGround__isItemInvalGround = 0x801803c8;
         """),
     'GM4J01':
     textwrap.dedent("""\
@@ -1375,6 +1464,9 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
         ItemObj__getSpecialKind = 0x8021A04C;
+        ObjUtility__getKartZdir = 0x8022588c;
+        KartStrat__DoSpeedCrl = 0x802a781c;
+        CrsGround__isItemInvalGround = 0x80181524;
         """),
     'GM4E01dbg':
     textwrap.dedent("""\
@@ -1392,6 +1484,9 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
         ItemShuffleMgr__calcSlot = 0x80243508;
         ItemObj__getSpecialKind = 0x802512DC;
+        ObjUtility__getKartZdir = 0x8025e39c;
+        KartStrat__DoSpeedCrl = 0x802ea110;
+        CrsGround__isItemInvalGround = 0x801a3204;
         """),
 }
 """
@@ -1492,6 +1587,7 @@ def patch_dol_file(
     type_specific_item_boxes: bool,
     sectioned_courses: bool,
     tilting_courses: bool,
+    bouncy_material: bool,
     dol_path: str,
     log: logging.Logger,
     debug_output: bool,
@@ -1683,6 +1779,10 @@ def patch_dol_file(
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
+            ('__BOUNCY_MATERIAL__', str(int(bouncy_material))),
+            ('__KART_BOUNCE_FLAG_ADRESS__', f'0x{KART_BOUNCE_FLAG_ADRESSES[game_id]:04X}'),
+            ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__', f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
+            ('__KART_LAST_MOMENTUM_ADRESS__', f'0x{KART_LAST_MOMENTUM_ADRESSES[game_id]:04X}'),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
@@ -1829,6 +1929,15 @@ def patch_dol_file(
                                        'override_total_lap_count')
                     project.branchlink(CHECK_LAP_EX_CALL_ADDRESSES[game_id], 'check_lap_ex')
 
+                if bouncy_material:
+                    project.branchlink(DO_SPD_CTRL_CALL_HIJACK_ADDRESSES[game_id],
+                                       'do_spd_ctrl_call_hijack')
+                    project.branchlink(GET_SPLASH_HEIGHT_INLINE_ADDRESSES[game_id],
+                                       'get_splash_height_inline')
+                    project.branchlink(GET_SPLASH_ID_INLINE_ADDRESSES[game_id],
+                                       'get_splash_id_inline')
+                    project.branchlink(IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES[game_id],
+                                       'is_item_inval_ground_hijack')
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
                 # Further symbol post-processing once the map is available.
