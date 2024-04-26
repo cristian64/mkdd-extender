@@ -2822,8 +2822,8 @@ OPTIONAL_ARGUMENTS = {
             'The patch will apply a bounce effect to any custom course material with its collision '
             'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
             '\n\n'
-            'The patch will apply a bounce effect to any custom course material with its collision '
-            'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
+            'The 8-character hash at the end of a material name is used to determine the parameters '
+            'of the bounce. A write-up is available at "https://lance-o.github.io/bouncy_material/".'
             '\n\n'
             'NOTE: This patch does not support the NTSC-U Debug version.'
          ),
