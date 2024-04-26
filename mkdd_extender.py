@@ -2823,7 +2823,7 @@ OPTIONAL_ARGUMENTS = {
             'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
             '\n\n'
             'The 8-character hash at the end of a material name is used to determine the parameters '
-            'of the bounce. A write-up is available at "https://lance-o.github.io/bouncy_material/".'
+            'of the bounce. A write-up is available at "https://github.com/lance-o/bouncy_material".'
             '\n\n'
             'NOTE: This patch does not support the NTSC-U Debug version.'
          ),
