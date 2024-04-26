@@ -1059,7 +1059,7 @@ void decrement_mini_turbo_timer(char* const this)
     }
     else
     {
-        clear_boost_flag(this, 0x570, 0xfffffbff);
+        clear_boost_flag(this, 0x570, 0xfffffdff);
     }
 }
 
