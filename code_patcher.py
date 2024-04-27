@@ -1398,7 +1398,7 @@ which I refer to as the material's hash, is read. It ordinarily loads the locati
 into r3, but r3 is set to 0 instead if the ground material is one used by mods.
 """
 
-IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES ={
+IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES = {
     'GM4E01': 0x8021857c,
     'GM4P01': 0x80218558,
     'GM4J01': 0x802185a4,
@@ -1410,7 +1410,7 @@ ground material used by the game. When it reads custom materials, it may return 
 hijacked to nullify this behaviour, so that items may collide with custom materials.
 """
 
-GET_ADD_THICKNESS_INLINE_ADDRESSES  ={
+GET_ADD_THICKNESS_INLINE_ADDRESSES = {
     'GM4E01': 0x8017de14,
     'GM4P01': 0x8017ccb8,
     'GM4J01': 0x8017de14,
@@ -1422,7 +1422,7 @@ hash. It presumably does something to the ground based on what it reads, and it 
 Ground::checkPosition. It is better to stop it from reading errant data.
 """
 
-GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES ={
+GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES = {
     'GM4E01': 0x802adbd4,
     'GM4P01': 0x802adbb0,
     'GM4J01': 0x802adbfc,
@@ -1434,7 +1434,7 @@ second byte is set to 1. 0x50000000 would not trigger it, but 0x50000100 would. 
 the function is from "KartGame::DoAirCheck".
 """
 
-GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES ={
+GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES = {
     'GM4E01': 0x802b90c8,
     'GM4P01': 0x802b908c,
     'GM4J01': 0x802b90f0,
@@ -1795,6 +1795,7 @@ def patch_dol_file(
             ('__CURRENT_PAGE_ADDRESS__', f'0x{CURRENT_PAGE_ADDRESSES[game_id]:08X}'),
             ('__EXTENDER_CUP__', str(int(extender_cup))),
             ('__GM4E01_DEBUG_BUILD__', str(int(game_id == 'GM4E01dbg'))),
+            ('__GM4P01_PAL__', str(int(game_id == 'GM4P01'))),
             ('__GP_AWARDED_SCORES_ADDRESS__', f'0x{GP_AWARDED_SCORES_ADDRESSES[game_id]:08X}'),
             ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
             ('__GP_CUP_INDEX_ADDRESS__', f'0x{GP_CUP_INDEX_ADDRESSES[game_id]:08X}'),
@@ -1821,7 +1822,8 @@ def patch_dol_file(
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
             ('__BOUNCY_MATERIAL__', str(int(bouncy_material))),
             ('__KART_BOUNCE_FLAG_ADRESS__', f'0x{KART_BOUNCE_FLAG_ADRESSES[game_id]:04X}'),
-            ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__', f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
+            ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__',
+             f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
             ('__KART_LAST_MOMENTUM_ADRESS__', f'0x{KART_LAST_MOMENTUM_ADRESSES[game_id]:04X}'),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),

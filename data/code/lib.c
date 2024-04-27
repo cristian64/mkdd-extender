@@ -18,6 +18,7 @@
 #define CURRENT_PAGE_ADDRESS __CURRENT_PAGE_ADDRESS__
 #define EXTENDER_CUP __EXTENDER_CUP__
 #define GM4E01_DEBUG_BUILD __GM4E01_DEBUG_BUILD__
+#define GM4P01_PAL __GM4P01_PAL__
 #define GP_AWARDED_SCORES_ADDRESS __GP_AWARDED_SCORES_ADDRESS__
 #define GP_COURSE_INDEX_ADDRESS __GP_COURSE_INDEX_ADDRESS__
 #define GP_CUP_INDEX_ADDRESS __GP_CUP_INDEX_ADDRESS__
@@ -44,6 +45,7 @@
 #define KART_BOUNCE_FLAG_ADRESS __KART_BOUNCE_FLAG_ADRESS__
 #define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
 #define KART_LAST_MOMENTUM_ADRESS __KART_LAST_MOMENTUM_ADRESS__
+#define RACE_MANAGER_OFFSET_ADRESS __RACE_MANAGER_OFFSET_ADRESS__
 
 void change_course_page(const int delta)
 {
@@ -1114,7 +1116,11 @@ void handle_y_adjustment(char* const this, char* const ctrl, int kart_num)
 // Gets mirror flag from RaceManager.
 char is_mirror(char* const race_manager)
 {
+#if !GM4P01_PAL
     int* race_manager_pointer = (int*)(race_manager - 0x5c38);
+#else
+    int* race_manager_pointer = (int*)(race_manager - 0x5c18);
+#endif
     int* pointer_pointer = (int*)(*race_manager_pointer + 0x38);
     char* mirror_flag = (char*)(*pointer_pointer + 0x2c);
     return *mirror_flag;
