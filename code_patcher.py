@@ -1389,6 +1389,42 @@ ground material used by the game. When it reads custom materials, it may return 
 hijacked to nullify this behaviour, so that items may collide with custom materials.
 """
 
+GET_ADD_THICKNESS_INLINE_ADDRESSES  ={
+    'GM4E01': 0x8017de14,
+    'GM4P01': 0x8017ccb8,
+    'GM4J01': 0x8017de14,
+    'GM4E01dbg': 0x801a0064,
+}
+"""
+Inserted into the function "getAddThickness", over a lbz instruction reading from the material
+hash. It presumably does something to the ground based on what it reads, and it is called from
+Ground::checkPosition. It is better to stop it from reading errant data.
+"""
+
+GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES ={
+    'GM4E01': 0x802adbd4,
+    'GM4P01': 0x802adbb0,
+    'GM4J01': 0x802adbfc,
+    'GM4E01dbg': 0x802efb04,
+}
+"""
+A call to the function getStaggerCode, which ordinarily returns true when the material hash's 
+second byte is set to 1. 0x50000000 would not trigger it, but 0x50000100 would. This call to 
+the function is from "KartGame::DoAirCheck".
+"""
+
+GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES ={
+    'GM4E01': 0x802b90c8,
+    'GM4P01': 0x802b908c,
+    'GM4J01': 0x802b90f0,
+    'GM4E01dbg': 0x802fa140,
+}
+"""
+A call to the function getStaggerCode, from "KartAnime::IsDangerLoopAnime". This call is also
+hijacked, just in case. It seems the first hijack is enough, but it's better to not read
+errant data if it can be helped.
+"""
+
 for address in OSARENALO_ADDRESSES.values():
     assert address % 32 == 0
 
@@ -1410,6 +1446,7 @@ SYMBOLS_MAP = {
         ObjUtility__getKartZdir = 0x80225864;
         KartStrat__DoSpeedCrl = 0x802a77f4;
         CrsGround__isItemInvalGround = 0x80181524;
+        CrsGround__getStaggerCode = 0x80181564;
         """),
     'GM4P01':
     textwrap.dedent("""\
@@ -1428,6 +1465,7 @@ SYMBOLS_MAP = {
         ObjUtility__getKartZdir = 0x80225848;
         KartStrat__DoSpeedCrl = 0x802a77d0;
         CrsGround__isItemInvalGround = 0x801803c8;
+        CrsGround__getStaggerCode = 0x80180408;
         """),
     'GM4J01':
     textwrap.dedent("""\
@@ -1446,6 +1484,7 @@ SYMBOLS_MAP = {
         ObjUtility__getKartZdir = 0x8022588c;
         KartStrat__DoSpeedCrl = 0x802a781c;
         CrsGround__isItemInvalGround = 0x80181524;
+        CrsGround__getStaggerCode = 0x80181564;
         """),
     'GM4E01dbg':
     textwrap.dedent("""\
@@ -1466,6 +1505,7 @@ SYMBOLS_MAP = {
         ObjUtility__getKartZdir = 0x8025e39c;
         KartStrat__DoSpeedCrl = 0x802ea110;
         CrsGround__isItemInvalGround = 0x801a3204;
+        CrsGround__getStaggerCode = 0x801a32c0;
         """),
 }
 """
@@ -1922,6 +1962,12 @@ def patch_dol_file(
                                        'get_splash_id_inline')
                     project.branchlink(IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES[game_id],
                                        'is_item_inval_ground_hijack')
+                    project.branchlink(GET_ADD_THICKNESS_INLINE_ADDRESSES[game_id],
+                                       'get_add_thickness_inline')
+                    project.branchlink(GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES[game_id],
+                                       'get_stagger_code_hijack_air_check')
+                    project.branchlink(GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES[game_id],
+                                       'get_stagger_code_hijack_danger_loop')
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
                 # Further symbol post-processing once the map is available.
