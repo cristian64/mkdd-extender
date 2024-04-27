@@ -609,12 +609,12 @@ int is_ground_flag_mod(char* ground_flag)
 // This and skip_item are separated to make bug reports easier to diagnose in the future.
 int should_return_fake_code(char* const ground)
 {
-    int* ground_materials = (int*)(ground + 0x20); // Pointer to the triangle's material in memory.
+    int* ground_materials = (int*)(ground + 0x20);  // Pointer to the triangle's material in memory.
     int ret = 0;
 
     if (*ground_materials != 0)
     {
-        char* ground_flag = (char*)(*ground_materials + 0x16); // Pointer to the collision flag.
+        char* ground_flag = (char*)(*ground_materials + 0x16);  // Pointer to the collision flag.
         ret = is_ground_flag_mod(ground_flag);
     }
 
@@ -639,7 +639,7 @@ int should_skip_item_inval(char* ground)
 // This nullifies that behaviour.
 void get_splash_id_inline()
 {
-    register char* const ground asm("r3"); // R3 is a CrsGround object.
+    register char* const ground asm("r3");  // R3 is a CrsGround object.
 
     if (should_return_fake_code(ground) == 1)
     {
@@ -648,9 +648,8 @@ void get_splash_id_inline()
     }
     else
     {
-        asm("lwz %r3,0x20(%r5)"); // Original instruction.
+        asm("lwz %r3,0x20(%r5)");  // Original instruction.
     }
-
 }
 
 void get_splash_height_inline()
@@ -666,7 +665,7 @@ void is_item_inval_ground_hijack()
     char* ground_char = (char*)(ground + 0x0);
     if (should_skip_item_inval(ground_char) != 1)
     {
-        CrsGround__isItemInvalGround(ground); // Original instruction.
+        CrsGround__isItemInvalGround(ground);  // Original instruction.
     }
     else
     {
@@ -697,7 +696,7 @@ void get_add_thickness_inline()
 // Stop game from performing fall animation when overtop custom material.
 void get_stagger_code_hijack_air_check()
 {
-    register char* const ground asm("r3"); // R3 is CrsGround
+    register char* const ground asm("r3");  // R3 is CrsGround
     if (should_return_fake_code(ground) != 1)
     {
         CrsGround__getStaggerCode(ground);  // Original instruction.
@@ -721,17 +720,17 @@ void get_splash_height_inline()
     get_splash_id_inline();
 }
 
-void get_splash_id_inline() 
+void get_splash_id_inline()
 {
-    asm("lwz %r3,0x20(%r30)"); // Original instruction.
+    asm("lwz %r3,0x20(%r30)");  // Original instruction.
 }
 
-void is_item_inval_ground_hijack() 
+void is_item_inval_ground_hijack()
 {
-    CrsGround__isItemInvalGround(); // Original instruction. No arg needed, r3 is already correct.
+    CrsGround__isItemInvalGround();  // Original instruction. No arg needed, r3 is already correct.
 }
 
-void get_add_thickness_inline() 
+void get_add_thickness_inline()
 {
     asm("lbz %r0,0x20(%r3)");
 }
@@ -751,7 +750,6 @@ void get_stagger_code_hijack_danger_loop()
 
 #if BOUNCY_MATERIAL
 #if !GM4E01_DEBUG_BUILD
-
 
 // Reads number of wheels on ground. If > 0, is grounded.
 int is_touching_ground(char* const this)
@@ -862,7 +860,6 @@ void add_insant_y(char* const this)
 
     *curr_y_value += 5.0;
 }
-
 
 // Returns boost flag status at specified location.
 int get_boost_flag(char* const this, int mem, unsigned int hash)
@@ -1039,7 +1036,6 @@ void handle_boosts(char* const this)
     }
 }
 
-
 // Slows XZ movement during bounce while not pressing left or right.
 float deaccelerate_speed(float last_momentum)
 {
@@ -1171,7 +1167,6 @@ void handle_x_adjustment(char* const this, char* const ctrl, char* const race_ma
         this, z_direction_vector[0], z_direction_vector[1], z_direction_vector[2]);
 }
 
-
 // Resets last recorded XZ momentum before bounce liftoff;
 void reset_last_momentum(int kart_num)
 {
@@ -1195,8 +1190,12 @@ void call_do_spd_ctrl_mod(char* const this,
     clamp_movement_vector_descent(this);
 }
 
-void call_do_spd_ctrl(char* const this, char* const strat, char* const ctrl,
-                      char* const race_manager, int kart_num, int kart_bounce_flag)
+void call_do_spd_ctrl(char* const this,
+                      char* const strat,
+                      char* const ctrl,
+                      char* const race_manager,
+                      int kart_num,
+                      int kart_bounce_flag)
 {
     if (kart_bounce_flag == false)
     {
@@ -1223,25 +1222,23 @@ void call_do_spd_ctrl(char* const this, char* const strat, char* const ctrl,
         asm("ori %r9, %r9, 0x000a");
         asm("lis %r10, 0x0000");
         asm("ori %r10, %r10, 0x0000");
-
     }
-
 }
 
-
 // This is functionally the bounce material's main() function.
-void do_spd_ctrl_call_hijack() 
+void do_spd_ctrl_call_hijack()
 {
-    register char* const kart_body asm("r30"); // KartBody object.
-    register char* const kart_strat asm("r29"); // KartStrat object.
-    register char* const kart_ctrl asm("r27"); // KartCtrl object.
-    register char* const race_manager asm("r13"); // RaceManager object.
+    register char* const kart_body asm("r30");     // KartBody object.
+    register char* const kart_strat asm("r29");    // KartStrat object.
+    register char* const kart_ctrl asm("r27");     // KartCtrl object.
+    register char* const race_manager asm("r13");  // RaceManager object.
 
     int* const kart_num = (int*)(kart_strat + 0x22c);
 
-    char* kart_bounce_flag = (char*)(KART_BOUNCE_FLAG_ADRESS + *kart_num); // Could be stored in 1 byte.
+    char* kart_bounce_flag =
+        (char*)(KART_BOUNCE_FLAG_ADRESS + *kart_num);  // Could be stored in 1 byte.
 
-    if (*kart_bounce_flag == true) // Falses flag if kart is grounded. 
+    if (*kart_bounce_flag == true)  // Falses flag if kart is grounded.
     {
         if (is_touching_ground(kart_body) == true)
         {
@@ -1249,7 +1246,7 @@ void do_spd_ctrl_call_hijack()
         }
     }
 
-    if (*kart_bounce_flag == false) // Not elif for consistent chain of bounces.
+    if (*kart_bounce_flag == false)  // Not elif for consistent chain of bounces.
     {
         if (is_touching_ground_and_flag_b0(kart_body) == true)
         {
@@ -1259,16 +1256,19 @@ void do_spd_ctrl_call_hijack()
         }
     }
 
-    call_do_spd_ctrl(kart_body, kart_strat, kart_ctrl,
-                    race_manager, *kart_num, *kart_bounce_flag); // This many arguments is ugly.
+    call_do_spd_ctrl(kart_body,
+                     kart_strat,
+                     kart_ctrl,
+                     race_manager,
+                     *kart_num,
+                     *kart_bounce_flag);  // This many arguments is ugly.
 }
-
 
 // If Debug version.
 #else
 void do_spd_ctrl_call_hijack()
 {
-    KartStrat__DoSpeedCrl(); // Original instruction with no argument. Correct arg already in r3.
+    KartStrat__DoSpeedCrl();  // Original instruction with no argument. Correct arg already in r3.
 }
 #endif
 
