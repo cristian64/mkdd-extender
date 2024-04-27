@@ -12,18 +12,23 @@ OBJDUMPPATH = os.environ.get("GCCKIT_OBJDUMPPATH")
 OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 
-def get_creation_flags():
-    creationflags = 0
+def run(args):
     if platform.system() == "Windows":
-        creationflags |= subprocess.CREATE_NO_WINDOW
-    return creationflags
+        output = subprocess.check_output(args,
+                                         creationflags=subprocess.CREATE_NO_WINDOW,
+                                         stderr=subprocess.STDOUT,
+                                         text=True)
+        if output:
+            print(output)
+    else:
+        subprocess.check_call(args)
 
 
 def compile_(inpath, outpath, mode, optimize="-O1", warnings=('-W', '-Wall', '-Wextra')):
     assert mode in ("-S", "-c")
     args = [GCCPATH, inpath, mode, "-o", outpath, optimize]
     args += warnings
-    subprocess.check_call(args, creationflags=get_creation_flags())
+    run(args)
 
 
 def link(infiles, outfile, outmap, linker_files):
@@ -39,13 +44,13 @@ def link(infiles, outfile, outmap, linker_files):
         arg.append(file)
 
     arg.extend(("-Map", outmap))
-    subprocess.check_call(arg, creationflags=get_creation_flags())
+    run(arg)
 
 
 def objdump(*args):
     arg = [OBJDUMPPATH]
     arg.extend(args)
-    subprocess.check_call(arg, creationflags=get_creation_flags())
+    run(arg)
 
 
 def objcopy(*args, attrs=tuple()):
@@ -53,7 +58,7 @@ def objcopy(*args, attrs=tuple()):
     arg.extend(args)
     for attr in attrs:
         arg.extend(("-R", attr))
-    subprocess.check_call(arg, creationflags=get_creation_flags())
+    run(arg)
 
 
 def read_map(mappath):
