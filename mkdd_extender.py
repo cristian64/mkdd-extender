@@ -1310,10 +1310,10 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
 
         if needs_mixing:
             if channel_count == 4:
-                data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+                data = audioop.tomono(data, bit_depth // 8, 1.0, 1.0)
                 channel_count = 2
             if channel_count == 2:
-                data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+                data = audioop.tomono(data, bit_depth // 8, 1.0, 1.0)
                 channel_count = 1
 
         sample_rate_ratio = 1
