@@ -872,7 +872,7 @@ int get_boost_flag(char* const this, int mem, unsigned int hash)
 }
 
 // Multipliers for Y axis when bounce initates while dashing.
-float get_kart_dash_y_mul(char* const this)
+float get_kart_boost_y_mul(char* const this)
 {
     float ret = 1.0;
 
@@ -896,7 +896,7 @@ float get_kart_dash_y_mul(char* const this)
 
 // Multipliers for XZ axes when bounce initates while dashing.
 // NOTE: MT and Mushroom can boosts can stack.
-float get_kart_dash_x_mul(char* const this)
+float get_kart_boost_x_mul(char* const this)
 {
     float ret = 1.0;
 
@@ -913,10 +913,10 @@ float get_kart_dash_x_mul(char* const this)
 }
 
 // Returns true for Mushroom and MT, but not Star.
-int is_kart_dash(char* const this)
+int is_kart_boost(char* const this)
 {
     int ret = false;
-    if (get_boost_flag(this, 0x574, 0x8000) != 0)  // Generic boost
+    if (get_boost_flag(this, 0x574, 0x8000) != 0)  // Generic dash
     {
         ret = true;
     }
@@ -937,12 +937,12 @@ void clear_boost_flag(char* const this, int mem, unsigned int hash)
 
 // Decrements timer for generic dashes (e.g. Mushrooms, Boost Panels).
 // NOTE: This function and below could have been merged
-void decrement_boost_timer(char* const this)
+void decrement_dash_timer(char* const this)
 {
-    short* boost_timer = (short*)(this + 0x596);
-    if (*boost_timer > 0)
+    short* dash_timer = (short*)(this + 0x596);
+    if (*dash_timer > 0)
     {
-        *boost_timer = *boost_timer - 1;
+        *dash_timer = *dash_timer - 1;
     }
     else
     {
@@ -989,7 +989,7 @@ void begin_bounce_liftoff(char* const this, int kart_num)
     int ground_hash_upper = (ground_hash >> 16) & 0xffff;
     int ground_hash_lower = ground_hash & 0xffff;
 
-    if (is_kart_dash(this) == 1)  // If bounce is slow, set speed to minimum value when dashing.
+    if (is_kart_boost(this) == 1)  // If bounce is slow, set speed to minimum value when dashing.
     {
         ground_hash_lower = floor_xz_speed(ground_hash_lower);
     }
@@ -999,8 +999,8 @@ void begin_bounce_liftoff(char* const this, int kart_num)
     float* scale = (float*)(this + 0x470);  // Also used for scaling movement vectors.
 
     // NOTE: I have left divisor at 100.0. This choice is explained in github documentation.
-    float y_speed = ((float)ground_hash_upper * get_kart_dash_y_mul(this)) / 100.0;
-    float x_z_speed = ((float)ground_hash_lower * get_kart_dash_x_mul(this)) / 100.0;
+    float y_speed = ((float)ground_hash_upper * get_kart_boost_y_mul(this)) / 100.0;
+    float x_z_speed = ((float)ground_hash_lower * get_kart_boost_x_mul(this)) / 100.0;
 
     float movement_vector[] = {0.0, y_speed, 0.0};
     float z_direction_vector[] = {0.0, 0.0, 0.0};
@@ -1031,10 +1031,39 @@ void begin_bounce_liftoff(char* const this, int kart_num)
 // while also adding own logic.
 void handle_boosts(char* const this)
 {
-    if (is_kart_dash(this) == 1)
+    if (is_kart_boost(this) == 1)
     {
-        decrement_boost_timer(this);
+        decrement_dash_timer(this);
         decrement_mini_turbo_timer(this);
+    }
+}
+
+void stop_mini_turbo_timer_underflow(char* const this)
+{
+    short int* mini_turbo_timer = (short*)(this + 0x59E);
+    if (*mini_turbo_timer <= 1)
+    {
+        *mini_turbo_timer = 0;
+        clear_boost_flag(this, 0x570, 0xfffffdff);
+    }
+}
+
+void stop_dash_timer_underflow(char* const this)
+{
+    short* dash_timer = (short*)(this + 0x596);
+    if (*dash_timer <= 1)
+    {
+        *dash_timer = 0;
+        clear_boost_flag(this, 0x574, 0xdffc3fff);
+    }
+}
+
+void stop_boost_timer_underflow(char* const this)
+{
+    if (is_kart_boost(this) == 1)
+    {
+        stop_dash_timer_underflow(this);
+        stop_mini_turbo_timer_underflow(this);
     }
 }
 
@@ -1248,6 +1277,7 @@ void do_spd_ctrl_call_hijack()
     {
         if (is_touching_ground(kart_body) == true)
         {
+            stop_boost_timer_underflow(kart_body);
             *kart_bounce_flag = false;
         }
     }
