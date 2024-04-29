@@ -37,7 +37,7 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     import audioop  # Deprecated in Python 3.11.
 
-__version__ = '1.8.0'
+__version__ = '1.8.1'
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
@@ -1310,10 +1310,10 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
 
         if needs_mixing:
             if channel_count == 4:
-                data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+                data = audioop.tomono(data, bit_depth // 8, 1.0, 1.0)
                 channel_count = 2
             if channel_count == 2:
-                data = audioop.tomono(data, bit_depth // 8, 0.5, 0.5)
+                data = audioop.tomono(data, bit_depth // 8, 1.0, 1.0)
                 channel_count = 1
 
         sample_rate_ratio = 1
@@ -2804,29 +2804,30 @@ OPTIONAL_ARGUMENTS = {
             'a lap when passed. This allows for more flexible single-lap courses '
             'or courses with multiple routes for laps.',
         ),
-        (   'Tilting Courses', bool,
+        (
+            'Tilting Courses',
+            bool,
             'If enabled, general support for tilting courses will be added to the game.'
             '\n\n'
             'The patch allows custom courses to set the tilt setting in the BOL header (located at '
-            '`0x04`) to "entire course" (value `0x02`) to receive the same handling that Tilt-A-Kart '
-            'receives.'
+            '`0x04`) to "entire course" (value `0x02`) to receive the same handling that '
+            'Tilt-A-Kart receives.'
             '\n\n'
-            'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects in '
-            'the BOL file have a base height of `10000` units. Custom courses that use the tilt '
-            'functionality should follow the same structure; the game will apply the 10000 offset to '
-            'the models\' geometry after the tilt rotation is applied.'
+            'The BMD and BCO models in Tilt-A-Kart are placed at height `0`, whereas the objects '
+            'in the BOL file have a base height of `10000` units. Custom courses that use the tilt '
+            'functionality should follow the same structure; the game will apply the 10000 offset '
+            'to the models\' geometry after the tilt rotation is applied.',
         ),
-        (   'Bouncy Material', bool,
-            'If enabled, logic for a bouncy ground material collision flag will be added to the game.'
-            '\n\n'
-            'The patch will apply a bounce effect to any custom course material with its collision '
-            'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
-            '\n\n'
-            'The 8-character hash at the end of a material name is used to determine the parameters '
-            'of the bounce. A write-up is available at "https://github.com/lance-o/bouncy_material".'
-            '\n\n'
-            'NOTE: This patch does not support the NTSC-U Debug version.'
-         ),
+        ('Bouncy Material', bool,
+         'If enabled, logic for a bouncy ground material collision flag will be added to the game.'
+         '\n\n'
+         'The patch will apply a bounce effect to any custom course material with its collision '
+         'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
+         '\n\n'
+         'The 8-character hash at the end of a material name is used to determine the parameters '
+         'of the bounce. A write-up is available at "https://github.com/lance-o/bouncy_material".'
+         '\n\n'
+         'NOTE: This patch does not support the NTSC-U Debug version.'),
     ),
     'Expert Options': (
         (
