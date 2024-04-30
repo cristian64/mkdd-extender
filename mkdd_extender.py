@@ -2501,7 +2501,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
         bool(args.tilting_courses),
-        bool(args.bouncy_material),
+        bool(args.extended_terrain_types),
         dol_path,
         log,
         bool(args.debug_output),

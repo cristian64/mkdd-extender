@@ -1306,7 +1306,7 @@ retail ISO images when the instruction sequence (see `OSARENALO_INSTRUCTIONS_ADD
 executed.
 """
 
-KART_BOUNCE_FLAG_ADRESSES = {
+KART_EXTENDED_TERRAIN_FLAG_ADDRESSES = {
     'GM4E01': 0x80005230,
     'GM4P01': 0x80005230,
     'GM4J01': 0x80005230,
@@ -1330,7 +1330,7 @@ material in the .BCO file. Very useful for developing a CT with bounce materials
 how much force you require. Unused, otherwise.
 """
 
-KART_LAST_MOMENTUM_ADRESSES = {
+KART_LAST_MOMENTUM_ADDRESSES = {
     'GM4E01': 0x80005240,
     'GM4P01': 0x80005240,
     'GM4J01': 0x80005240,
@@ -1607,7 +1607,7 @@ def patch_dol_file(
     type_specific_item_boxes: bool,
     sectioned_courses: bool,
     tilting_courses: bool,
-    bouncy_material: bool,
+    extended_terrain_types: bool,
     dol_path: str,
     log: logging.Logger,
     debug_output: bool,
@@ -1798,11 +1798,12 @@ def patch_dol_file(
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
-            ('__BOUNCY_MATERIAL__', str(int(bouncy_material))),
-            ('__KART_BOUNCE_FLAG_ADRESS__', f'0x{KART_BOUNCE_FLAG_ADRESSES[game_id]:04X}'),
+            ('__EXTENDED_TERRAIN_TYPES__', str(int(extended_terrain_types))),
+            ('__KART_EXTENDED_TERRAIN_FLAG_ADDRESS__',
+             f'0x{KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id]:04X}'),
             ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__',
              f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
-            ('__KART_LAST_MOMENTUM_ADRESS__', f'0x{KART_LAST_MOMENTUM_ADRESSES[game_id]:04X}'),
+            ('__KART_LAST_MOMENTUM_ADDRESS__', f'0x{KART_LAST_MOMENTUM_ADDRESSES[game_id]:04X}'),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
@@ -1955,7 +1956,7 @@ def patch_dol_file(
                                        'override_total_lap_count')
                     project.branchlink(CHECK_LAP_EX_CALL_ADDRESSES[game_id], 'check_lap_ex')
 
-                if bouncy_material:
+                if extended_terrain_types:
                     project.branchlink(DO_SPD_CTRL_CALL_HIJACK_ADDRESSES[game_id],
                                        'do_spd_ctrl_call_hijack')
                     project.branchlink(GET_SPLASH_HEIGHT_INLINE_ADDRESSES[game_id],

@@ -39,11 +39,10 @@
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 #define SECTIONED_COURSES __SECTIONED_COURSES__
-#define BOUNCY_MATERIAL __BOUNCY_MATERIAL__
-#define KART_BOUNCE_FLAG_ADRESS __KART_BOUNCE_FLAG_ADRESS__
+#define EXTENDED_TERRAIN_TYPES __EXTENDED_TERRAIN_TYPES__
+#define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
 #define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
-#define KART_LAST_MOMENTUM_ADRESS __KART_LAST_MOMENTUM_ADRESS__
-#define RACE_MANAGER_OFFSET_ADRESS __RACE_MANAGER_OFFSET_ADRESS__
+#define KART_LAST_MOMENTUM_ADDRESS __KART_LAST_MOMENTUM_ADDRESS__
 
 void change_course_page(const int delta)
 {
@@ -595,7 +594,7 @@ void check_lap_ex()
 
 // This is in its own section despite not needing to be for now as it will have
 // to handle cases where one custom material is enabled and another is not.
-#if BOUNCY_MATERIAL
+#if EXTENDED_TERRAIN_TYPES
 #if !GM4E01_DEBUG_BUILD
 // Check against all of the custom material flags enabled by the patch.
 int is_ground_flag_mod(char* ground_flag)
@@ -750,7 +749,7 @@ void get_stagger_code_hijack_danger_loop()
 
 #endif
 
-#if BOUNCY_MATERIAL
+#if EXTENDED_TERRAIN_TYPES
 #if !GM4E01_DEBUG_BUILD
 
 // Reads number of wheels on ground. If > 0, is grounded.
@@ -853,14 +852,6 @@ int get_ground_hash(char* const this)
     int* pointerpointer = (int*)(*pointer + 0x20);
 
     return *pointerpointer;
-}
-
-// Move off of ground slightly (stops repeated liftoff calls).
-void add_insant_y(char* const this)
-{
-    float* curr_y_value = (float*)(this + 0x240);
-
-    *curr_y_value += 5.0;
 }
 
 // Returns boost flag status at specified location.
@@ -1023,8 +1014,6 @@ void begin_bounce_liftoff(char* const this, int kart_num)
     *velocity_frame += 10.0f;  // If this is higher than speed, will not scale movement vector.
 
     write_movement_vector(this, movement_vector[0], movement_vector[1], movement_vector[2]);
-
-    add_insant_y(this);
 }
 
 // Boosts are usually handled by DoSpeedCtrl. Replicates its functionality
@@ -1176,7 +1165,7 @@ signed int get_stick_dir_id(char* const ctrl, char* const race_manager, int kart
 void handle_x_adjustment(char* const this, char* const ctrl, char* const race_manager, int kart_num)
 {
     float* last_momentum =
-        (float*)(KART_LAST_MOMENTUM_ADRESS + (kart_num * 0x4));  // Stored at 0x80005240.
+        (float*)(KART_LAST_MOMENTUM_ADDRESS + (kart_num * 0x4));  // Stored at 0x80005240.
 
     float z_direction_vector[] = {0.0, 0.0, 0.0};
     ObjUtility__getKartZdir(kart_num, z_direction_vector);
@@ -1205,7 +1194,7 @@ void handle_x_adjustment(char* const this, char* const ctrl, char* const race_ma
 // Resets last recorded XZ momentum before bounce liftoff;
 void reset_last_momentum(int kart_num)
 {
-    float* last_momentum = (float*)(KART_LAST_MOMENTUM_ADRESS + (kart_num * 0x4));
+    float* last_momentum = (float*)(KART_LAST_MOMENTUM_ADDRESS + (kart_num * 0x4));
     *last_momentum = 0;
 }
 
@@ -1260,6 +1249,81 @@ void call_do_spd_ctrl(char* const this,
     }
 }
 
+// Currently is a two byte structure. If new materials need flags, this can be added to and extended.
+void set_kart_extended_terrain_flag(char* flag, unsigned int hash, int value)
+{
+    if (value == 0)
+    {
+        *flag = *flag & ~hash;
+    }
+    else
+    {
+        *flag = *flag | hash;
+    }
+}
+
+void set_kart_bounce_liftoff_flag(char* flag, int value)
+{
+    set_kart_extended_terrain_flag(flag, 0x2, value);
+}
+
+void set_kart_bounce_flag(char* flag, int value)
+{
+    set_kart_extended_terrain_flag(flag, 0x1, value);
+}
+
+void set_kart_bounce_flag_both(char* flag, int value)
+{
+    set_kart_bounce_liftoff_flag(flag, value);
+    set_kart_bounce_flag(flag, value);
+}
+
+int get_kart_extended_terrain_flag(char* flag, unsigned int hash)
+{
+    int terrain_flag = *flag & hash;
+    return terrain_flag;
+}
+
+int get_kart_bounce_liftoff_flag(char* flag)
+{
+    int ret = 0;
+    if (get_kart_extended_terrain_flag(flag, 0x2) != 0)
+    {
+        ret = 1;
+    }
+    return ret;
+}
+
+int get_kart_bounce_flag(char* flag)
+{
+    int ret = 0;
+    if (get_kart_extended_terrain_flag(flag, 0x1) != 0)
+    {
+        ret = 1;
+    }
+    return ret;
+}
+
+// In case flags are set during times they shouldn't be, clear them.
+void clear_bounce_flags_if_errant(char* const this, int kart_num)
+{
+    char* flag = (char*)(KART_EXTENDED_TERRAIN_FLAG_ADDRESS + kart_num);
+    int kart_bounce_flag = get_kart_bounce_flag(flag);
+    int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(flag);
+
+    if (is_touching_ground(this) == true && is_touching_ground_and_flag_b0(this) == false)
+    {
+        if (kart_bounce_flag == true)
+        {
+            set_kart_bounce_flag(flag, false);
+        }
+        if (kart_bounce_liftoff_flag == true)
+        {
+            set_kart_bounce_liftoff_flag(flag, false);
+        }
+    }
+}
+
 // This is functionally the bounce material's main() function.
 void do_spd_ctrl_call_hijack()
 {
@@ -1270,34 +1334,40 @@ void do_spd_ctrl_call_hijack()
 
     int* const kart_num = (int*)(kart_strat + 0x22c);
 
-    char* kart_bounce_flag =
-        (char*)(KART_BOUNCE_FLAG_ADRESS + *kart_num);  // Could be stored in 1 byte.
+    clear_bounce_flags_if_errant(kart_body, *kart_num);
 
-    if (*kart_bounce_flag == true)  // Falses flag if kart is grounded.
+    char* kart_extended_terrain_flag = (char*)(KART_EXTENDED_TERRAIN_FLAG_ADDRESS + *kart_num);
+
+    int kart_bounce_flag = get_kart_bounce_flag(kart_extended_terrain_flag);
+    int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(kart_extended_terrain_flag);
+
+    if (kart_bounce_flag == true)  // Clear flags dependent on Kart being grounded.
     {
-        if (is_touching_ground(kart_body) == true)
+        if (is_touching_ground(kart_body) == true && kart_bounce_liftoff_flag == false)
         {
             stop_boost_timer_underflow(kart_body);
-            *kart_bounce_flag = false;
+            set_kart_bounce_flag(kart_extended_terrain_flag, false);
+            kart_bounce_flag = false;
+        }
+        else if (is_touching_ground(kart_body) == false)
+        {
+            set_kart_bounce_liftoff_flag(kart_extended_terrain_flag, false);
+            kart_bounce_liftoff_flag = false;
         }
     }
 
-    if (*kart_bounce_flag == false)  // Not elif for consistent chain of bounces.
+    if (kart_bounce_flag == false && kart_bounce_liftoff_flag == false)
     {
         if (is_touching_ground_and_flag_b0(kart_body) == true)
         {
             reset_last_momentum(*kart_num);
             begin_bounce_liftoff(kart_body, *kart_num);
-            *kart_bounce_flag = true;
+            set_kart_bounce_flag_both(kart_extended_terrain_flag, true);
+            kart_bounce_flag = true;
         }
     }
 
-    call_do_spd_ctrl(kart_body,
-                     kart_strat,
-                     kart_ctrl,
-                     race_manager,
-                     *kart_num,
-                     *kart_bounce_flag);  // This many arguments is ugly.
+    call_do_spd_ctrl(kart_body, kart_strat, kart_ctrl, race_manager, *kart_num, kart_bounce_flag);
 }
 
 // If Debug version.
