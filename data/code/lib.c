@@ -597,10 +597,10 @@ void check_lap_ex()
 #if EXTENDED_TERRAIN_TYPES
 #if !GM4E01_DEBUG_BUILD
 // Check against all of the custom material flags enabled by the patch.
-int is_ground_flag_mod(char* ground_flag)
+int is_terrain_type_mod(char* terrain_type)
 {
     int ret = 0;
-    if (*ground_flag == 0xB0)
+    if (*terrain_type == 0xB0)
     {
         ret = 1;
     }
@@ -615,8 +615,8 @@ int should_return_fake_code(char* const ground)
 
     if (*ground_materials != 0)
     {
-        char* ground_flag = (char*)(*ground_materials + 0x16);  // Pointer to the collision flag.
-        ret = is_ground_flag_mod(ground_flag);
+        char* terrain_type = (char*)(*ground_materials + 0x16);  // Pointer to the collision flag.
+        ret = is_terrain_type_mod(terrain_type);
     }
 
     return ret;
@@ -629,8 +629,8 @@ int should_skip_item_inval(char* ground)
 
     if (*ground_materials != 0)
     {
-        char* ground_flag = (char*)(*ground_materials + 0x16);
-        ret = is_ground_flag_mod(ground_flag);
+        char* terrain_type = (char*)(*ground_materials + 0x16);
+        ret = is_terrain_type_mod(terrain_type);
     }
 
     return ret;
@@ -681,9 +681,9 @@ void is_item_inval_ground_hijack()
 void get_add_thickness_inline()
 {
     register char* const ground_info asm("r25");  // R25 is material information.
-    char* ground_flag = (char*)(ground_info + 0x16);
+    char* terrain_type = (char*)(ground_info + 0x16);
 
-    if (is_ground_flag_mod(ground_flag) == 1)
+    if (is_terrain_type_mod(terrain_type) == 1)
     {
         asm("lis %r0, 0x00000");
         asm("ori %r0, %r0, 0x0000");
@@ -767,13 +767,13 @@ int is_touching_ground(char* const this)
 }
 
 // Is grounded and is touching bounce material flag.
-int is_touching_ground_and_flag_b0(char* const this)
+int is_touching_ground_and_type_b0(char* const this)
 {
-    int ground_type = *(int*)(this + 0x78);
+    int terrain_type = *(int*)(this + 0x78);
     int ground_B0 = 176;  // 0xB0 in hex.
     int ret = 0;
 
-    if (ground_type == ground_B0 && is_touching_ground(this) == true)
+    if (terrain_type == ground_B0 && is_touching_ground(this) == true)
     {
         ret = 1;
     }
@@ -1311,7 +1311,7 @@ void clear_bounce_flags_if_errant(char* const this, int kart_num)
     int kart_bounce_flag = get_kart_bounce_flag(flag);
     int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(flag);
 
-    if (is_touching_ground(this) == true && is_touching_ground_and_flag_b0(this) == false)
+    if (is_touching_ground(this) == true && is_touching_ground_and_type_b0(this) == false)
     {
         if (kart_bounce_flag == true)
         {
@@ -1358,7 +1358,7 @@ void do_spd_ctrl_call_hijack()
 
     if (kart_bounce_flag == false && kart_bounce_liftoff_flag == false)
     {
-        if (is_touching_ground_and_flag_b0(kart_body) == true)
+        if (is_touching_ground_and_type_b0(kart_body) == true)
         {
             reset_last_momentum(*kart_num);
             begin_bounce_liftoff(kart_body, *kart_num);
