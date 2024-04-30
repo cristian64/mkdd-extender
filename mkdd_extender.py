@@ -2499,7 +2499,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
         bool(args.tilting_courses),
-        bool(args.bouncy_material),
+        bool(args.extended_terrain_types),
         dol_path,
         log,
         bool(args.debug_output),
@@ -2818,14 +2818,15 @@ OPTIONAL_ARGUMENTS = {
             'functionality should follow the same structure; the game will apply the 10000 offset '
             'to the models\' geometry after the tilt rotation is applied.',
         ),
-        ('Bouncy Material', bool,
-         'If enabled, logic for a bouncy ground material collision flag will be added to the game.'
+        ('Extended Terrain Types', bool,
+         'If enabled, new terrain types that add custom mechanics will be added to the game. '
          '\n\n'
-         'The patch will apply a bounce effect to any custom course material with its collision '
-         'flag set to `0xB0XX`, with XX being the ordinary sound flag.'
+         'Information about these terrain types, including instructions on how to add them '
+         'to a Custom Track can be found at the following locations:'
          '\n\n'
-         'The 8-character hash at the end of a material name is used to determine the parameters '
-         'of the bounce. A write-up is available at "https://github.com/lance-o/bouncy_material".'
+         'https://lance-o.github.io/extended_terrain_types '
+         '\n\n'
+         'https://github.com/lance-o/extended_terrain_types '
          '\n\n'
          'NOTE: This patch does not support the NTSC-U Debug version.'),
     ),
