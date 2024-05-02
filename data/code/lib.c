@@ -44,7 +44,6 @@
 #define EXTENDED_TERRAIN_TYPES __EXTENDED_TERRAIN_TYPES__
 #define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
 #define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
-#define KART_LAST_MOMENTUM_ADDRESS __KART_LAST_MOMENTUM_ADDRESS__
 
 void change_course_page(const int delta)
 {
@@ -755,6 +754,8 @@ void get_stagger_code_hijack_danger_loop()
 #if EXTENDED_TERRAIN_TYPES
 #if !GM4E01_DEBUG_BUILD
 
+float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+
 // Reads number of wheels on ground. If > 0, is grounded.
 int is_touching_ground(char* const this)
 {
@@ -1167,8 +1168,7 @@ signed int get_stick_dir_id(char* const ctrl, char* const race_manager, int kart
 // Main function for shifting sideways during bounce.
 void handle_x_adjustment(char* const this, char* const ctrl, char* const race_manager, int kart_num)
 {
-    float* last_momentum =
-        (float*)(KART_LAST_MOMENTUM_ADDRESS + (kart_num * 0x4));  // Stored at 0x80005240.
+    float* const last_momentum = &s_last_momenta[kart_num];
 
     float z_direction_vector[] = {0.0, 0.0, 0.0};
     ObjUtility__getKartZdir(kart_num, z_direction_vector);
@@ -1197,7 +1197,7 @@ void handle_x_adjustment(char* const this, char* const ctrl, char* const race_ma
 // Resets last recorded XZ momentum before bounce liftoff;
 void reset_last_momentum(int kart_num)
 {
-    float* last_momentum = (float*)(KART_LAST_MOMENTUM_ADDRESS + (kart_num * 0x4));
+    float* const last_momentum = &s_last_momenta[kart_num];
     *last_momentum = 0;
 }
 

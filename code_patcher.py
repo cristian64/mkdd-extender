@@ -1328,38 +1328,23 @@ executed.
 """
 
 KART_EXTENDED_TERRAIN_FLAG_ADDRESSES = {
-    'GM4E01': 0x80005230,
-    'GM4P01': 0x80005230,
-    'GM4J01': 0x80005230,
-    'GM4E01dbg': 0x80005230,
+    'GM4E01': 0x802ed672,
+    'GM4P01': 0x802f9d06,
+    'GM4J01': 0x8030a786,
+    'GM4E01dbg': 0x8032b1d2,
 }
 """
-Free space used to store a Char that functions as a flag for every Kart in the race.
-This space is sometimes used by Ralf codes to write ASM into them - though, not this
-location specifically.
+Padding used to store a Char that functions as a flag for every Kart in the race.
 """
 
 KART_BOUNCE_DEFAULT_READ_ADDRESSES = {
-    'GM4E01': 0x8000523c,
-    'GM4P01': 0x8000523c,
-    'GM4J01': 0x8000523c,
-    'GM4E01dbg': 0x8000523c,
+    k: v + 8
+    for k, v in KART_EXTENDED_TERRAIN_FLAG_ADDRESSES.items()
 }
 """
-Free space used by bouce logic to read movement vector data from if nothing was set up for the
-material in the .BCO file. Very useful for developing a CT with bounce materials if you don't know
-how much force you require. Unused, otherwise.
-"""
-
-KART_LAST_MOMENTUM_ADDRESSES = {
-    'GM4E01': 0x80005240,
-    'GM4P01': 0x80005240,
-    'GM4J01': 0x80005240,
-    'GM4E01dbg': 0x80005240,
-}
-"""
-Free space used by bouce logic to store previous XZ movement. This allows XZ movement to accelerate
-and not move jaggedly.
+Padding used by bounce logic to read movement vector data from if nothing was set up for the
+material in the .BCO file. Very useful for developing a CC with Bouncy if you don't know
+how much force you require. Loccation defined is KART_EXTENDED_TERRAIN_FLAG[game_id] + 0x8.
 """
 
 DO_SPD_CTRL_CALL_HIJACK_ADDRESSES = {
@@ -1825,7 +1810,6 @@ def patch_dol_file(
              f'0x{KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id]:04X}'),
             ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__',
              f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
-            ('__KART_LAST_MOMENTUM_ADDRESS__', f'0x{KART_LAST_MOMENTUM_ADDRESSES[game_id]:04X}'),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
@@ -1850,6 +1834,11 @@ def patch_dol_file(
                 project.dol.write(b'\0')
                 project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
                 project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+
+                project.dol.seek(KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id])
+                project.dol.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+                project.dol.seek(KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id])
+                project.dol.write(b'\x50\x00\x50\x00')
 
                 # Initialize the strings with the character of the first page ('0').
                 for string, address in string_addresses.items():
