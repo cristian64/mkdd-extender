@@ -1547,6 +1547,14 @@ def find_char_offset_in_string(string: str) -> int:
     return len(os.path.splitext(string)[0]) - 1
 
 
+def extended_terrain_types_fail_debug(game_id, extended_terrain_types):
+    if game_id == 'GM4E01dbg' and extended_terrain_types:
+        raise RuntimeError(
+            f'The patch "Extended Terrain Types" is incompatible with the Debug version. Please select a NSTC-U, NTSC-J or PAL .iso.'
+        )
+    return
+
+
 def read_osarena(dol_path, game_id) -> int:
     with open(dol_path, 'rb') as f:
         dol_file = dolreader.DolFile(f)
@@ -1621,6 +1629,7 @@ def patch_dol_file(
 
     log.info('Generating and injecting C code...')
 
+    extended_terrain_types_fail_debug(game_id, extended_terrain_types)
     initial_page_index = initial_page_number - 1
     page_count = len(audio_track_data)
     page_course_count = (mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
