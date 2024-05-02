@@ -2818,17 +2818,19 @@ OPTIONAL_ARGUMENTS = {
             'functionality should follow the same structure; the game will apply the 10000 offset '
             'to the models\' geometry after the tilt rotation is applied.',
         ),
-        ('Extended Terrain Types', bool,
-         'If enabled, new terrain types that add custom mechanics will be added to the game. '
-         '\n\n'
-         'Information about these terrain types, including instructions on how to add them '
-         'to a Custom Track can be found at the following locations:'
-         '\n\n'
-         'https://lance-o.github.io/extended_terrain_types '
-         '\n\n'
-         'https://github.com/lance-o/extended_terrain_types '
-         '\n\n'
-         'NOTE: This patch does not support the NTSC-U Debug version.'),
+        (
+            'Extended Terrain Types',
+            bool,
+            'If enabled, new terrain types that add custom mechanics will be added to the game:'
+            '\n\n'
+            '- **Bouncy**: Karts rebound off the terrain\n'
+            '\n\n'
+            'More information about these terrain types, including instructions on how to add them '
+            'to a custom course, can be found at the following locations:'
+            '\n\n'
+            '- https://lance-o.github.io/extended_terrain_types\n'
+            '- https://github.com/lance-o/extended_terrain_types\n',
+        ),
     ),
     'Expert Options': (
         (
