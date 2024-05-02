@@ -931,13 +931,14 @@ void clear_boost_flag(char* const this, int mem, unsigned int hash)
 // NOTE: This function and below could have been merged
 void decrement_dash_timer(char* const this)
 {
-    short* dash_timer = (short*)(this + 0x596);
+    signed short* dash_timer = (signed short*)(this + 0x596);
     if (*dash_timer > 0)
     {
         *dash_timer = *dash_timer - 1;
     }
     else
     {
+        *dash_timer = 0;
         clear_boost_flag(this, 0x574, 0xdffc3fff);
     }
 }
@@ -945,13 +946,14 @@ void decrement_dash_timer(char* const this)
 // Decrements timer specifically for MTs.
 void decrement_mini_turbo_timer(char* const this)
 {
-    short int* mini_turbo_timer = (short*)(this + 0x59E);
+    signed short int* mini_turbo_timer = (signed short*)(this + 0x59E);
     if (*mini_turbo_timer > 0)
     {
         *mini_turbo_timer = *mini_turbo_timer - 1;
     }
     else
     {
+        *mini_turbo_timer = 0;
         clear_boost_flag(this, 0x570, 0xfffffdff);
     }
 }
@@ -1030,7 +1032,7 @@ void handle_boosts(char* const this)
 
 void stop_mini_turbo_timer_underflow(char* const this)
 {
-    short int* mini_turbo_timer = (short*)(this + 0x59E);
+    signed short int* mini_turbo_timer = (signed short*)(this + 0x59E);
     if (*mini_turbo_timer <= 1)
     {
         *mini_turbo_timer = 0;
@@ -1040,7 +1042,7 @@ void stop_mini_turbo_timer_underflow(char* const this)
 
 void stop_dash_timer_underflow(char* const this)
 {
-    short* dash_timer = (short*)(this + 0x596);
+    signed short* dash_timer = (signed short*)(this + 0x596);
     if (*dash_timer <= 1)
     {
         *dash_timer = 0;
