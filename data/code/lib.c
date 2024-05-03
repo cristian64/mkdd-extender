@@ -920,42 +920,18 @@ int is_kart_boost(char* const this)
     return ret;
 }
 
+// Sets dash flag at specified location;
+void set_boost_flag(char* const this, int mem, unsigned int hash)
+{
+    int* flag = (int*)(this + mem);
+    *flag = *flag | hash;
+}
+
 // Clears dash flag at specified location;
 void clear_boost_flag(char* const this, int mem, unsigned int hash)
 {
     int* flag = (int*)(this + mem);
     *flag = *flag & hash;
-}
-
-// Decrements timer for generic dashes (e.g. Mushrooms, Boost Panels).
-// NOTE: This function and below could have been merged
-void decrement_dash_timer(char* const this)
-{
-    signed short* dash_timer = (signed short*)(this + 0x596);
-    if (*dash_timer > 0)
-    {
-        *dash_timer = *dash_timer - 1;
-    }
-    else
-    {
-        *dash_timer = 0;
-        clear_boost_flag(this, 0x574, 0xdffc3fff);
-    }
-}
-
-// Decrements timer specifically for MTs.
-void decrement_mini_turbo_timer(char* const this)
-{
-    signed short int* mini_turbo_timer = (signed short*)(this + 0x59E);
-    if (*mini_turbo_timer > 0)
-    {
-        *mini_turbo_timer = *mini_turbo_timer - 1;
-    }
-    else
-    {
-        *mini_turbo_timer = 0;
-        clear_boost_flag(this, 0x570, 0xfffffdff);
-    }
 }
 
 // Increases movement vector of XZ axes when below a certain threshold.
@@ -1019,44 +995,69 @@ void begin_bounce_liftoff(char* const this, int kart_num)
     write_movement_vector(this, movement_vector[0], movement_vector[1], movement_vector[2]);
 }
 
+void decrement_mini_turbo_timer(char* const this)
+{
+    short* mini_turbo_timer = (short*)(this + 0x59E);
+    if (get_boost_flag(this, 0x570, 0x200) != 0)
+    {
+        --*mini_turbo_timer;
+
+        if (*mini_turbo_timer == 0)
+        {
+            clear_boost_flag(this, 0x570, 0xfffffdff);
+        }
+    }
+}
+
+void decrement_unknown_boost(char* const this)
+{
+    char* unknown_decrement = (char*)(this + 0x5B5);
+
+    if (*unknown_decrement != '\0')
+    {
+        --*unknown_decrement;
+    }
+
+    if (get_boost_flag(this, 0x570, 0x4) != 0 && *unknown_decrement == '\0')
+    {
+        clear_boost_flag(this, 0x570, 0xfffffffb);
+    }
+}
+
+// This function essentially recreates KartStrat::DoDash()'s boost timer decrementation.
+// Uglier than older implementaiton (triple if indentation), but doesn't underflow.
+void decrement_boost_timers(char* const this)
+{
+    short* dash_timer = (short*)(this + 0x596);
+    char* unknown_decrement = (char*)(this + 0x5B5);
+
+    decrement_mini_turbo_timer(this);
+    decrement_unknown_boost(this);
+
+
+    if (get_boost_flag(this, 0x574, 0x8000) != 0)
+    {
+        --*dash_timer;
+
+        if (*dash_timer == 0)
+        {
+            if (get_boost_flag(this, 0x574, 0x10000) != 0)
+            {
+                set_boost_flag(this, 0x570, 0x4);
+                *unknown_decrement = 0xf;
+            }
+            clear_boost_flag(this, 0x574, 0xdffc3fff);
+            clear_boost_flag(this, 0x570, 0xfffffbff);
+        }
+    }
+    
+}
+
 // Boosts are usually handled by DoSpeedCtrl. Replicates its functionality
 // while also adding own logic.
 void handle_boosts(char* const this)
 {
-    if (is_kart_boost(this) == 1)
-    {
-        decrement_dash_timer(this);
-        decrement_mini_turbo_timer(this);
-    }
-}
-
-void stop_mini_turbo_timer_underflow(char* const this)
-{
-    signed short int* mini_turbo_timer = (signed short*)(this + 0x59E);
-    if (*mini_turbo_timer <= 1)
-    {
-        *mini_turbo_timer = 0;
-        clear_boost_flag(this, 0x570, 0xfffffdff);
-    }
-}
-
-void stop_dash_timer_underflow(char* const this)
-{
-    signed short* dash_timer = (signed short*)(this + 0x596);
-    if (*dash_timer <= 1)
-    {
-        *dash_timer = 0;
-        clear_boost_flag(this, 0x574, 0xdffc3fff);
-    }
-}
-
-void stop_boost_timer_underflow(char* const this)
-{
-    if (is_kart_boost(this) == 1)
-    {
-        stop_dash_timer_underflow(this);
-        stop_mini_turbo_timer_underflow(this);
-    }
+    decrement_boost_timers(this);
 }
 
 // Slows XZ movement during bounce while not pressing left or right.
@@ -1347,7 +1348,6 @@ void do_spd_ctrl_call_hijack()
     {
         if (is_touching_ground(kart_body) == true && kart_bounce_liftoff_flag == false)
         {
-            stop_boost_timer_underflow(kart_body);
             set_kart_bounce_flag(kart_extended_terrain_flag, false);
             kart_bounce_flag = false;
         }
@@ -1368,7 +1368,6 @@ void do_spd_ctrl_call_hijack()
             kart_bounce_flag = true;
         }
     }
-
     call_do_spd_ctrl(kart_body, kart_strat, kart_ctrl, race_manager, *kart_num, kart_bounce_flag);
 }
 
