@@ -591,22 +591,16 @@ void check_lap_ex()
 }
 #endif
 
-// This is in its own section despite not needing to be for now as it will have
-// to handle cases where one custom material is enabled and another is not.
+// The importance of this remaining in its own section is that its functionality will be needed for
+// any future custom terrain types added, within the Extended Terrain Types patch or otherwise.
 #if EXTENDED_TERRAIN_TYPES
-#if !GM4E01_DEBUG_BUILD
 // Check against all of the custom material flags enabled by the patch.
-int is_terrain_type_mod(char* terrain_type)
+int is_extended_terrain_type(const char terrain_type)
 {
-    int ret = 0;
-    if (*terrain_type == 0xB0)
-    {
-        ret = 1;
-    }
-    return ret;
+    return terrain_type == 0xB0;
 }
 
-// This and skip_item are separated to make bug reports easier to diagnose in the future.
+
 int should_return_fake_code(char* const ground)
 {
     int* ground_materials = (int*)(ground + 0x20);  // Pointer to the triangle's material in memory.
@@ -614,47 +608,28 @@ int should_return_fake_code(char* const ground)
 
     if (*ground_materials != 0)
     {
-        char* terrain_type = (char*)(*ground_materials + 0x16);  // Pointer to the collision flag.
-        ret = is_terrain_type_mod(terrain_type);
+        const char terrain_type = *(char*)(*ground_materials + 0x16);  // Pointer to the collision flag.
+        ret = is_extended_terrain_type(terrain_type);
     }
 
     return ret;
 }
 
-int should_skip_item_inval(char* ground)
-{
-    int* ground_materials = (int*)(ground + 0x20);
-    int ret = 0;
-
-    if (*ground_materials != 0)
-    {
-        char* terrain_type = (char*)(*ground_materials + 0x16);
-        ret = is_terrain_type_mod(terrain_type);
-    }
-
-    return ret;
-}
 
 // Game will search for a Splash object due to the material hash being used.
 // This nullifies that behaviour.
-void get_splash_id_inline()
+void get_splash_code_inline()
 {
     register char* const ground asm("r3");  // R3 is a CrsGround object.
 
     if (should_return_fake_code(ground) == 1)
     {
-        asm("lis %r3, 0x00000");
-        asm("ori %r3, %r3, 0x0000");
+        asm("li %r3, 0x0");
     }
     else
     {
         asm("lwz %r3,0x20(%r5)");  // Original instruction.
     }
-}
-
-void get_splash_height_inline()
-{
-    get_splash_id_inline();
 }
 
 // Game does not want material flags it does not recognize to allow for items to collide with them.
@@ -663,16 +638,14 @@ void is_item_inval_ground_hijack()
 {
     register int* const ground asm("r3");
     char* ground_char = (char*)(ground + 0x0);
-    if (should_skip_item_inval(ground_char) != 1)
+    if (should_return_fake_code(ground_char) != 1)
     {
         CrsGround__isItemInvalGround(ground);  // Original instruction.
     }
     else
     {
-        asm("lis %r3, 0x00000");
-        asm("ori %r3, %r3, 0x0000");
-        asm("lis %r4, 0x00000");
-        asm("ori %r4, %r4, 0x0000");
+        asm("li %r3, 0x0");
+        asm("li %r4, 0x0");
     }
 }
 
@@ -682,10 +655,9 @@ void get_add_thickness_inline()
     register char* const ground_info asm("r25");  // R25 is material information.
     char* terrain_type = (char*)(ground_info + 0x16);
 
-    if (is_terrain_type_mod(terrain_type) == 1)
+    if (is_extended_terrain_type(*terrain_type) == 1)
     {
-        asm("lis %r0, 0x00000");
-        asm("ori %r0, %r0, 0x0000");
+        asm("li %r0, 0x0");
     }
     else
     {
@@ -694,7 +666,7 @@ void get_add_thickness_inline()
 }
 
 // Stop game from performing fall animation when overtop custom material.
-void get_stagger_code_hijack_air_check()
+void get_stagger_code_hijack()
 {
     register char* const ground asm("r3");  // R3 is CrsGround
     if (should_return_fake_code(ground) != 1)
@@ -703,53 +675,13 @@ void get_stagger_code_hijack_air_check()
     }
     else
     {
-        asm("lis %r3, 0x00000");
-        asm("ori %r3, %r3, 0x0000");
+        asm("li %r3, 0x0");
     }
 }
-
-void get_stagger_code_hijack_danger_loop()
-{
-    get_stagger_code_hijack_air_check();
-}
-
-// If Debug version.
-#else
-void get_splash_height_inline()
-{
-    get_splash_id_inline();
-}
-
-void get_splash_id_inline()
-{
-    asm("lwz %r3,0x20(%r30)");  // Original instruction.
-}
-
-void is_item_inval_ground_hijack()
-{
-    CrsGround__isItemInvalGround();  // Original instruction. No arg needed, r3 is already correct.
-}
-
-void get_add_thickness_inline()
-{
-    asm("lbz %r0,0x20(%r3)");
-}
-
-void get_stagger_code_hijack_air_check()
-{
-    CrsGround__getStaggerCode();  // Original instruction. No arg needed, r3 is already correct.
-}
-
-void get_stagger_code_hijack_danger_loop()
-{
-    get_stagger_code_hijack_air_check();
-}
-#endif
 
 #endif
 
 #if EXTENDED_TERRAIN_TYPES
-#if !GM4E01_DEBUG_BUILD
 
 float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
@@ -1247,8 +1179,7 @@ void call_do_spd_ctrl(char* const this,
         asm("ori %r8, %r8, 0x0040");
         asm("lis %r9, 0x0000");
         asm("ori %r9, %r9, 0x000a");
-        asm("lis %r10, 0x0000");
-        asm("ori %r10, %r10, 0x0000");
+        asm("li %r10, 0x0");
     }
 }
 
@@ -1370,13 +1301,5 @@ void do_spd_ctrl_call_hijack()
     }
     call_do_spd_ctrl(kart_body, kart_strat, kart_ctrl, race_manager, *kart_num, kart_bounce_flag);
 }
-
-// If Debug version.
-#else
-void do_spd_ctrl_call_hijack()
-{
-    KartStrat__DoSpeedCrl();  // Original instruction with no argument. Correct arg already in r3.
-}
-#endif
 
 #endif

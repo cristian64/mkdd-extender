@@ -1824,10 +1824,11 @@ def patch_dol_file(
                     project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
                     project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
-                project.dol.seek(KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id])
-                project.dol.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
-                project.dol.seek(KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id])
-                project.dol.write(b'\x50\x00\x50\x00')
+                if (extended_terrain_types):
+                    project.dol.seek(KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id])
+                    project.dol.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+                    project.dol.seek(KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id])
+                    project.dol.write(b'\x50\x00\x50\x00')
 
                 # Initialize the strings with the character of the first page ('0').
                 for string, address in string_addresses.items():
@@ -1958,17 +1959,18 @@ def patch_dol_file(
                     project.branchlink(DO_SPD_CTRL_CALL_HIJACK_ADDRESSES[game_id],
                                        'do_spd_ctrl_call_hijack')
                     project.branchlink(GET_SPLASH_HEIGHT_INLINE_ADDRESSES[game_id],
-                                       'get_splash_height_inline')
+                                       'get_splash_code_inline')
                     project.branchlink(GET_SPLASH_ID_INLINE_ADDRESSES[game_id],
-                                       'get_splash_id_inline')
+                                       'get_splash_code_inline')
                     project.branchlink(IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES[game_id],
                                        'is_item_inval_ground_hijack')
                     project.branchlink(GET_ADD_THICKNESS_INLINE_ADDRESSES[game_id],
                                        'get_add_thickness_inline')
                     project.branchlink(GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES[game_id],
-                                       'get_stagger_code_hijack_air_check')
+                                       'get_stagger_code_hijack')
                     project.branchlink(GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES[game_id],
-                                       'get_stagger_code_hijack_danger_loop')
+                                       'get_stagger_code_hijack')
+
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
                 # Further symbol post-processing once the map is available.
