@@ -615,20 +615,19 @@ int should_return_fake_code(char* const ground)
     return ret;
 }
 
-
 // Game will search for a Splash object due to the material hash being used.
 // This nullifies that behaviour.
 void get_splash_code_inline()
 {
     register char* const ground asm("r3");  // R3 is a CrsGround object.
-
+    asm("mr %r5, %r3"); // Stop registers from misbehaving; CrsGround stored for later.
     if (should_return_fake_code(ground) == 1)
     {
         asm("li %r3, 0x0");
     }
     else
     {
-        asm("lwz %r3,0x20(%r5)");  // Original instruction.
+        asm("lwz %r3,0x20(%r5)");
     }
 }
 
