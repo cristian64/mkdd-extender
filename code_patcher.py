@@ -1703,10 +1703,12 @@ def patch_dol_file(
                 project.dol.write(b'\0')
                 project.dol.seek(CURRENT_PAGE_ADDRESSES[game_id])
                 project.dol.write(initial_page_index.to_bytes(1, 'big'))
-                project.dol.seek(GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id])
-                project.dol.write(b'\0')
-                project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
-                project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+                if extender_cup:
+                    project.dol.seek(GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id])
+                    project.dol.write(b'\0')
+                if type_specific_item_boxes:
+                    project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
+                    project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
                 # Initialize the strings with the character of the first page ('0').
                 for string, address in string_addresses.items():
