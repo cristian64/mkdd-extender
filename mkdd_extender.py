@@ -353,7 +353,8 @@ def rename(src_path: str, dst_path: str):
     if windows and os.path.isdir(src_path) and shutil.which('robocopy'):
         with subprocess.Popen(('robocopy', '/e', '/move', '/ndl', '/nfl', src_path, dst_path),
                               stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE) as process:
+                              stderr=subprocess.PIPE,
+                              creationflags=subprocess.CREATE_NO_WINDOW) as process:
             process.communicate()
             success_code = 0 <= process.returncode <= 7  # https://ss64.com/nt/robocopy-exit.html
             if not success_code:
