@@ -37,7 +37,7 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     import audioop  # Deprecated in Python 3.11.
 
-__version__ = '1.8.1'
+__version__ = '1.8.2'
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
@@ -353,7 +353,8 @@ def rename(src_path: str, dst_path: str):
     if windows and os.path.isdir(src_path) and shutil.which('robocopy'):
         with subprocess.Popen(('robocopy', '/e', '/move', '/ndl', '/nfl', src_path, dst_path),
                               stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE) as process:
+                              stderr=subprocess.PIPE,
+                              creationflags=subprocess.CREATE_NO_WINDOW) as process:
             process.communicate()
             success_code = 0 <= process.returncode <= 7  # https://ss64.com/nt/robocopy-exit.html
             if not success_code:
@@ -2964,7 +2965,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
             gcm_file.read_entire_disc()
         except Exception as e:
             raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}') from e
-        if 'files/Cours0' in gcm_file.dirs_by_path:
+        if os.path.join('files', 'Cours0') in gcm_file.dirs_by_path:
             raise MKDDExtenderError('The input ISO image appears to have been extended already.')
         files_extracted = 0
         for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):

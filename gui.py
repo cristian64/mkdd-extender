@@ -633,10 +633,14 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
 
-        self.clear_selection_action = QtGui.QAction('Clear', self)
+        self.clear_selection_action = QtGui.QAction('Clear Selection', self)
         self.clear_selection_action.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete))
         self.clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        self.clear_page_action = QtGui.QAction('Clear Page', self)
+        self.clear_all_pages_action = QtGui.QAction('Clear All Pages', self)
         self.addAction(self.clear_selection_action)
+        self.addAction(self.clear_page_action)
+        self.addAction(self.clear_all_pages_action)
 
     def add_companion_table(self, table: QtWidgets.QTableWidget):
         self.__companion_tables.append(table)
@@ -1372,42 +1376,54 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         label.show()
 
 
-class ProgressDialog(QtWidgets.QProgressDialog):
+class ProgressDialog:
+
+    class _ProgressDialog(QtWidgets.QProgressDialog):
+
+        def __init__(self, text: str, parent: QtWidgets.QWidget = None):
+            super().__init__(parent)
+
+            self.setWindowTitle(text)
+            self.setMinimum(0)
+            self.setMaximum(0)
+            self.setValue(0)
+            self.setCancelButton(None)
+            self.setLabelText('Please wait...')
+            self.setMinimumWidth(int(self.fontMetrics().horizontalAdvance(text) * 1.25))
+
+            self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowTitleHint
+                                | QtCore.Qt.CustomizeWindowHint)
+
+            self.finished = False
+
+        def closeEvent(self, event: QtGui.QCloseEvent):
+            if not self.finished:
+                event.ignore()
+                return
+            super().closeEvent(event)
+
+        def keyPressEvent(self, event: QtGui.QKeyEvent):
+            if not self.finished:
+                event.ignore()
+                return
+            super().keyPressEvent(event)
+
+        def keyReleaseEvent(self, event: QtGui.QKeyEvent):
+            if not self.finished:
+                event.ignore()
+                return
+            super().keyReleaseEvent(event)
 
     def __init__(self, text: str, func: callable, parent: QtWidgets.QWidget = None):
-        super().__init__(parent)
-
-        self.setWindowTitle(text)
-        self.setMinimum(0)
-        self.setMaximum(0)
-        self.setValue(0)
-        self.setCancelButton(None)
-        self.setLabelText('Please wait...')
-        self.setMinimumWidth(int(self.fontMetrics().horizontalAdvance(text) * 1.25))
-
-        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowTitleHint
-                            | QtCore.Qt.CustomizeWindowHint)
-
+        self._text = text
         self._func = func
+        self._parent = parent
+
+        self._cancel_button = None
         self._finished = False
 
-    def closeEvent(self, event: QtGui.QCloseEvent):
-        if not self._finished:
-            event.ignore()
-            return
-        super().closeEvent(event)
-
-    def keyPressEvent(self, event: QtGui.QKeyEvent):
-        if not self._finished:
-            event.ignore()
-            return
-        super().keyPressEvent(event)
-
-    def keyReleaseEvent(self, event: QtGui.QKeyEvent):
-        if not self._finished:
-            event.ignore()
-            return
-        super().keyReleaseEvent(event)
+    def set_cancel_button(self, cancel_button: QtWidgets.QAbstractButton):
+        self._cancel_button = cancel_button
 
     def execute_and_wait(self) -> Any:
         result = None
@@ -1427,10 +1443,15 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         timer = QtCore.QTimer()
         timer.setInterval(10)
 
+        dialog = None
+
         def check_completion():
+            nonlocal dialog
             if self._finished or not thread.is_alive():
                 self._finished = True
-                self.close()
+            if self._finished and dialog is not None and not dialog.finished:
+                dialog.finished = True
+                dialog.close()
 
         timer.timeout.connect(check_completion)
         timer.start()
@@ -1440,10 +1461,13 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         # responsiveness can vary dramatically between different file systems).
         thread.join(0.1)
         if thread.is_alive():
-            self.exec_()
-        else:
-            self._finished = True
-            self.close()
+            dialog = ProgressDialog._ProgressDialog(self._text, self._parent)
+            if self._cancel_button is not None:
+                dialog.setCancelButton(self._cancel_button)
+                dialog.canceled.disconnect()
+                self._cancel_button.clicked.disconnect()
+            dialog.deleteLater()
+            dialog.exec()
 
         timer.stop()
         thread.join()
@@ -1934,6 +1958,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             page_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_battle_stages_table.clear_selection_action.triggered.connect(self._clear_selection)
+            page_table.clear_page_action.triggered[bool].connect(
+                lambda _checked, page_index=page_index: self._clear_page(page_index))
+            page_battle_stages_table.clear_page_action.triggered[bool].connect(
+                lambda _checked, page_index=page_index: self._clear_page(page_index))
+            page_table.clear_all_pages_action.triggered.connect(self._clear_all_pages)
+            page_battle_stages_table.clear_all_pages_action.triggered.connect(self._clear_all_pages)
 
             page_label = VerticalLabel()
             self._page_labels.append(page_label)
@@ -2566,9 +2596,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._pending_undo_actions += 1
         self._process_undo_action()
 
-    def _get_page_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+    def _get_page_items(
+        self,
+        page_index: int | None = None,
+    ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        for page_table in self._page_tables:
+        page_tables = (self._page_tables if page_index is None else [self._page_tables[page_index]])
+        for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
@@ -2576,9 +2610,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         items.append(item)
         return items
 
-    def _get_page_battle_stages_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+    def _get_page_battle_stages_items(
+        self,
+        page_index: int | None = None,
+    ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        for page_table in self._page_battle_stages_tables:
+        page_tables = (self._page_battle_stages_tables
+                       if page_index is None else [self._page_battle_stages_tables[page_index]])
+        for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
@@ -2586,10 +2625,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         items.append(item)
         return items
 
-    def _get_page_all_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+    def _get_page_all_items(
+        self,
+        page_index: int | None = None,
+    ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        for page_table in list(
-                itertools.chain(*zip(self._page_tables, self._page_battle_stages_tables))):
+        if page_index is None:
+            page_tables = itertools.chain(*zip(self._page_tables, self._page_battle_stages_tables))
+        else:
+            page_tables = (self._page_tables[page_index],
+                           self._page_battle_stages_tables[page_index])
+        for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
@@ -2779,6 +2825,26 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for item in self._get_page_all_items():
                 if item.isSelected():
                     item.setText(str())
+        self._sync_emblems()
+        self._update_info_view()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
+    def _clear_page(self, page_index: int):
+        with self._blocked_page_signals():
+            for item in self._get_page_all_items(page_index):
+                item.setText(str())
+        self._sync_emblems()
+        self._update_info_view()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
+    def _clear_all_pages(self):
+        with self._blocked_page_signals():
+            for item in self._get_page_all_items():
+                item.setText(str())
         self._sync_emblems()
         self._update_info_view()
 
@@ -3872,9 +3938,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 'Building ISO file...', lambda: mkdd_extender.extend_game(args, raise_if_canceled),
                 self)
 
-            progress_dialog.setCancelButton(cancel_button)
-            progress_dialog.canceled.disconnect()
-            cancel_button.clicked.disconnect()
+            progress_dialog.set_cancel_button(cancel_button)
 
             progress_dialog.execute_and_wait()
 
