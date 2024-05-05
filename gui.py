@@ -2586,9 +2586,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._pending_undo_actions += 1
         self._process_undo_action()
 
-    def _get_page_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+    def _get_page_items(
+        self,
+        page_index: int | None = None,
+    ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        for page_table in self._page_tables:
+        page_tables = (self._page_tables if page_index is None else [self._page_tables[page_index]])
+        for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
@@ -2596,9 +2600,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         items.append(item)
         return items
 
-    def _get_page_battle_stages_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+    def _get_page_battle_stages_items(
+        self,
+        page_index: int | None = None,
+    ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        for page_table in self._page_battle_stages_tables:
+        page_tables = (self._page_battle_stages_tables
+                       if page_index is None else [self._page_battle_stages_tables[page_index]])
+        for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
@@ -2606,10 +2615,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         items.append(item)
         return items
 
-    def _get_page_all_items(self) -> 'list[QtWidgets.QTableWidgetItem]':
+    def _get_page_all_items(
+        self,
+        page_index: int | None = None,
+    ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        for page_table in list(
-                itertools.chain(*zip(self._page_tables, self._page_battle_stages_tables))):
+        if page_index is None:
+            page_tables = itertools.chain(*zip(self._page_tables, self._page_battle_stages_tables))
+        else:
+            page_tables = (self._page_tables[page_index],
+                           self._page_battle_stages_tables[page_index])
+        for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
                     item = page_table.item(row, column)
