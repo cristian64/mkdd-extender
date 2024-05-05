@@ -236,11 +236,11 @@ COURSE_TO_MINIMAP_ADDRESSES = {
     'GM4E01': {
         'BabyLuigi': (0x803CDDEC, 0x803CDDF0, 0x803CDDF4, 0x803CDDF8, 0x80141E14),
         'Peach': (0x803CDE0C, 0x803CDE10, 0x803CDE14, 0x803CDE18, 0x80141EE0),
-        'Daisy': (0x803CDE34, 0x803CDE38, 0x803CDE3C, 0x803CDE40, 0x8014200c),
+        'Daisy': (0x803CDE34, 0x803CDE38, 0x803CDE3C, 0x803CDE40, 0x8014200C),
         'Luigi': (0x803CDE5C, 0x803CDE60, 0x803CDE64, 0x803CDE68, 0x801420D8),
         'Mario': (0x803CDE74, 0x803CDE78, 0x803CDE7C, 0x803CDE80, 0x801421A4),
         'Yoshi': (0x803CDE90, 0x803CDE94, 0x803CDE98, 0x803CDE9C, 0x80142270),
-        'Nokonoko': (0x803CDEB0, 0x803CDEB4, 0x803CDEB8, 0x803CDEBC, 0x8014233c),
+        'Nokonoko': (0x803CDEB0, 0x803CDEB4, 0x803CDEB8, 0x803CDEBC, 0x8014233C),
         'Patapata': (0x803CDEC8, 0x803CDECC, 0x803CDED0, 0x803CDED4, 0x80142408),
         'Waluigi': (0x803CDEE8, 0x803CDEEC, 0x803CDEF0, 0x803CDEF4, 0x801424D4),
         'Wario': (0x803CDF0C, 0x803CDF10, 0x803CDF14, 0x803CDF18, 0x801425A0),
@@ -309,21 +309,21 @@ COURSE_TO_MINIMAP_ADDRESSES = {
         'Mini8 (2)': (0x803E8624, 0x803E8628, 0x803E862C, 0x803E8630, 0x80142C4C),
     },
     'GM4E01dbg': {
-        'BabyLuigi': (0x80419100, 0x80419104, 0x80419108, 0x8041910C, 0x8015415c),
+        'BabyLuigi': (0x80419100, 0x80419104, 0x80419108, 0x8041910C, 0x8015415C),
         'Peach': (0x80419120, 0x80419124, 0x80419128, 0x8041912C, 0x80154254),
-        'Daisy': (0x80419148, 0x8041914C, 0x80419150, 0x80419154, 0x801543ac),
-        'Luigi': (0x80419170, 0x80419174, 0x80419178, 0x8041917C, 0x801544a4),
-        'Mario': (0x80419188, 0x8041918C, 0x80419190, 0x80419194, 0x8015459c),
+        'Daisy': (0x80419148, 0x8041914C, 0x80419150, 0x80419154, 0x801543AC),
+        'Luigi': (0x80419170, 0x80419174, 0x80419178, 0x8041917C, 0x801544A4),
+        'Mario': (0x80419188, 0x8041918C, 0x80419190, 0x80419194, 0x8015459C),
         'Yoshi': (0x804191A4, 0x804191A8, 0x804191AC, 0x804191B0, 0x80154694),
-        'Nokonoko': (0x804191C4, 0x804191C8, 0x804191CC, 0x804191D0, 0x8015478c),
+        'Nokonoko': (0x804191C4, 0x804191C8, 0x804191CC, 0x804191D0, 0x8015478C),
         'Patapata': (0x804191DC, 0x804191E0, 0x804191E4, 0x804191E8, 0x80154884),
-        'Waluigi': (0x804191FC, 0x80419200, 0x80419204, 0x80419208, 0x8015497c),
-        'Wario': (0x80419220, 0x80419224, 0x80419228, 0x8041922C, 0x80154a74),
-        'Diddy': (0x8041923C, 0x80419240, 0x80419244, 0x80419248, 0x80154b6c),
-        'Donkey': (0x80419254, 0x80419258, 0x8041925C, 0x80419260, 0x80154c64),
-        'Koopa': (0x80419270, 0x80419274, 0x80419278, 0x8041927C, 0x80154d5c),
-        'Rainbow': (0x80419284, 0x80419288, 0x8041928C, 0x80419290, 0x80154e54),
-        'Desert': (0x80419298, 0x8041929C, 0x804192A0, 0x804192A4, 0x80154f4c),
+        'Waluigi': (0x804191FC, 0x80419200, 0x80419204, 0x80419208, 0x8015497C),
+        'Wario': (0x80419220, 0x80419224, 0x80419228, 0x8041922C, 0x80154A74),
+        'Diddy': (0x8041923C, 0x80419240, 0x80419244, 0x80419248, 0x80154B6C),
+        'Donkey': (0x80419254, 0x80419258, 0x8041925C, 0x80419260, 0x80154C64),
+        'Koopa': (0x80419270, 0x80419274, 0x80419278, 0x8041927C, 0x80154D5C),
+        'Rainbow': (0x80419284, 0x80419288, 0x8041928C, 0x80419290, 0x80154E54),
+        'Desert': (0x80419298, 0x8041929C, 0x804192A0, 0x804192A4, 0x80154F4C),
         'Snow': (0x804192B8, 0x804192BC, 0x804192C0, 0x804192C4, 0x80155044),
         'Mini1': (0x804192C8, 0x804192CC, 0x804192D0, 0x804192D4, 0x8015513C),
         'Mini2': (0x804192D8, 0x804192DC, 0x804192E0, 0x804192E4, 0x80155174),
@@ -1269,9 +1269,9 @@ This is called during `loadCrsData` to reset the section counter.
 """
 
 COUNT_SECTION_POINT_CALL_ADDRESSES = {
-    'GM4E01': 0x8017C7d4,
+    'GM4E01': 0x8017C7D4,
     'GM4P01': 0x8017B678,
-    'GM4J01': 0x8017C7d4,
+    'GM4J01': 0x8017C7D4,
     'GM4E01dbg': 0x8019DE28,
 }
 """
@@ -1334,13 +1334,13 @@ SYMBOLS_MAP = {
     'GM4E01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x8008b3d0;
-        SceneCourseSelect__calcAnm = 0x8016b6e0;
+        JAISeMgr__startSound = 0x8008B3D0;
+        SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
         SceneMapSelect__reset = 0x8017398C;
         KartChecker__setLapTime = 0x80186868;
-        LANSelectMode__calcAnm = 0x801e428c;
+        LANSelectMode__calcAnm = 0x801E428C;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
@@ -1349,13 +1349,13 @@ SYMBOLS_MAP = {
     'GM4P01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x8008b3d0;
-        SceneCourseSelect__calcAnm = 0x8016a584;
+        JAISeMgr__startSound = 0x8008B3D0;
+        SceneCourseSelect__calcAnm = 0x8016A584;
         SceneMapSelect__calcAnm = 0x80173974;
         SceneMapSelect__map_init = 0x801730A0;
         SceneMapSelect__reset = 0x80172830;
-        KartChecker__setLapTime = 0x8018570c;
-        LANSelectMode__calcAnm = 0x801e4264;
+        KartChecker__setLapTime = 0x8018570C;
+        LANSelectMode__calcAnm = 0x801E4264;
         SequenceInfo__setClrGPCourse = 0x8013FD14;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
@@ -1364,13 +1364,13 @@ SYMBOLS_MAP = {
     'GM4J01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x8008b3d0;
-        SceneCourseSelect__calcAnm = 0x8016b6e0;
+        JAISeMgr__startSound = 0x8008B3D0;
+        SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
         SceneMapSelect__reset = 0x8017398C;
         KartChecker__setLapTime = 0x80186868;
-        LANSelectMode__calcAnm = 0x801e42b4;
+        LANSelectMode__calcAnm = 0x801E42B4;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
