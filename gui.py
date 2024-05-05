@@ -633,7 +633,7 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
 
-        self.clear_selection_action = QtGui.QAction('Clear', self)
+        self.clear_selection_action = QtGui.QAction('Clear Selection', self)
         self.clear_selection_action.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete))
         self.clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
         self.addAction(self.clear_selection_action)
