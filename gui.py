@@ -636,7 +636,11 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
         self.clear_selection_action = QtGui.QAction('Clear Selection', self)
         self.clear_selection_action.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Delete))
         self.clear_selection_action.setShortcutContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        self.clear_page_action = QtGui.QAction('Clear Page', self)
+        self.clear_all_pages_action = QtGui.QAction('Clear All Pages', self)
         self.addAction(self.clear_selection_action)
+        self.addAction(self.clear_page_action)
+        self.addAction(self.clear_all_pages_action)
 
     def add_companion_table(self, table: QtWidgets.QTableWidget):
         self.__companion_tables.append(table)
@@ -1954,6 +1958,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             page_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_battle_stages_table.clear_selection_action.triggered.connect(self._clear_selection)
+            page_table.clear_page_action.triggered[bool].connect(
+                lambda _checked, page_index=page_index: self._clear_page(page_index))
+            page_battle_stages_table.clear_page_action.triggered[bool].connect(
+                lambda _checked, page_index=page_index: self._clear_page(page_index))
+            page_table.clear_all_pages_action.triggered.connect(self._clear_all_pages)
+            page_battle_stages_table.clear_all_pages_action.triggered.connect(self._clear_all_pages)
 
             page_label = VerticalLabel()
             self._page_labels.append(page_label)
@@ -2815,6 +2825,26 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for item in self._get_page_all_items():
                 if item.isSelected():
                     item.setText(str())
+        self._sync_emblems()
+        self._update_info_view()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
+    def _clear_page(self, page_index: int):
+        with self._blocked_page_signals():
+            for item in self._get_page_all_items(page_index):
+                item.setText(str())
+        self._sync_emblems()
+        self._update_info_view()
+
+        self._pending_undo_actions += 1
+        self._process_undo_action()
+
+    def _clear_all_pages(self):
+        with self._blocked_page_signals():
+            for item in self._get_page_all_items():
+                item.setText(str())
         self._sync_emblems()
         self._update_info_view()
 
