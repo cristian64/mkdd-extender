@@ -1372,42 +1372,54 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         label.show()
 
 
-class ProgressDialog(QtWidgets.QProgressDialog):
+class ProgressDialog:
+
+    class _ProgressDialog(QtWidgets.QProgressDialog):
+
+        def __init__(self, text: str, parent: QtWidgets.QWidget = None):
+            super().__init__(parent)
+
+            self.setWindowTitle(text)
+            self.setMinimum(0)
+            self.setMaximum(0)
+            self.setValue(0)
+            self.setCancelButton(None)
+            self.setLabelText('Please wait...')
+            self.setMinimumWidth(int(self.fontMetrics().horizontalAdvance(text) * 1.25))
+
+            self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowTitleHint
+                                | QtCore.Qt.CustomizeWindowHint)
+
+            self.finished = False
+
+        def closeEvent(self, event: QtGui.QCloseEvent):
+            if not self.finished:
+                event.ignore()
+                return
+            super().closeEvent(event)
+
+        def keyPressEvent(self, event: QtGui.QKeyEvent):
+            if not self.finished:
+                event.ignore()
+                return
+            super().keyPressEvent(event)
+
+        def keyReleaseEvent(self, event: QtGui.QKeyEvent):
+            if not self.finished:
+                event.ignore()
+                return
+            super().keyReleaseEvent(event)
 
     def __init__(self, text: str, func: callable, parent: QtWidgets.QWidget = None):
-        super().__init__(parent)
-
-        self.setWindowTitle(text)
-        self.setMinimum(0)
-        self.setMaximum(0)
-        self.setValue(0)
-        self.setCancelButton(None)
-        self.setLabelText('Please wait...')
-        self.setMinimumWidth(int(self.fontMetrics().horizontalAdvance(text) * 1.25))
-
-        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowTitleHint
-                            | QtCore.Qt.CustomizeWindowHint)
-
+        self._text = text
         self._func = func
+        self._parent = parent
+
+        self._cancel_button = None
         self._finished = False
 
-    def closeEvent(self, event: QtGui.QCloseEvent):
-        if not self._finished:
-            event.ignore()
-            return
-        super().closeEvent(event)
-
-    def keyPressEvent(self, event: QtGui.QKeyEvent):
-        if not self._finished:
-            event.ignore()
-            return
-        super().keyPressEvent(event)
-
-    def keyReleaseEvent(self, event: QtGui.QKeyEvent):
-        if not self._finished:
-            event.ignore()
-            return
-        super().keyReleaseEvent(event)
+    def set_cancel_button(self, cancel_button: QtWidgets.QAbstractButton):
+        self._cancel_button = cancel_button
 
     def execute_and_wait(self) -> Any:
         result = None
@@ -1427,10 +1439,15 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         timer = QtCore.QTimer()
         timer.setInterval(10)
 
+        dialog = None
+
         def check_completion():
+            nonlocal dialog
             if self._finished or not thread.is_alive():
                 self._finished = True
-                self.close()
+            if self._finished and dialog is not None and not dialog.finished:
+                dialog.finished = True
+                dialog.close()
 
         timer.timeout.connect(check_completion)
         timer.start()
@@ -1440,10 +1457,13 @@ class ProgressDialog(QtWidgets.QProgressDialog):
         # responsiveness can vary dramatically between different file systems).
         thread.join(0.1)
         if thread.is_alive():
-            self.exec_()
-        else:
-            self._finished = True
-            self.close()
+            dialog = ProgressDialog._ProgressDialog(self._text, self._parent)
+            if self._cancel_button is not None:
+                dialog.setCancelButton(self._cancel_button)
+                dialog.canceled.disconnect()
+                self._cancel_button.clicked.disconnect()
+            dialog.deleteLater()
+            dialog.exec()
 
         timer.stop()
         thread.join()
@@ -3872,9 +3892,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 'Building ISO file...', lambda: mkdd_extender.extend_game(args, raise_if_canceled),
                 self)
 
-            progress_dialog.setCancelButton(cancel_button)
-            progress_dialog.canceled.disconnect()
-            cancel_button.clicked.disconnect()
+            progress_dialog.set_cancel_button(cancel_button)
 
             progress_dialog.execute_and_wait()
 
