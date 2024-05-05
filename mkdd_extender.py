@@ -2950,7 +2950,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
             gcm_file.read_entire_disc()
         except Exception as e:
             raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}') from e
-        if 'files/Cours0' in gcm_file.dirs_by_path:
+        if os.path.join('files', 'Cours0') in gcm_file.dirs_by_path:
             raise MKDDExtenderError('The input ISO image appears to have been extended already.')
         files_extracted = 0
         for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):
