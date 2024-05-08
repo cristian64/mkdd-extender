@@ -1846,7 +1846,7 @@ def patch_dol_file(
                     project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
                     project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
 
-                if (extended_terrain_types):
+                if extended_terrain_types:
                     project.dol.seek(KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id])
                     project.dol.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
                     project.dol.seek(KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id])
