@@ -594,9 +594,6 @@ void check_lap_ex()
 #define EXTENDED_TERRAIN_BOUNCE_FLAG 0x1
 #define EXTENDED_TERRAIN_BOUNCE_LIFTOFF_FLAG 0x2
 
-#define CRS_GROUND_COLLISION_TRIANGLE_POINTER_OFFSET 0x20
-#define COLLISION_TRIANGLE_TERRAIN_TYPE_OFFSET 0x16
-#define COLLISION_TRIANGLE_SPLASH_HASH_OFFSET 0x20
 #define EXTENDED_TERRAIN_BOUNCY 0xB0
 
 // The importance of this remaining in its own section is that its functionality will be needed for
@@ -610,8 +607,19 @@ typedef struct
     short normal[3];
     char terrain_type;
     char terrain_type_part_two;
-    // ...
+    char min_max_table;
+    char camera_code;
+    short neighbor_triangles[3];
+    int splash_hash;
+    // splash_hash is actually a 4-byte structure.
+
 } CollisionTriangle;
+
+struct CrsGround
+{
+    char unknown[0x20];
+    struct CollisionTriangle* col_triangle;
+};
 
 // Check against all of the custom material flags enabled by the patch.
 int is_extended_terrain_type(const char terrain_type)
@@ -619,14 +627,8 @@ int is_extended_terrain_type(const char terrain_type)
     return terrain_type == EXTENDED_TERRAIN_BOUNCY;
 }
 
-int should_return_fake_code(char* const ground)
+int should_return_fake_code(const CollisionTriangle* triangle)
 {
-    const int* const triangle_ptr =
-        (int*)(ground + COLLISION_TRIANGLE_SPLASH_HASH_OFFSET);  // Pointer to the triangle's
-                                                                 // material in memory.
-
-    const CollisionTriangle* const triangle = (const CollisionTriangle*)*triangle_ptr;
-
     if (triangle)
     {
         return is_extended_terrain_type(triangle->terrain_type);
@@ -637,29 +639,23 @@ int should_return_fake_code(char* const ground)
 
 // Game will search for a Splash object due to the material hash being used.
 // This nullifies that behaviour.
-int get_splash_code_inline()
+struct CollisionTriangle* get_splash_code_inline()
 {
-    register const char* const r3 asm("r3");  // R3 is a CrsGround object.
-
-    register const char* ground = r3;
-    register const int* triangle_ptr =
-        (const char*)(r3 + CRS_GROUND_COLLISION_TRIANGLE_POINTER_OFFSET);
-    asm("mr %r5, %r3");  // Stop registers from misbehaving; CrsGround stored for later.
-    if (should_return_fake_code(ground))
+    register const struct CrsGround* const ground asm("r3");
+    if (should_return_fake_code(ground->col_triangle))
     {
         return 0;
     }
 
-    return *triangle_ptr;
+    return ground->col_triangle;
 }
 
 // Game does not want material flags it does not recognize to allow for items to collide with them.
 // This allows items to sit on custom materials as one would ordinarily expect.
 void is_item_inval_ground_hijack()
 {
-    register int* const ground asm("r3");
-    char* ground_char = (char*)(ground + 0x0);
-    if (should_return_fake_code(ground_char) != 1)
+    register const struct CrsGround* const ground asm("r3");
+    if (should_return_fake_code(ground->col_triangle) != 1)
     {
         CrsGround__isItemInvalGround(ground);  // Original instruction.
     }
@@ -673,10 +669,8 @@ void is_item_inval_ground_hijack()
 // Unsure of the vanilla functionality of what is being hooked.
 void get_add_thickness_inline()
 {
-    register char* const ground_info asm("r25");  // R25 is material information.
-    char* terrain_type = (char*)(ground_info + COLLISION_TRIANGLE_TERRAIN_TYPE_OFFSET);
-
-    if (is_extended_terrain_type(*terrain_type) == 1)
+    register const CollisionTriangle* const triangle asm("r25");
+    if (is_extended_terrain_type(triangle->terrain_type))
     {
         asm("li %r0, 0x0");
     }
@@ -689,8 +683,8 @@ void get_add_thickness_inline()
 // Stop game from performing fall animation when overtop custom material.
 int get_stagger_code_hijack()
 {
-    register char* const ground asm("r3");  // R3 is CrsGround
-    if (should_return_fake_code(ground) != 1)
+    register const struct CrsGround* const ground asm("r3");
+    if (should_return_fake_code(ground->col_triangle) != 1)
     {
         return CrsGround__getStaggerCode(ground);  // Original instruction.
     }
@@ -716,6 +710,8 @@ int get_stagger_code_hijack()
 #define KART_BODY_VELOCITY_OFFSET 0x3EC
 #define KART_BODY_MOVEMENT_SCALE_OFFSET 0x470
 #define KART_BODY_KART_NUM_OFFSET 0x22C
+
+#define CRS_GROUND_COLLISION_TRIANGLE_POINTER_OFFSET 0x20
 
 #define MINI_TURBO_FLAGS 0x570
 #define MINI_TURBO_BOOST_FLAG 0x200
@@ -840,7 +836,7 @@ void clamp_movement_vector_descent(char* const this)
 int get_ground_hash(char* const this)
 {
     int* pointer = (int*)(this + KART_BODY_COLLISION_TRIANGLE_POINTER_OFFSET);
-    int* pointerpointer = (int*)(*pointer + COLLISION_TRIANGLE_SPLASH_HASH_OFFSET);
+    int* pointerpointer = (int*)(*pointer + CRS_GROUND_COLLISION_TRIANGLE_POINTER_OFFSET);
 
     return *pointerpointer;
 }
@@ -848,9 +844,7 @@ int get_ground_hash(char* const this)
 // Returns boost flag status at specified location.
 int get_boost_flag(char* const this, int mem, unsigned int hash)
 {
-    unsigned int flag = *(unsigned int*)(this + mem);
-    int ret = flag & hash;
-    return ret;
+    return (*(unsigned int*)(this + mem)) & hash;
 }
 
 // Multipliers for Y axis when bounce initates while dashing.
