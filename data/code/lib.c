@@ -138,10 +138,11 @@ void process_course_page_change(const int mode)
 #if USE_ALT_BUTTONS
     const char buttons =
         *(const char*)(mode == LAN_MODE ? ALT_BUTTONS_STATE_ADDRESS : BUTTONS_STATE_ADDRESS);
+    if (buttons == BUTTON_UP || buttons == BUTTON_DOWN)
 #else
     const unsigned short buttons = *(const unsigned short*)(BUTTONS_STATE_ADDRESS);
-#endif
     if (buttons & (BUTTON_UP | BUTTON_DOWN))
+#endif
     {
         // The spam flag is used to time how soon the course page can be changed again.
         const char spam_flag = *(char*)SPAM_FLAG_ADDRESS;
