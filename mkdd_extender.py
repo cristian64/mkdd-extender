@@ -1441,7 +1441,14 @@ def patch_title_lines(use_alternative_buttons: bool, battle_stages_enabled: bool
         timg_dir = os.path.join(titleline_dirpath, 'timg')
         scrn_dir = os.path.join(titleline_dirpath, 'scrn')
 
-        title_filenames = ['selectcourse.bti', 'selectcup.bti']
+        # The "VS.? CO-OP?" image will be repurposed for LAN mode, using the "SELECT MODE" image
+        # as base. Note that the image indexes that are hardcoded in the game logic will be swapped
+        # so that the **VS.? CO-OP?** screen uses the "SELECT MODE" image, and the **SELECT MODE**
+        # screen [in LAN mode] uses the reimagined "VS.? CO-OP?" image (i.e. "SELECT MODE" now).
+        shutil.copyfile(os.path.join(timg_dir, 'selectmode.bti'),
+                        os.path.join(timg_dir, 'vscoop.bti'))
+
+        title_filenames = ['selectcourse.bti', 'selectcup.bti', 'vscoop.bti']
         if battle_stages_enabled:
             title_filenames.append('selectmap.bti')
 
@@ -2488,6 +2495,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
     code_patcher.patch_dol_file(
         iso_tmp_dir,
         game_id,
+        args,
         initial_page_number,
         bool(args.use_alternative_buttons),
         replaces_data,
