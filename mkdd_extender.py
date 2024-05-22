@@ -2488,6 +2488,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
     code_patcher.patch_dol_file(
         iso_tmp_dir,
         game_id,
+        args,
         initial_page_number,
         bool(args.use_alternative_buttons),
         replaces_data,

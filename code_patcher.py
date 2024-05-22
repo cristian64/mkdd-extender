@@ -5,7 +5,7 @@ as well as other code patches.
 The GC-C-Kit tool is used for building and extracting the symbols that are then injected in the
 input DOL file.
 """
-
+import argparse
 import collections
 import contextlib
 import logging
@@ -131,6 +131,26 @@ GP_INITIAL_PAGE_ADDRESSES = {k: v + 1 for k, v in CURRENT_PAGE_ADDRESSES.items()
 """
 Memory address where the initial page in GP mode is stored. Defined as the next byte after the
 current page. Used in the Extender Cup.
+"""
+
+LAN_MENU_TITLE_INDEX_INSTRUCTION_ADDRESSES = {
+    'GM4E01': 0x801E457C,
+    'GM4P01': 0x801E4554,
+    'GM4J01': 0x801E45A4,
+    'GM4E01dbg': 0x80216318,
+}
+"""
+Address to a `li` instruction that precedes the call to `MenuTitleLine::drop()` and that stores the
+index (`3`) of the menu title image that is loaded for the **SELECT MODE** screen in LAN mode.
+
+The array that includes the pointers to the C strings is located at 0x80353158 in NTSC-U.
+
+Note that the "SELECT MODE" menu title image is shared between multiplayer and LAN mode. In order to
+provide the menu title image with the controls image in LAN mode without altering the other screen,
+another image would have to be introduced or repurposed.
+
+Instead, the index will be changed to the "SELECT COURSE" image (index `4`), which users have argue
+is a better text for the screen anyway.
 """
 
 GP_GLOBAL_COURSE_INDEX_ADDRESSES = {k: v + 1 for k, v in GP_INITIAL_PAGE_ADDRESSES.items()}
@@ -1480,6 +1500,7 @@ def patch_bti_filenames_in_blo_file(game_id: str, battle_stages_enabled: bool, b
 def patch_dol_file(
     iso_tmp_dir: str,
     game_id: str,
+    args: argparse.Namespace,
     initial_page_number: int,
     use_alternative_buttons: bool,
     replaces_data: dict,
@@ -1729,6 +1750,10 @@ def patch_dol_file(
                         project.dol.write(struct.pack('>f', values[i]))
                     project.dol.seek(addresses[4] + 3)
                     project.dol.write(struct.pack('>B', values[4]))
+
+                if not args.skip_menu_titles:
+                    project.dol.seek(LAN_MENU_TITLE_INDEX_INSTRUCTION_ADDRESSES[game_id] + 3)
+                    project.dol.write(b'\4')
 
                 if battle_stages_enabled:
                     project.dol.seek(LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES[game_id] + 3)
