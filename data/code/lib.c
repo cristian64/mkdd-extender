@@ -17,6 +17,7 @@
 #define COURSE_TO_STREAM_FILE_INDEX_ADDRESS __COURSE_TO_STREAM_FILE_INDEX_ADDRESS__
 #define CURRENT_PAGE_ADDRESS __CURRENT_PAGE_ADDRESS__
 #define EXTENDER_CUP __EXTENDER_CUP__
+#define GAMEAUDIO_MAIN_ADDRESS __GAMEAUDIO_MAIN_ADDRESS__
 #define GM4E01_DEBUG_BUILD __GM4E01_DEBUG_BUILD__
 #define GP_AWARDED_SCORES_ADDRESS __GP_AWARDED_SCORES_ADDRESS__
 #define GP_COURSE_INDEX_ADDRESS __GP_COURSE_INDEX_ADDRESS__
@@ -159,6 +160,8 @@ void process_course_page_change(const int mode)
                 refresh_mapselectmode();
             }
 #endif
+
+            GameAudio_Main_startSystemSe((void*)GAMEAUDIO_MAIN_ADDRESS, 0x0002000C);
         }
         else
         {

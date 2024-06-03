@@ -946,6 +946,20 @@ def get_string_addresses(game_id: str, battle_stages_enabled: bool):
     }
 
 
+GAMEAUDIO_MAIN_ADDRESSES = {
+    'GM4E01': 0x803B06D4,
+    'GM4P01': 0x803BA4F4,
+    'GM4J01': 0x803CACF4,
+    'GM4E01dbg': 0x803FB220,
+}
+"""
+The address in static memory that is passed to the `GameAudio::Main::startSystemSe()` function; it
+appears to be a singleton class.
+
+The function is used to play sounds. The second argument is the sound ID (e.g. `0x20000` is the
+sound that is played when the player navigates courses or cups).
+"""
+
 LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES = {
     'GM4E01': 0x8017C4CC,
     'GM4P01': 0x8017B370,
@@ -1299,6 +1313,7 @@ SYMBOLS_MAP = {
     'GM4E01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        GameAudio_Main_startSystemSe = 0x80115E74;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
@@ -1313,6 +1328,7 @@ SYMBOLS_MAP = {
     'GM4P01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        GameAudio_Main_startSystemSe = 0x80115EA4;
         SceneCourseSelect__calcAnm = 0x8016A584;
         SceneMapSelect__calcAnm = 0x80173974;
         SceneMapSelect__map_init = 0x801730A0;
@@ -1327,6 +1343,7 @@ SYMBOLS_MAP = {
     'GM4J01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        GameAudio_Main_startSystemSe = 0x80115E74;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
@@ -1341,6 +1358,7 @@ SYMBOLS_MAP = {
     'GM4E01dbg':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        GameAudio_Main_startSystemSe = 0x8011E540;
         SceneCourseSelect__calcAnm = 0x80189448;
         SceneMapSelect__calcAnm = 0x801943D0;
         SceneMapSelect__map_init = 0x80193824;
@@ -1620,6 +1638,7 @@ def patch_dol_file(
              f'0x{COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + offset:08X}'),
             ('__CURRENT_PAGE_ADDRESS__', f'0x{CURRENT_PAGE_ADDRESSES[game_id]:08X}'),
             ('__EXTENDER_CUP__', str(int(extender_cup))),
+            ('__GAMEAUDIO_MAIN_ADDRESS__', f'0x{GAMEAUDIO_MAIN_ADDRESSES[game_id]:08X}'),
             ('__GM4E01_DEBUG_BUILD__', str(int(game_id == 'GM4E01dbg'))),
             ('__GP_AWARDED_SCORES_ADDRESS__', f'0x{GP_AWARDED_SCORES_ADDRESSES[game_id]:08X}'),
             ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
