@@ -30,9 +30,6 @@
 #define LAN_STRUCT_OFFSET4 __LAN_STRUCT_OFFSET4__
 #define LAN_STRUCT_OFFSET5 __LAN_STRUCT_OFFSET5__
 #define PAGE_COUNT __PAGE_COUNT__
-#define PLAY_SOUND_R3 __PLAY_SOUND_R3__
-#define PLAY_SOUND_R4 __PLAY_SOUND_R4__
-#define PLAY_SOUND_R5 __PLAY_SOUND_R5__
 #define PLAYER_ITEM_ROLLS_ADDRESS __PLAYER_ITEM_ROLLS_ADDRESS__
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
@@ -162,10 +159,6 @@ void process_course_page_change(const int mode)
                 refresh_mapselectmode();
             }
 #endif
-
-            *(int*)PLAY_SOUND_R4 = 0x0002000c;
-            JAISeMgr__startSound(
-                (void*)PLAY_SOUND_R3, (void*)PLAY_SOUND_R4, (void*)PLAY_SOUND_R5, 0);
         }
         else
         {

@@ -946,61 +946,6 @@ def get_string_addresses(game_id: str, battle_stages_enabled: bool):
     }
 
 
-PLAY_SOUND_ADDRESSES = {
-    'GM4E01': (0x80500A90, 0x803E2210, 0x803B0758),
-    'GM4P01': (0x8050A8D0, 0x803EC050, 0x803BA578),
-    'GM4J01': (0x8051B0B0, 0x803FC830, 0x803CAD78),
-    'GM4E01dbg': (0x8054C9F0, 0x8042E170, 0x803FB2A4),
-}
-"""
-These are the addresses of the pointers that are used as arguments to the `JAISeMgr::startSound()`
-function, which will need to be passed to the C code to invoke the function with the correct
-arguments.
-
-That function's symbol is placed in the same memory address for all three regions (`0x8008b3d0`),
-but the arguments it takes differ between regions. Also, in the debug build the symbol is at another
-location (`0x80089974`).
-
-In order to determine the value of these arguments (stored in r3, r4, r5, and r6), a breakpoint is
-set in `JAUSoundMgr::startSound()` on the instruction where `JAISeMgr::startSound()` is invoked,
-which is `0x800a4e2c`. Go to the course/cup selection screen, and switch between courses or cups
-to hit the breakpoint. These should be the relevant addresses:
-
-NTSC:
-r3 0x80500a90
-r4 0x803e2210
-r5 0x803b0758
-r6 0x00000000
-
-PAL:
-r3 0x8050a8d0
-r4 0x803ec050
-r5 0x803ba578
-r6 0x00000000
-
-JAP:
-r3 0x8051b0b0
-r4 0x803fc830
-r5 0x803cad78
-r6 0x00000000
-
-NTSC (debug):
-r3 0x8054c9f0
-r4 0x8042e170
-r5 0x803fb2a4
-r6 0x00000000
-
-Note that the address in r4 changes when the sound is played from a different screen (e.g. from the
-select mode screen). It's not really relevant to us, because we only want to play sounds from the
-course/cup selection screen. The address in r3 and r5 don't seem to change regardless of the screen.
-The memory pointed by r5 holds `0x0`. And r6 is `0x0` always (my bet is this is the pointer to the
-optional 3D position that `JAISeMgr::startSound()` accepts, which is not needed for 2D sounds).
-
-The memory addressed by r4 needs to hold the sound ID (`0x20000` is the sound that is played when
-the player navigates courses or cups; `0x2000c` can be used for a different sound, the one that is
-played when the player accepts a letter in the initialism screen).
-"""
-
 LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES = {
     'GM4E01': 0x8017C4CC,
     'GM4P01': 0x8017B370,
@@ -1354,7 +1299,6 @@ SYMBOLS_MAP = {
     'GM4E01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x8008B3D0;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
@@ -1369,7 +1313,6 @@ SYMBOLS_MAP = {
     'GM4P01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x8008B3D0;
         SceneCourseSelect__calcAnm = 0x8016A584;
         SceneMapSelect__calcAnm = 0x80173974;
         SceneMapSelect__map_init = 0x801730A0;
@@ -1384,7 +1327,6 @@ SYMBOLS_MAP = {
     'GM4J01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x8008B3D0;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
@@ -1399,7 +1341,6 @@ SYMBOLS_MAP = {
     'GM4E01dbg':
     textwrap.dedent("""\
         memcpy = 0x80003540;
-        JAISeMgr__startSound = 0x80089974;
         SceneCourseSelect__calcAnm = 0x80189448;
         SceneMapSelect__calcAnm = 0x801943D0;
         SceneMapSelect__map_init = 0x80193824;
@@ -1693,9 +1634,6 @@ def patch_dol_file(
             ('__LAN_STRUCT_OFFSET4__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][4]:04X}'),
             ('__LAN_STRUCT_OFFSET5__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][5]:04X}'),
             ('__PAGE_COUNT__', f'{page_count}'),
-            ('__PLAY_SOUND_R3__', f'0x{PLAY_SOUND_ADDRESSES[game_id][0] + offset:08X}'),
-            ('__PLAY_SOUND_R4__', f'0x{PLAY_SOUND_ADDRESSES[game_id][1]:08X}'),
-            ('__PLAY_SOUND_R5__', f'0x{PLAY_SOUND_ADDRESSES[game_id][2]:08X}'),
             ('__PLAYER_ITEM_ROLLS_ADDRESS__', f'0x{PLAYER_ITEM_ROLLS_ADDRESSES[game_id]:08X}'),
             ('__REDRAW_COURSESELECT_SCREEN_ADDRESS__',
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
