@@ -684,7 +684,7 @@ void get_add_thickness_inline()
 int get_stagger_code_hijack()
 {
     register const struct CrsGround* const ground asm("r3");
-    if (should_return_fake_code(ground->col_triangle) != 1)
+    if (!should_return_fake_code(ground->col_triangle))
     {
         return CrsGround__getStaggerCode(ground);  // Original instruction.
     }
@@ -709,7 +709,7 @@ int get_stagger_code_hijack()
 #define GENERIC_DASH_GO_BOOST_FLAG 0x10000
 #define GENERIC_DASH_CLEAR_HASH 0xdffc3fff
 
-#define BOUNCE_DESCENT_CAP -300.0
+#define BOUNCE_DESCENT_CAP -300.0f
 #define BOUNCE_BOOST_XZ_FLOOR 0x4500
 
 #if !GM4P01_PAL
@@ -783,7 +783,7 @@ int is_touching_ground(struct KartBody* kart_body)
 }
 
 // Is grounded and is touching bounce material flag.
-int is_touching_ground_and_type_b0(struct KartBody* kart_body)
+int is_touching_ground_and_bouncy_type(struct KartBody* kart_body)
 {
     if (!is_touching_ground(kart_body))
     {
@@ -850,21 +850,21 @@ int get_boost_flag(unsigned int flags, unsigned int hash)
 // Multipliers for Y axis when bounce initates while dashing.
 float get_kart_boost_y_mul(struct KartBody* kart_body)
 {
-    float ret = 1.0;
+    float ret = 1.0f;
 
     if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_BOOST_FLAG) != 0)
     {
-        ret = 1.1;
+        ret = 1.1f;
     }
     else if (get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_BOOST_FLAG) != 0)
     {
-        ret = 0.8;
+        ret = 0.8f;
     }
 
     if ((get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_DRIFT_LEFT_FLAG) != 0) ||
         get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_DRIFT_RIGHT_FLAG) != 0)
     {
-        ret += 0.15;
+        ret += 0.15f;
     }
 
     return ret;
@@ -874,15 +874,15 @@ float get_kart_boost_y_mul(struct KartBody* kart_body)
 // NOTE: MT and Mushroom can boosts can stack.
 float get_kart_boost_x_mul(struct KartBody* kart_body)
 {
-    float ret = 1.0;
+    float ret = 1.0f;
 
     if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_BOOST_FLAG) != 0)
     {
-        ret += 0.28;
+        ret += 0.28f;
     }
     if (get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_BOOST_FLAG) != 0)
     {
-        ret += 0.33;
+        ret += 0.33f;
     }
 
     return ret;
@@ -933,7 +933,7 @@ void begin_bounce_liftoff(struct KartBody* kart_body, int kart_num)
 {
     int ground_hash = get_ground_hash(kart_body);
 
-    if (ground_hash == 0)  // If no bounce settings, read from memory. Useful during CT development.
+    if (ground_hash == '\0')  // If no bounce settings, read from memory. Useful during CT development.
     {
         ground_hash = *(int*)(KART_BOUNCE_DEFAULT_READ_ADDRESS);  // Location is 0x8000523C.
     }
@@ -952,18 +952,18 @@ void begin_bounce_liftoff(struct KartBody* kart_body, int kart_num)
     float* scale = &kart_body->mov_scale;
 
     // NOTE: I have left divisor at 100.0. This choice is explained in github documentation.
-    float y_speed = ((float)ground_hash_upper * get_kart_boost_y_mul(kart_body)) / 100.0;
-    float x_z_speed = ((float)ground_hash_lower * get_kart_boost_x_mul(kart_body)) / 100.0;
+    const float y_speed = ((float)ground_hash_upper * get_kart_boost_y_mul(kart_body)) / 100.0f;
+    const float x_z_speed = ((float)ground_hash_lower * get_kart_boost_x_mul(kart_body)) / 100.0f;
 
-    float movement_vector[] = {0.0, y_speed, 0.0};
-    float z_direction_vector[] = {0.0, 0.0, 0.0};
+    float movement_vector[] = {0.0f, y_speed, 0.0f};
+    float z_direction_vector[] = {0.0f, 0.0f, 0.0f};
 
     ObjUtility__getKartZdir(kart_num, z_direction_vector);  // Function that stores Z direction.
                                                             // to 2nd argument vector structure.
                                                             // Used to get X direction (forwards)
                                                             // by flipping X and Z axes.
 
-    movement_vector[0] = (z_direction_vector[2] * -1.0) * x_z_speed;
+    movement_vector[0] = (z_direction_vector[2] * -1.0f) * x_z_speed;
     movement_vector[2] = (z_direction_vector[0]) * x_z_speed;
 
     // Set to be equal to the movement we want to perform in the game's eyes.
@@ -971,7 +971,7 @@ void begin_bounce_liftoff(struct KartBody* kart_body, int kart_num)
     *velocity_frame =
         ((movement_vector[0] * movement_vector[0]) + (movement_vector[1] * movement_vector[1]) +
          (movement_vector[2] * movement_vector[2])) *
-        2.16 * *scale;
+        2.16f * *scale;
 
     write_movement_vector(kart_body, movement_vector[0], movement_vector[1], movement_vector[2]);
 }
@@ -1040,11 +1040,11 @@ void handle_boosts(struct KartBody* kart_body)
 }
 
 // Slows XZ movement during bounce while not pressing left or right.
-float deaccelerate_speed(float last_momentum)
+float deaccelerate_speed(const float last_momentum)
 {
-    float decceleration = 0.004;
+    const float decceleration = 0.004f;
 
-    float momentum = 0.0;
+    float momentum = 0.0f;
 
     if (last_momentum > 0)
     {
@@ -1060,10 +1060,10 @@ float deaccelerate_speed(float last_momentum)
 // Used for XZ movement.
 float add_speed(float last_momentum, signed int stick_id)
 {
-    float acceleration = 0.02;
-    float cap = 1.0;
+    const float acceleration = 0.02f;
+    const float cap = 1.0f;
 
-    float momentum = 0.0;
+    float momentum = 0.0f;
 
     if (stick_id == 1)
     {
@@ -1093,19 +1093,19 @@ char get_stick_ctrl(struct KartCtrl* kart_ctrl, int kart_num)
 // Main function for modifying descent speed during bounce.
 void handle_y_adjustment(struct KartBody* kart_body, struct KartCtrl* kart_ctrl, int kart_num)
 {
-    char stick = get_stick_ctrl(kart_ctrl, kart_num);
-    float y_speed_adjustment = 0.0;
+    const char stick = get_stick_ctrl(kart_ctrl, kart_num);
+    float y_speed_adjustment = 0.0f;
 
     if ((stick & CONTROL_STICK_DOWN) != 0)
     {
-        y_speed_adjustment = 0.0675;
+        y_speed_adjustment = 0.0675f;
     }
     else if ((stick & CONTROL_STICK_UP) != 0)
     {
-        y_speed_adjustment = -0.125;
+        y_speed_adjustment = -0.125f;
     }
 
-    float y_adjust_vector[] = {0.0, y_speed_adjustment * 10.0, 0.0};
+    const float y_adjust_vector[] = {0.0f, y_speed_adjustment * 10.0f, 0.0f};
     add_movement_vector(kart_body, y_adjust_vector[0], y_adjust_vector[1], y_adjust_vector[2]);
 }
 
@@ -1114,16 +1114,16 @@ void handle_y_adjustment(struct KartBody* kart_body, struct KartCtrl* kart_ctrl,
 instead of mislabelling things I don't understand.*/
 char is_mirror(char* const race_manager)
 {
-    int* race_manager_pointer = (int*)(race_manager + RACE_MANAGER_OFFSET);
-    int* pointer_pointer = (int*)(*race_manager_pointer + RACE_MANAGER_POINTER_OFFSET);
-    char* mirror_flag = (char*)(*pointer_pointer + RACE_MANAGER_IS_MIRROR_OFFSET);
+    const int* race_manager_pointer = (int*)(race_manager + RACE_MANAGER_OFFSET);
+    const int* pointer_pointer = (int*)(*race_manager_pointer + RACE_MANAGER_POINTER_OFFSET);
+    const char* mirror_flag = (char*)(*pointer_pointer + RACE_MANAGER_IS_MIRROR_OFFSET);
     return *mirror_flag;
 }
 
 // Returns simplified number for easy determination of stick position.
 signed int get_stick_dir_id(struct KartCtrl* kart_ctrl, char* const race_manager, int kart_num)
 {
-    char stick = get_stick_ctrl(kart_ctrl, kart_num);
+    const char stick = get_stick_ctrl(kart_ctrl, kart_num);
     signed int ret = 0;
     if ((stick & CONTROL_STICK_RIGHT) != 0)
     {
@@ -1133,7 +1133,7 @@ signed int get_stick_dir_id(struct KartCtrl* kart_ctrl, char* const race_manager
     {
         ret = 1;
     }
-    if (is_mirror(race_manager) == false)  // Flip if NOT mirror.
+    if (!is_mirror(race_manager))  // Flip if NOT mirror.
     {
         ret *= -1;
     }
@@ -1148,12 +1148,12 @@ void handle_x_adjustment(struct KartBody* kart_body,
 {
     float* const last_momentum = &s_last_momenta[kart_num];
 
-    float z_direction_vector[] = {0.0, 0.0, 0.0};
+    float z_direction_vector[] = {0.0f, 0.0f, 0.0f};
     ObjUtility__getKartZdir(kart_num, z_direction_vector);
 
-    signed int stick_dir_id = get_stick_dir_id(kart_ctrl, race_manager, kart_num);
+    const signed int stick_dir_id = get_stick_dir_id(kart_ctrl, race_manager, kart_num);
 
-    float speed = 0;
+    float speed = 0.0f;
 
     if (stick_dir_id != 0)  // If holding left or right.
     {
@@ -1164,7 +1164,7 @@ void handle_x_adjustment(struct KartBody* kart_body,
         speed = deaccelerate_speed(*last_momentum);
     }
     *last_momentum = speed;  // Stores to 0x80005240 + kart_num.
-    speed *= 10.0;
+    speed *= 10.0f;
 
     z_direction_vector[0] *= speed;
     z_direction_vector[2] *= speed;
@@ -1202,7 +1202,7 @@ void call_do_spd_ctrl(struct KartBody* kart_body,
                       int kart_num,
                       int kart_bounce_flag)
 {
-    if (kart_bounce_flag == false)
+    if (!kart_bounce_flag)
     {
         call_do_spd_ctrl_normal(kart_strat);
     }
@@ -1264,13 +1264,13 @@ void clear_bounce_flags_if_errant(struct KartBody* kart_body, int kart_num)
     int kart_bounce_flag = get_kart_bounce_flag(flag);
     int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(flag);
 
-    if (is_touching_ground(kart_body) == true && is_touching_ground_and_type_b0(kart_body) == false)
+    if (is_touching_ground(kart_body) && !is_touching_ground_and_bouncy_type(kart_body))
     {
-        if (kart_bounce_flag == true)
+        if (kart_bounce_flag)
         {
             set_kart_bounce_flag(flag, false);
         }
-        if (kart_bounce_liftoff_flag == true)
+        if (kart_bounce_liftoff_flag)
         {
             set_kart_bounce_liftoff_flag(flag, false);
         }
@@ -1294,23 +1294,23 @@ void do_spd_ctrl_call_hijack()
     int kart_bounce_flag = get_kart_bounce_flag(kart_extended_terrain_flag);
     int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(kart_extended_terrain_flag);
 
-    if (kart_bounce_flag == true)  // Clear flags dependent on Kart being grounded.
+    if (kart_bounce_flag)  // Clear flags dependent on Kart being grounded.
     {
-        if (is_touching_ground(kart_body) == true && kart_bounce_liftoff_flag == false)
+        if (is_touching_ground(kart_body)&& !kart_bounce_liftoff_flag)
         {
             set_kart_bounce_flag(kart_extended_terrain_flag, false);
             kart_bounce_flag = false;
         }
-        else if (is_touching_ground(kart_body) == false)
+        else if (!is_touching_ground(kart_body))
         {
             set_kart_bounce_liftoff_flag(kart_extended_terrain_flag, false);
             kart_bounce_liftoff_flag = false;
         }
     }
 
-    if (kart_bounce_flag == false && kart_bounce_liftoff_flag == false)
+    if (!kart_bounce_flag && !kart_bounce_liftoff_flag)
     {
-        if (is_touching_ground_and_type_b0(kart_body) == true)
+        if (is_touching_ground_and_bouncy_type(kart_body))
         {
             reset_last_momentum(*kart_num);
             begin_bounce_liftoff(kart_body, *kart_num);
