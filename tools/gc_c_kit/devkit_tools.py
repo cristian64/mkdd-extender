@@ -14,12 +14,16 @@ OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
 
 def run(args):
     if platform.system() == "Windows":
-        output = subprocess.check_output(args,
-                                         creationflags=subprocess.CREATE_NO_WINDOW,
-                                         stderr=subprocess.STDOUT,
-                                         text=True)
-        if output:
-            print(output)
+        try:
+            output = subprocess.check_output(args,
+                                             creationflags=subprocess.CREATE_NO_WINDOW,
+                                             stderr=subprocess.STDOUT,
+                                             text=True)
+            if output:
+                print(output)
+        except subprocess.CalledProcessError as e:
+            print(e.output)
+            raise e
     else:
         subprocess.check_call(args)
 
