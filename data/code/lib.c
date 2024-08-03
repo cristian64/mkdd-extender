@@ -766,12 +766,18 @@ typedef struct KartPad
 {
     char dont_need_buffer[0x24];
     char stick;
+    char unknown;
+    char face_buttons;
+    char shoulder_buttons;
+    
 } KartPad;
 
 typedef struct KartCtrl
 {
     char unknown_buffer_1[0x60];
     struct KartPad* pads[8];
+    char unknown_buffer_2[0x20];
+    struct KartBody* kart_bodies[8];
 } KartCtrl;
 
 float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
