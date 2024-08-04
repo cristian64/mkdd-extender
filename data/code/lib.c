@@ -8,6 +8,8 @@
 #define false 0
 #define true 1
 
+#define NULL ((void*)0)
+
 #define BUTTON_DOWN 0x00000004  // D-pad Down (or X in alternative buttons)
 #define BUTTON_UP 0x00000008    // D-pad Up (or Y in alternative buttons)
 
@@ -644,7 +646,7 @@ struct CollisionTriangle* get_splash_code_inline()
     register const struct CrsGround* const ground asm("r3");
     if (should_return_fake_code(ground->col_triangle))
     {
-        return 0;
+        return NULL;
     }
 
     return ground->col_triangle;
