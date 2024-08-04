@@ -8,6 +8,8 @@
 #define false 0
 #define true 1
 
+#define NULL ((void*)0)
+
 #define BUTTON_DOWN 0x00000004  // D-pad Down (or X in alternative buttons)
 #define BUTTON_UP 0x00000008    // D-pad Up (or Y in alternative buttons)
 
@@ -19,6 +21,7 @@
 #define EXTENDER_CUP __EXTENDER_CUP__
 #define GAMEAUDIO_MAIN_ADDRESS __GAMEAUDIO_MAIN_ADDRESS__
 #define GM4E01_DEBUG_BUILD __GM4E01_DEBUG_BUILD__
+#define GM4P01_PAL __GM4P01_PAL__
 #define GP_AWARDED_SCORES_ADDRESS __GP_AWARDED_SCORES_ADDRESS__
 #define GP_COURSE_INDEX_ADDRESS __GP_COURSE_INDEX_ADDRESS__
 #define GP_CUP_INDEX_ADDRESS __GP_CUP_INDEX_ADDRESS__
@@ -38,6 +41,9 @@
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 #define SECTIONED_COURSES __SECTIONED_COURSES__
+#define EXTENDED_TERRAIN_TYPES __EXTENDED_TERRAIN_TYPES__
+#define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
+#define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
 
 void change_course_page(const int delta)
 {
@@ -585,4 +591,742 @@ void check_lap_ex()
     asm("lwz %r3, 0x3c(%r29)");  // Hijacked instruction.
 #endif
 }
+#endif
+
+#define EXTENDED_TERRAIN_BOUNCE_FLAG 0x1
+#define EXTENDED_TERRAIN_BOUNCE_LIFTOFF_FLAG 0x2
+
+#define EXTENDED_TERRAIN_BOUNCY 0xB0
+
+// The importance of this remaining in its own section is that its functionality will be needed for
+// any future custom terrain types added, within the Extended Terrain Types patch or otherwise.
+#if EXTENDED_TERRAIN_TYPES
+
+typedef struct CollisionTriangle
+{
+    int point_indexes[3];
+    float unknown;
+    short normal[3];
+    char terrain_type;
+    char terrain_type_part_two;
+    char min_max_table;
+    char camera_code;
+    short neighbor_triangles[3];
+    int splash_hash;
+    // splash_hash is actually a 4-byte structure.
+
+} CollisionTriangle;
+
+struct CrsGround
+{
+    char unknown[0x20];
+    struct CollisionTriangle* col_triangle;
+};
+
+// Check against all of the custom material flags enabled by the patch.
+int is_extended_terrain_type(const char terrain_type)
+{
+    return terrain_type == EXTENDED_TERRAIN_BOUNCY;
+}
+
+int should_return_fake_code(struct CollisionTriangle* triangle)
+{
+    if (triangle)
+    {
+        return is_extended_terrain_type(triangle->terrain_type);
+    }
+
+    return 0;
+}
+
+// Game will search for a Splash object due to the material hash being used.
+// This nullifies that behaviour.
+struct CollisionTriangle* get_splash_code_inline()
+{
+    register const struct CrsGround* const ground asm("r3");
+    if (should_return_fake_code(ground->col_triangle))
+    {
+        return NULL;
+    }
+
+    return ground->col_triangle;
+}
+
+// Game does not want material flags it does not recognize to allow for items to collide with them.
+// This allows items to sit on custom materials as one would ordinarily expect.
+void is_item_inval_ground_hijack()
+{
+    register const struct CrsGround* const ground asm("r3");
+    if (should_return_fake_code(ground->col_triangle) != 1)
+    {
+        CrsGround__isItemInvalGround(ground);  // Original instruction.
+    }
+    else
+    {
+        asm("li %r3, 0x0");
+        asm("li %r4, 0x0");
+    }
+}
+
+// Unsure of the vanilla functionality of what is being hooked.
+void get_add_thickness_inline()
+{
+    register const CollisionTriangle* const triangle asm("r25");
+    if (is_extended_terrain_type(triangle->terrain_type))
+    {
+        asm("li %r0, 0x0");
+    }
+    else
+    {
+        asm("lbz %r0,0x20(%r25)");  // Original instruction.
+    }
+}
+
+// Stop game from performing fall animation when overtop custom material.
+int get_stagger_code_hijack()
+{
+    register const struct CrsGround* const ground asm("r3");
+    if (!should_return_fake_code(ground->col_triangle))
+    {
+        return CrsGround__getStaggerCode(ground);  // Original instruction.
+    }
+    return 0;
+}
+
+#endif
+
+#define CONTROL_STICK_RIGHT 0x1
+#define CONTROL_STICK_LEFT 0x2
+#define CONTROL_STICK_DOWN 0x4
+#define CONTROL_STICK_UP 0x8
+
+#define MINI_TURBO_BOOST_FLAG 0x200
+#define MINI_TURBO_DRIFT_RIGHT_FLAG 0x10000
+#define MINI_TURBO_DRIFT_LEFT_FLAG 0x8000
+#define MINI_TURBO_CLEAR_HASH_1 0xfffffdff
+#define MINI_TURBO_CLEAR_HASH_2 0xfffffffb
+#define MINI_TURBO_CLEAR_HASH_3 0xfffffbff
+
+#define GENERIC_DASH_BOOST_FLAG 0x8000
+#define GENERIC_DASH_GO_BOOST_FLAG 0x10000
+#define GENERIC_DASH_CLEAR_HASH 0xdffc3fff
+
+#define BOUNCE_DESCENT_CAP -300.0f
+#define BOUNCE_BOOST_XZ_FLOOR 0x4500
+
+#if !GM4P01_PAL
+
+#define RACE_MANAGER_OFFSET -0x5C38
+
+#else
+
+#define RACE_MANAGER_OFFSET -0x5C18
+
+#endif
+
+#define RACE_MANAGER_POINTER_OFFSET 0x38
+#define RACE_MANAGER_IS_MIRROR_OFFSET 0x2C
+
+#if EXTENDED_TERRAIN_TYPES
+
+typedef struct KartBody
+{
+    char unknown_buffer_1[0x4C];
+    struct CollisionTriangle* col_triangle;  // Offset = 0x4C
+    char unknown_buffer_2[0x28];
+    int curr_terrain_type;  // Offset = 0x78
+    char unknown_buffer_3[0x1C0];
+    float position_vector[3];  // Offset = 0x23C
+    char unknown_buffer_4[0x18];
+    float mov_vector[3];  // Offset = 0x260
+    char unknown_buffer_5[0x180];
+    float velocity;  // Offset = 0x3EC
+    char unknown_buffer_6[0x80];
+    float mov_scale;  // Offset = 0x470
+    char unknown_buffer_7[0xFC];
+    unsigned int mini_turbo_flags;    // Offset = 0x570
+    unsigned int generic_dash_flags;  // Offset = 0x574
+    char unknown_buffer_8[0x1E];
+    short generic_dash_timer;  // Offset = 0x596
+    char unknown_buffer_9[0x6];
+    short mini_turbo_timer;  // Offset = 0x59E
+    char unknown_buffer_10[0x4];
+    int num_wheels_grounded;  // Offset = 0x5A4
+    char unknown_buffer_11[0xD];
+    char unknown_timer;  // Offset = 0x5B5
+
+} KartBody;
+
+typedef struct KartStrat
+{
+    char unknown_buffer_1[0x22C];
+    int kart_num;
+
+} KartStrat;
+
+typedef struct KartPad
+{
+    char dont_need_buffer[0x24];
+    char stick;
+    char unknown;
+    char face_buttons;
+    char shoulder_buttons;
+    
+} KartPad;
+
+typedef struct KartCtrl
+{
+    char unknown_buffer_1[0x60];
+    struct KartPad* pads[8];
+    char unknown_buffer_2[0x20];
+    struct KartBody* kart_bodies[8];
+} KartCtrl;
+
+float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+
+// Reads number of wheels on ground. If > 0, is grounded.
+int is_touching_ground(struct KartBody* kart_body)
+{
+    return kart_body->num_wheels_grounded != 0;
+}
+
+// Is grounded and is touching bounce material flag.
+int is_touching_ground_and_bouncy_type(struct KartBody* kart_body)
+{
+    if (!is_touching_ground(kart_body))
+    {
+        return false;
+    }
+    return kart_body->curr_terrain_type == EXTENDED_TERRAIN_BOUNCY;
+}
+
+// Moves Kart position directly. Bad when done in large amounts, which is why XZ movement is small.
+void add_absolute_position_vector(struct KartBody* kart_body,
+                                  float movement_vector_x,
+                                  float movement_vector_y,
+                                  float movement_vector_z)
+{
+    kart_body->position_vector[0] += movement_vector_x;
+    kart_body->position_vector[1] += movement_vector_y;
+    kart_body->position_vector[2] += movement_vector_z;
+}
+
+// Add to Kart's movement vector. Used for Y adjustment during bounce.
+void add_movement_vector(struct KartBody* kart_body,
+                         float movement_vector_x,
+                         float movement_vector_y,
+                         float movement_vector_z)
+{
+    kart_body->mov_vector[0] += movement_vector_x;
+    kart_body->mov_vector[1] += movement_vector_y;
+    kart_body->mov_vector[2] += movement_vector_z;
+}
+
+// Overwrite the Kart's movement vector. Used during liftoff.
+void write_movement_vector(struct KartBody* kart_body,
+                           float movement_vector_x,
+                           float movement_vector_y,
+                           float movement_vector_z)
+{
+    kart_body->mov_vector[0] = movement_vector_x;
+    kart_body->mov_vector[1] = movement_vector_y;
+    kart_body->mov_vector[2] = movement_vector_z;
+}
+
+// Stops kart from falling too fast. Must do manually as DoSpeedCtrl is hijacked and not running.
+void clamp_movement_vector_descent(struct KartBody* kart_body)
+{
+    if (kart_body->mov_vector[1] <= BOUNCE_DESCENT_CAP)
+    {
+        write_movement_vector(
+            kart_body, kart_body->mov_vector[0], BOUNCE_DESCENT_CAP, kart_body->mov_vector[2]);
+    }
+}
+
+int get_ground_hash(struct KartBody* kart_body)
+{
+    const CollisionTriangle* const triangle = kart_body->col_triangle;
+    return triangle->splash_hash;
+}
+
+// Returns boost flag status at specified location.
+int get_boost_flag(unsigned int flags, unsigned int hash)
+{
+    return flags & hash;
+}
+
+// Multipliers for Y axis when bounce initates while dashing.
+float get_kart_boost_y_mul(struct KartBody* kart_body)
+{
+    float ret = 1.0f;
+
+    if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_BOOST_FLAG) != 0)
+    {
+        ret = 1.1f;
+    }
+    else if (get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_BOOST_FLAG) != 0)
+    {
+        ret = 0.8f;
+    }
+
+    if ((get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_DRIFT_LEFT_FLAG) != 0) ||
+        get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_DRIFT_RIGHT_FLAG) != 0)
+    {
+        ret += 0.15f;
+    }
+
+    return ret;
+}
+
+// Multipliers for XZ axes when bounce initates while dashing.
+// NOTE: MT and Mushroom can boosts can stack.
+float get_kart_boost_x_mul(struct KartBody* kart_body)
+{
+    float ret = 1.0f;
+
+    if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_BOOST_FLAG) != 0)
+    {
+        ret += 0.28f;
+    }
+    if (get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_BOOST_FLAG) != 0)
+    {
+        ret += 0.33f;
+    }
+
+    return ret;
+}
+
+// Returns true for Mushroom and MT, but not Star.
+int is_kart_boost(struct KartBody* kart_body)
+{
+    int ret = false;
+    if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_BOOST_FLAG) !=
+        0)  // Generic dash
+    {
+        ret = true;
+    }
+    else if (get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_BOOST_FLAG) != 0)  // Mini turbo
+    {
+        ret = true;
+    }
+
+    return ret;
+}
+
+// Sets dash flag at specified location;
+void set_boost_flag(unsigned int* flags, unsigned int hash)
+{
+    *flags = *flags | hash;
+}
+
+// Clears dash flag at specified location;
+void clear_boost_flag(unsigned int* flags, unsigned int hash)
+{
+    *flags = *flags & hash;
+}
+
+// Increases movement vector of XZ axes when below a certain threshold.
+// Only used for dashing.
+int floor_xz_speed(int xz_speed)
+{
+    if (xz_speed < BOUNCE_BOOST_XZ_FLOOR)
+    {
+        xz_speed = BOUNCE_BOOST_XZ_FLOOR;
+    }
+    return xz_speed;
+}
+
+// Called when game detects that the Kart is touching bounce flag material.
+void begin_bounce_liftoff(struct KartBody* kart_body, int kart_num)
+{
+    int ground_hash = get_ground_hash(kart_body);
+
+    if (ground_hash == '\0')  // If no bounce settings, read from memory. Useful during CT development.
+    {
+        ground_hash = *(int*)(KART_BOUNCE_DEFAULT_READ_ADDRESS);  // Location is 0x8000523C.
+    }
+
+    int ground_hash_upper = (ground_hash >> 16) & 0xffff;
+    int ground_hash_lower = ground_hash & 0xffff;
+
+    if (is_kart_boost(kart_body) ==
+        1)  // If bounce is slow, set speed to minimum value when dashing.
+    {
+        ground_hash_lower = floor_xz_speed(ground_hash_lower);
+    }
+
+    // These are used for scaling movement vector down to the game's normal limits.
+    float* velocity_frame = &kart_body->velocity;
+    float* scale = &kart_body->mov_scale;
+
+    // NOTE: I have left divisor at 100.0. This choice is explained in github documentation.
+    const float y_speed = ((float)ground_hash_upper * get_kart_boost_y_mul(kart_body)) / 100.0f;
+    const float x_z_speed = ((float)ground_hash_lower * get_kart_boost_x_mul(kart_body)) / 100.0f;
+
+    float movement_vector[] = {0.0f, y_speed, 0.0f};
+    float z_direction_vector[] = {0.0f, 0.0f, 0.0f};
+
+    ObjUtility__getKartZdir(kart_num, z_direction_vector);  // Function that stores Z direction.
+                                                            // to 2nd argument vector structure.
+                                                            // Used to get X direction (forwards)
+                                                            // by flipping X and Z axes.
+
+    movement_vector[0] = (z_direction_vector[2] * -1.0f) * x_z_speed;
+    movement_vector[2] = (z_direction_vector[0]) * x_z_speed;
+
+    // Set to be equal to the movement we want to perform in the game's eyes.
+    // Now, the game will not scale down the movement vector.
+    *velocity_frame =
+        ((movement_vector[0] * movement_vector[0]) + (movement_vector[1] * movement_vector[1]) +
+         (movement_vector[2] * movement_vector[2])) *
+        2.16f * *scale;
+
+    write_movement_vector(kart_body, movement_vector[0], movement_vector[1], movement_vector[2]);
+}
+
+void decrement_mini_turbo_timer(struct KartBody* kart_body)
+{
+    short* mini_turbo_timer = &kart_body->mini_turbo_timer;
+    if (get_boost_flag(kart_body->mini_turbo_flags, MINI_TURBO_BOOST_FLAG) != 0)
+    {
+        --*mini_turbo_timer;
+
+        if (*mini_turbo_timer == 0)
+        {
+            clear_boost_flag(&kart_body->mini_turbo_flags, MINI_TURBO_CLEAR_HASH_1);
+        }
+    }
+}
+
+void decrement_unknown_boost(struct KartBody* kart_body)
+{
+    char* unknown_decrement = &kart_body->unknown_timer;
+
+    if (*unknown_decrement != '\0')
+    {
+        --*unknown_decrement;
+    }
+
+    if (get_boost_flag(kart_body->mini_turbo_flags, 0x4) != 0 && *unknown_decrement == '\0')
+    {
+        clear_boost_flag(&kart_body->mini_turbo_flags, MINI_TURBO_CLEAR_HASH_2);
+    }
+}
+
+// This function essentially recreates KartStrat::DoDash()'s boost timer decrementation.
+// Uglier than older implementaiton (triple if indentation), but doesn't underflow.
+void decrement_boost_timers(struct KartBody* kart_body)
+{
+    short* dash_timer = &kart_body->generic_dash_timer;
+    char* unknown_decrement = &kart_body->unknown_timer;
+
+    decrement_mini_turbo_timer(kart_body);
+    decrement_unknown_boost(kart_body);
+
+    if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_BOOST_FLAG) != 0)
+    {
+        --*dash_timer;
+
+        if (*dash_timer == 0)
+        {
+            if (get_boost_flag(kart_body->generic_dash_flags, GENERIC_DASH_GO_BOOST_FLAG) != 0)
+            {
+                set_boost_flag(&kart_body->mini_turbo_flags, 0x4);
+                *unknown_decrement = 0xf;
+            }
+            clear_boost_flag(&kart_body->generic_dash_flags, GENERIC_DASH_CLEAR_HASH);
+            clear_boost_flag(&kart_body->mini_turbo_flags, MINI_TURBO_CLEAR_HASH_3);
+        }
+    }
+}
+
+// Boosts are usually handled by DoSpeedCtrl. Replicates its functionality
+// while also adding own logic.
+void handle_boosts(struct KartBody* kart_body)
+{
+    decrement_boost_timers(kart_body);
+}
+
+// Slows XZ movement during bounce while not pressing left or right.
+float deaccelerate_speed(const float last_momentum)
+{
+    const float decceleration = 0.004f;
+
+    float momentum = 0.0f;
+
+    if (last_momentum > 0)
+    {
+        momentum = last_momentum - decceleration;
+    }
+    else if (last_momentum < 0)
+    {
+        momentum = last_momentum + decceleration;
+    }
+    return momentum;
+}
+
+// Used for XZ movement.
+float add_speed(float last_momentum, signed int stick_id)
+{
+    const float acceleration = 0.02f;
+    const float cap = 1.0f;
+
+    float momentum = 0.0f;
+
+    if (stick_id == 1)
+    {
+        momentum = last_momentum + acceleration;
+        if (momentum > cap)
+        {
+            momentum = cap;
+        }
+    }
+    else if (stick_id == -1)
+    {
+        momentum = last_momentum - acceleration;
+        if (momentum < -cap)
+        {
+            momentum = -cap;
+        }
+    }
+    return momentum;
+}
+
+// Gets stick position from KartController. Works in replays, etc.
+char get_stick_ctrl(struct KartCtrl* kart_ctrl, int kart_num)
+{
+    return kart_ctrl->pads[kart_num]->stick;
+}
+
+// Main function for modifying descent speed during bounce.
+void handle_y_adjustment(struct KartBody* kart_body, struct KartCtrl* kart_ctrl, int kart_num)
+{
+    const char stick = get_stick_ctrl(kart_ctrl, kart_num);
+    float y_speed_adjustment = 0.0f;
+
+    if ((stick & CONTROL_STICK_DOWN) != 0)
+    {
+        y_speed_adjustment = 0.0675f;
+    }
+    else if ((stick & CONTROL_STICK_UP) != 0)
+    {
+        y_speed_adjustment = -0.125f;
+    }
+
+    const float y_adjust_vector[] = {0.0f, y_speed_adjustment * 10.0f, 0.0f};
+    add_movement_vector(kart_body, y_adjust_vector[0], y_adjust_vector[1], y_adjust_vector[2]);
+}
+
+// Gets mirror flag from RaceManager.
+/*I don't understand how the RaceManager backlink really works, so commiting to using offets
+instead of mislabelling things I don't understand.*/
+char is_mirror(char* const race_manager)
+{
+    const int* race_manager_pointer = (int*)(race_manager + RACE_MANAGER_OFFSET);
+    const int* pointer_pointer = (int*)(*race_manager_pointer + RACE_MANAGER_POINTER_OFFSET);
+    const char* mirror_flag = (char*)(*pointer_pointer + RACE_MANAGER_IS_MIRROR_OFFSET);
+    return *mirror_flag;
+}
+
+// Returns simplified number for easy determination of stick position.
+signed int get_stick_dir_id(struct KartCtrl* kart_ctrl, char* const race_manager, int kart_num)
+{
+    const char stick = get_stick_ctrl(kart_ctrl, kart_num);
+    signed int ret = 0;
+    if ((stick & CONTROL_STICK_RIGHT) != 0)
+    {
+        ret = -1;
+    }
+    else if ((stick & CONTROL_STICK_LEFT) != 0)
+    {
+        ret = 1;
+    }
+    if (!is_mirror(race_manager))  // Flip if NOT mirror.
+    {
+        ret *= -1;
+    }
+    return ret;
+}
+
+// Main function for shifting sideways during bounce.
+void handle_x_adjustment(struct KartBody* kart_body,
+                         struct KartCtrl* kart_ctrl,
+                         char* const race_manager,
+                         int kart_num)
+{
+    float* const last_momentum = &s_last_momenta[kart_num];
+
+    float z_direction_vector[] = {0.0f, 0.0f, 0.0f};
+    ObjUtility__getKartZdir(kart_num, z_direction_vector);
+
+    const signed int stick_dir_id = get_stick_dir_id(kart_ctrl, race_manager, kart_num);
+
+    float speed = 0.0f;
+
+    if (stick_dir_id != 0)  // If holding left or right.
+    {
+        speed = add_speed(*last_momentum, stick_dir_id);
+    }
+    else
+    {
+        speed = deaccelerate_speed(*last_momentum);
+    }
+    *last_momentum = speed;  // Stores to 0x80005240 + kart_num.
+    speed *= 10.0f;
+
+    z_direction_vector[0] *= speed;
+    z_direction_vector[2] *= speed;
+    add_absolute_position_vector(
+        kart_body, z_direction_vector[0], z_direction_vector[1], z_direction_vector[2]);
+}
+
+// Resets last recorded XZ momentum before bounce liftoff;
+void reset_last_momentum(int kart_num)
+{
+    float* const last_momentum = &s_last_momenta[kart_num];
+    *last_momentum = 0;
+}
+
+void call_do_spd_ctrl_normal(struct KartStrat* kart_strat)
+{
+    KartStrat__DoSpeedCrl(kart_strat);  // Original instruction;
+}
+
+void call_do_spd_ctrl_mod(struct KartBody* kart_body,
+                          struct KartCtrl* kart_ctrl,
+                          char* const race_manager,
+                          int kart_num)
+{
+    handle_boosts(kart_body);
+    handle_x_adjustment(kart_body, kart_ctrl, race_manager, kart_num);
+    handle_y_adjustment(kart_body, kart_ctrl, kart_num);
+    clamp_movement_vector_descent(kart_body);
+}
+
+void call_do_spd_ctrl(struct KartBody* kart_body,
+                      struct KartStrat* kart_strat,
+                      struct KartCtrl* kart_ctrl,
+                      char* const race_manager,
+                      int kart_num,
+                      int kart_bounce_flag)
+{
+    if (!kart_bounce_flag)
+    {
+        call_do_spd_ctrl_normal(kart_strat);
+    }
+    else
+    {
+        call_do_spd_ctrl_mod(kart_body, kart_ctrl, race_manager, kart_num);
+    }
+}
+
+// Currently is a two byte structure. If new materials need flags, this can be added to and
+// extended.
+void set_kart_extended_terrain_flag(char* flag, unsigned int hash, int value)
+{
+    if (value == 0)
+    {
+        *flag = *flag & ~hash;
+    }
+    else
+    {
+        *flag = *flag | hash;
+    }
+}
+
+void set_kart_bounce_liftoff_flag(char* flag, int value)
+{
+    set_kart_extended_terrain_flag(flag, EXTENDED_TERRAIN_BOUNCE_LIFTOFF_FLAG, value);
+}
+
+void set_kart_bounce_flag(char* flag, int value)
+{
+    set_kart_extended_terrain_flag(flag, EXTENDED_TERRAIN_BOUNCE_FLAG, value);
+}
+
+void set_kart_bounce_flag_both(char* flag, int value)
+{
+    set_kart_bounce_liftoff_flag(flag, value);
+    set_kart_bounce_flag(flag, value);
+}
+
+int get_kart_extended_terrain_flag(char* flag, unsigned int hash)
+{
+    return *flag & hash;
+}
+
+int get_kart_bounce_liftoff_flag(char* flag)
+{
+    return get_kart_extended_terrain_flag(flag, EXTENDED_TERRAIN_BOUNCE_LIFTOFF_FLAG) != 0;
+}
+
+int get_kart_bounce_flag(char* flag)
+{
+    return get_kart_extended_terrain_flag(flag, EXTENDED_TERRAIN_BOUNCE_FLAG) != 0;
+}
+
+// In case flags are set during times they shouldn't be, clear them.
+void clear_bounce_flags_if_errant(struct KartBody* kart_body, int kart_num)
+{
+    char* flag = (char*)(KART_EXTENDED_TERRAIN_FLAG_ADDRESS + kart_num);
+    int kart_bounce_flag = get_kart_bounce_flag(flag);
+    int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(flag);
+
+    if (is_touching_ground(kart_body) == true && !is_touching_ground_and_bouncy_type(kart_body))
+    {
+        if (kart_bounce_flag == true)
+        {
+            set_kart_bounce_flag(flag, false);
+        }
+        if (kart_bounce_liftoff_flag == true)
+        {
+            set_kart_bounce_liftoff_flag(flag, false);
+        }
+    }
+}
+
+// This is functionally the bounce material's main() function.
+void do_spd_ctrl_call_hijack()
+{
+    register struct KartBody* const kart_body asm("r30");    // KartBody object.
+    register struct KartStrat* const kart_strat asm("r29");  // KartStrat object.
+    register struct KartCtrl* const kart_ctrl asm("r27");    // KartCtrl object.
+    register char* const race_manager asm("r13");            // RaceManager object.
+
+    int* const kart_num = &kart_strat->kart_num;
+
+    clear_bounce_flags_if_errant(kart_body, *kart_num);
+
+    char* kart_extended_terrain_flag = (char*)(KART_EXTENDED_TERRAIN_FLAG_ADDRESS + *kart_num);
+
+    int kart_bounce_flag = get_kart_bounce_flag(kart_extended_terrain_flag);
+    int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(kart_extended_terrain_flag);
+
+    if (kart_bounce_flag == true)  // Clear flags dependent on Kart being grounded.
+    {
+        if (is_touching_ground(kart_body) == true && !kart_bounce_liftoff_flag)
+        {
+            set_kart_bounce_flag(kart_extended_terrain_flag, false);
+            kart_bounce_flag = false;
+        }
+        else if (!is_touching_ground(kart_body))
+        {
+            set_kart_bounce_liftoff_flag(kart_extended_terrain_flag, false);
+            kart_bounce_liftoff_flag = false;
+        }
+    }
+
+    if (!kart_bounce_flag && !kart_bounce_liftoff_flag)
+    {
+        if (is_touching_ground_and_bouncy_type(kart_body) == true)
+        {
+            reset_last_momentum(*kart_num);
+            begin_bounce_liftoff(kart_body, *kart_num);
+            set_kart_bounce_flag_both(kart_extended_terrain_flag, true);
+            kart_bounce_flag = true;
+        }
+    }
+    call_do_spd_ctrl(kart_body, kart_strat, kart_ctrl, race_manager, *kart_num, kart_bounce_flag);
+}
+
 #endif
