@@ -1270,13 +1270,13 @@ void clear_bounce_flags_if_errant(struct KartBody* kart_body, int kart_num)
     int kart_bounce_flag = get_kart_bounce_flag(flag);
     int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(flag);
 
-    if (is_touching_ground(kart_body) && !is_touching_ground_and_bouncy_type(kart_body))
+    if (is_touching_ground(kart_body) == true && !is_touching_ground_and_bouncy_type(kart_body))
     {
-        if (kart_bounce_flag)
+        if (kart_bounce_flag == true)
         {
             set_kart_bounce_flag(flag, false);
         }
-        if (kart_bounce_liftoff_flag)
+        if (kart_bounce_liftoff_flag == true)
         {
             set_kart_bounce_liftoff_flag(flag, false);
         }
@@ -1300,9 +1300,9 @@ void do_spd_ctrl_call_hijack()
     int kart_bounce_flag = get_kart_bounce_flag(kart_extended_terrain_flag);
     int kart_bounce_liftoff_flag = get_kart_bounce_liftoff_flag(kart_extended_terrain_flag);
 
-    if (kart_bounce_flag)  // Clear flags dependent on Kart being grounded.
+    if (kart_bounce_flag == true)  // Clear flags dependent on Kart being grounded.
     {
-        if (is_touching_ground(kart_body)&& !kart_bounce_liftoff_flag)
+        if (is_touching_ground(kart_body) == true && !kart_bounce_liftoff_flag)
         {
             set_kart_bounce_flag(kart_extended_terrain_flag, false);
             kart_bounce_flag = false;
@@ -1316,7 +1316,7 @@ void do_spd_ctrl_call_hijack()
 
     if (!kart_bounce_flag && !kart_bounce_liftoff_flag)
     {
-        if (is_touching_ground_and_bouncy_type(kart_body))
+        if (is_touching_ground_and_bouncy_type(kart_body) == true)
         {
             reset_last_momentum(*kart_num);
             begin_bounce_liftoff(kart_body, *kart_num);
