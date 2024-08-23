@@ -1643,7 +1643,8 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
         raise MKDDExtenderError('Unexpected value in `tracks` argument.')
 
     SUPPORTED_CODE_PATCHES = tuple(name.lower().replace(' ', '-')
-                                   for name, *_rest in OPTIONAL_ARGUMENTS['Code Patches'])
+                                   for name, *_rest in OPTIONAL_ARGUMENTS['Code Patches']
+                                   if name != '---')
     enabled_code_patches = tuple(name for name in SUPPORTED_CODE_PATCHES
                                  if getattr(args, name.replace('-', '_')))
 
@@ -2642,6 +2643,8 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
     option_lines = []
     for _group_name, group_options in OPTIONAL_ARGUMENTS.items():
         for option_label, option_type, _option_help in group_options:
+            if option_label == '---':
+                continue
             option_member_name = option_label_as_variable_name(option_label)
             option_value = getattr(args, option_member_name)
             option_as_argument = option_label_as_argument_name(option_label)
@@ -2922,6 +2925,9 @@ def create_args_parser() -> argparse.ArgumentParser:
     for group_name, group_options in OPTIONAL_ARGUMENTS.items():
         argument_group = parser.add_argument_group(group_name)
         for option_label, option_type, option_help in group_options:
+            if option_label == '---':
+                continue
+
             option_as_argument = option_label_as_argument_name(option_label)
 
             if option_type is bool:

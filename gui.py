@@ -99,6 +99,11 @@ def set_dark_theme(app: QtWidgets.QApplication):
             border: 1px solid #202020;
             background: #282828;
         }}
+
+        QFrame[frameShape="4"][frameShadow="16"],
+        QFrame[frameShape="5"][frameShadow="16"] {{
+            color: rgb(70, 70, 70);
+        }}
     """)
 
 
@@ -1735,6 +1740,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
             for option_label, _option_type, _option_help in group_options:
+                if option_label == '---':
+                    continue
                 option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 setattr(self, option_member_name, None)
 
@@ -2159,6 +2166,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options = []
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
             for option_label, _option_type, _option_help in group_options:
+                if option_label == '---':
+                    continue
                 option_variable_name = mkdd_extender.option_label_as_variable_name(option_label)
                 option_member_name = f'_{option_variable_name}'
                 option_value = getattr(self, option_member_name)
@@ -2986,6 +2995,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             group_box.setLayout(QtWidgets.QVBoxLayout())
 
             for option_label, option_type, option_help in group_options:
+                if option_label == '---':
+                    option_widget = QtWidgets.QFrame()
+                    option_widget.setFrameShape(QtWidgets.QFrame.HLine)
+                    option_widget.setFrameShadow(QtWidgets.QFrame.Plain)
+                    group_box.layout().addWidget(option_widget)
+                    continue
+
                 option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 option_value = getattr(self, option_member_name)
                 option_help = markdown_to_html(option_label, option_help)
@@ -3075,6 +3091,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         options_strings = []
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
             for option_label, option_type, _option_help in group_options:
+                if option_label == '---':
+                    continue
                 option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 option_value = getattr(self, option_member_name)
                 if option_value is None:
@@ -3920,6 +3938,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
                 for option_label, _option_type, _option_help in group_options:
+                    if option_label == '---':
+                        continue
                     option_variable_name = mkdd_extender.option_label_as_variable_name(option_label)
                     option_member_name = f'_{option_variable_name}'
                     option_value = getattr(self, option_member_name) or None
