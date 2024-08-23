@@ -2885,6 +2885,12 @@ OPTIONAL_ARGUMENTS = {
     ),
 }
 
+OPTIONAL_ARGUMENTS_ENABLED_BY = {}
+"""
+List of arguments that are only enabled in the GUI if the named buddy argument is given the
+established value.
+"""
+
 
 def option_label_as_argument_name(option_label: str) -> str:
     return f'--{option_label.lower().replace(" ", "-")}'
