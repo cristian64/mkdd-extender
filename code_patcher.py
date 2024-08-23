@@ -1306,6 +1306,110 @@ retail ISO images when the instruction sequence (see `OSARENALO_INSTRUCTIONS_ADD
 executed.
 """
 
+KART_EXTENDED_TERRAIN_FLAG_ADDRESSES = {
+    'GM4E01': 0x802ed672,
+    'GM4P01': 0x802f9d06,
+    'GM4J01': 0x8030a786,
+    'GM4E01dbg': 0x8032b1d2,
+}
+"""
+Padding used to store a Char that functions as a flag for every Kart in the race.
+"""
+
+KART_BOUNCE_DEFAULT_READ_ADDRESSES = {
+    k: v + 8
+    for k, v in KART_EXTENDED_TERRAIN_FLAG_ADDRESSES.items()
+}
+"""
+Padding used by bounce logic to read movement vector data from if nothing was set up for the
+material in the .BCO file. Very useful for developing a CC with Bouncy if you don't know
+how much force you require. Loccation defined is KART_EXTENDED_TERRAIN_FLAG[game_id] + 0x8.
+"""
+
+DO_SPD_CTRL_CALL_HIJACK_ADDRESSES = {
+    'GM4E01': 0x802aa8c8,
+    'GM4P01': 0x802aa8a4,
+    'GM4J01': 0x802aa8f0,
+    'GM4E01dbg': 0x802ec054,
+}
+"""
+A call to the function DoSpeedCtrl, done after the game calculates the Kart's status.
+This call is from the default case, which encompasses any driving state where the kart is not
+incapacitated/unable to move. This is hijacked to stop the Kart's Momentum from being clamped.
+"""
+
+GET_SPLASH_HEIGHT_INLINE_ADDRESSES = {
+    'GM4E01': 0x8018160c,
+    'GM4P01': 0x801804B0,
+    'GM4J01': 0x8018160c,
+    'GM4E01dbg': 0x801a33b0,
+}
+"""
+A lwz instruction in the function getSplashHeight. This occurs before the material's splash code,
+which I refer to as the material's hash, is read. It ordinarily loads the location of the hash
+into r3, but r3 is set to 0 instead if the ground material is one used by mods.
+"""
+
+GET_SPLASH_ID_INLINE_ADDRESSES = {
+    'GM4E01': 0x801816A8,
+    'GM4P01': 0x8018054C,
+    'GM4J01': 0x801816A8,
+    'GM4E01dbg': 0x801a33b0,
+}
+"""
+A lwz instruction in the function getSplashId. This occurs before the material's splash code,
+which I refer to as the material's hash, is read. It ordinarily loads the location of the hash
+into r3, but r3 is set to 0 instead if the ground material is one used by mods.
+"""
+
+IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES = {
+    'GM4E01': 0x8021857c,
+    'GM4P01': 0x80218558,
+    'GM4J01': 0x802185a4,
+    'GM4E01dbg': 0x8024f714,
+}
+"""
+A call to the function isItemInvalGround, which ordinarily returns false when it reads vanilla
+ground material used by the game. When it reads custom materials, it may return true. It is
+hijacked to nullify this behaviour, so that items may collide with custom materials.
+"""
+
+GET_ADD_THICKNESS_INLINE_ADDRESSES = {
+    'GM4E01': 0x8017de14,
+    'GM4P01': 0x8017ccb8,
+    'GM4J01': 0x8017de14,
+    'GM4E01dbg': 0x801a0064,
+}
+"""
+Inserted into the function "getAddThickness", over a lbz instruction reading from the material
+hash. It presumably does something to the ground based on what it reads, and it is called from
+Ground::checkPosition. It is better to stop it from reading errant data.
+"""
+
+GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES = {
+    'GM4E01': 0x802adbd4,
+    'GM4P01': 0x802adbb0,
+    'GM4J01': 0x802adbfc,
+    'GM4E01dbg': 0x802efb04,
+}
+"""
+A call to the function getStaggerCode, which ordinarily returns true when the material hash's 
+second byte is set to 1. 0x50000000 would not trigger it, but 0x50000100 would. This call to 
+the function is from "KartGame::DoAirCheck".
+"""
+
+GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES = {
+    'GM4E01': 0x802b90c8,
+    'GM4P01': 0x802b908c,
+    'GM4J01': 0x802b90f0,
+    'GM4E01dbg': 0x802fa140,
+}
+"""
+A call to the function getStaggerCode, from "KartAnime::IsDangerLoopAnime". This call is also
+hijacked, just in case. It seems the first hijack is enough, but it's better to not read
+errant data if it can be helped.
+"""
+
 for address in OSARENALO_ADDRESSES.values():
     assert address % 32 == 0
 
@@ -1324,6 +1428,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
         ItemObj__getSpecialKind = 0x8021A024;
+        ObjUtility__getKartZdir = 0x80225864;
+        KartStrat__DoSpeedCrl = 0x802a77f4;
+        CrsGround__isItemInvalGround = 0x80181524;
+        CrsGround__getStaggerCode = 0x80181564;
         """),
     'GM4P01':
     textwrap.dedent("""\
@@ -1339,6 +1447,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
         ItemObj__getSpecialKind = 0x8021A008;
+        ObjUtility__getKartZdir = 0x80225848;
+        KartStrat__DoSpeedCrl = 0x802a77d0;
+        CrsGround__isItemInvalGround = 0x801803c8;
+        CrsGround__getStaggerCode = 0x80180408;
         """),
     'GM4J01':
     textwrap.dedent("""\
@@ -1354,6 +1466,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
         ItemObj__getSpecialKind = 0x8021A04C;
+        ObjUtility__getKartZdir = 0x8022588c;
+        KartStrat__DoSpeedCrl = 0x802a781c;
+        CrsGround__isItemInvalGround = 0x80181524;
+        CrsGround__getStaggerCode = 0x80181564;
         """),
     'GM4E01dbg':
     textwrap.dedent("""\
@@ -1371,6 +1487,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
         ItemShuffleMgr__calcSlot = 0x80243508;
         ItemObj__getSpecialKind = 0x802512DC;
+        ObjUtility__getKartZdir = 0x8025e39c;
+        KartStrat__DoSpeedCrl = 0x802ea110;
+        CrsGround__isItemInvalGround = 0x801a3204;
+        CrsGround__getStaggerCode = 0x801a32c0;
         """),
 }
 """
@@ -1404,6 +1524,14 @@ def find_char_offset_in_string(string: str) -> int:
 
     # The last character before the extension.
     return len(os.path.splitext(string)[0]) - 1
+
+
+def extended_terrain_types_fail_debug(game_id, bouncy_terrain_type):
+    if game_id == 'GM4E01dbg' and bouncy_terrain_type:
+        raise RuntimeError(
+            f'The patch "Bouncy Terrain Type" is incompatible with the Debug version. Please select a NSTC-U, NTSC-J or PAL .iso.'
+        )
+    return
 
 
 def read_osarena(dol_path, game_id) -> int:
@@ -1472,6 +1600,7 @@ def patch_dol_file(
     type_specific_item_boxes: bool,
     sectioned_courses: bool,
     tilting_courses: bool,
+    bouncy_terrain_type: bool,
     dol_path: str,
     log: logging.Logger,
     debug_output: bool,
@@ -1480,6 +1609,7 @@ def patch_dol_file(
 
     log.info('Generating and injecting C code...')
 
+    extended_terrain_types_fail_debug(game_id, bouncy_terrain_type)
     initial_page_index = initial_page_number - 1
     page_count = len(audio_track_data)
     page_course_count = (mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
@@ -1640,6 +1770,7 @@ def patch_dol_file(
             ('__EXTENDER_CUP__', str(int(extender_cup))),
             ('__GAMEAUDIO_MAIN_ADDRESS__', f'0x{GAMEAUDIO_MAIN_ADDRESSES[game_id]:08X}'),
             ('__GM4E01_DEBUG_BUILD__', str(int(game_id == 'GM4E01dbg'))),
+            ('__GM4P01_PAL__', str(int(game_id == 'GM4P01'))),
             ('__GP_AWARDED_SCORES_ADDRESS__', f'0x{GP_AWARDED_SCORES_ADDRESSES[game_id]:08X}'),
             ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
             ('__GP_CUP_INDEX_ADDRESS__', f'0x{GP_CUP_INDEX_ADDRESSES[game_id]:08X}'),
@@ -1661,6 +1792,11 @@ def patch_dol_file(
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
+            ('__BOUNCY_TERRAIN_TYPE__', str(int(bouncy_terrain_type))),
+            ('__KART_EXTENDED_TERRAIN_FLAG_ADDRESS__',
+             f'0x{KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id]:04X}'),
+            ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__',
+             f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
@@ -1687,6 +1823,12 @@ def patch_dol_file(
                 if type_specific_item_boxes:
                     project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
                     project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+
+                if bouncy_terrain_type:
+                    project.dol.seek(KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id])
+                    project.dol.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+                    project.dol.seek(KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id])
+                    project.dol.write(b'\x50\x00\x50\x00')
 
                 # Initialize the strings with the character of the first page ('0').
                 for string, address in string_addresses.items():
@@ -1812,6 +1954,22 @@ def patch_dol_file(
                     project.branchlink(OVERRIDE_TOTAL_LAP_COUNT_CALL_ADDRESSES[game_id],
                                        'override_total_lap_count')
                     project.branchlink(CHECK_LAP_EX_CALL_ADDRESSES[game_id], 'check_lap_ex')
+
+                if bouncy_terrain_type:
+                    project.branchlink(DO_SPD_CTRL_CALL_HIJACK_ADDRESSES[game_id],
+                                       'do_spd_ctrl_call_hijack')
+                    project.branchlink(GET_SPLASH_HEIGHT_INLINE_ADDRESSES[game_id],
+                                       'get_splash_code_inline')
+                    project.branchlink(GET_SPLASH_ID_INLINE_ADDRESSES[game_id],
+                                       'get_splash_code_inline')
+                    project.branchlink(IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES[game_id],
+                                       'is_item_inval_ground_hijack')
+                    project.branchlink(GET_ADD_THICKNESS_INLINE_ADDRESSES[game_id],
+                                       'get_add_thickness_inline')
+                    project.branchlink(GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES[game_id],
+                                       'get_stagger_code_hijack')
+                    project.branchlink(GET_STAGGER_CODE_HIJACK_DANGER_LOOP_ADDRESSES[game_id],
+                                       'get_stagger_code_hijack')
 
                 project.build('main.dol' if pass_number == 0 else dol_path)
 

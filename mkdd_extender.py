@@ -2501,6 +2501,7 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
         bool(args.type_specific_item_boxes),
         bool(args.sectioned_courses),
         bool(args.tilting_courses),
+        bool(args.bouncy_terrain_type),
         dol_path,
         log,
         bool(args.debug_output),
@@ -2818,6 +2819,19 @@ OPTIONAL_ARGUMENTS = {
             'in the BOL file have a base height of `10000` units. Custom courses that use the tilt '
             'functionality should follow the same structure; the game will apply the 10000 offset '
             'to the models\' geometry after the tilt rotation is applied.',
+        ),
+        (
+            'Bouncy Terrain Type',
+            bool,
+            'If enabled, a new terrain type that causes karts to rebound off the ground will be '
+            'added to the game.'
+            '\n\n'
+            'More information about this terrain type, including instructions on how to add it '
+            'to a custom course, can be found at the following locations:'
+            '\n\n'
+            '- https://lance-o.github.io/extended_terrain_types/bouncy_terrain_type/BOUNCY_TERRAIN_TYPE.html\n'
+            '\n\n'
+            '- https://github.com/lance-o/extended_terrain_types\n',
         ),
     ),
     'Expert Options': (
