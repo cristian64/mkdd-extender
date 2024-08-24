@@ -2832,9 +2832,9 @@ OPTIONAL_ARGUMENTS = {
             'More information about this terrain type, including instructions on how to add it '
             'to a custom course, can be found at the following locations:'
             '\n\n'
-            '- https://lance-o.github.io/extended_terrain_types/bouncy_terrain_type/BOUNCY_TERRAIN_TYPE.html\n'
-            '\n\n'
-            '- https://github.com/lance-o/extended_terrain_types\n',
+            '- [Bouncy Terrain Type](https://lance-o.github.io/extended_terrain_types/'
+            'bouncy_terrain_type/BOUNCY_TERRAIN_TYPE.html)\n'
+            '- [Extended Terrain Types](https://github.com/lance-o/extended_terrain_types)\n',
         ),
     ),
     'Expert Options': (
