@@ -43,6 +43,7 @@ script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
 tools_dir = os.path.join(script_dir, 'tools')
 data_dir = os.path.join(script_dir, 'data')
+gui_dir = os.path.join(data_dir, 'gui')
 placeholder_race_track_dir = os.path.join(data_dir, 'courses', 'dstestcircle')
 placeholder_battle_stage_dir = os.path.join(data_dir, 'courses', 'dstestcircle_battlestage')
 
@@ -163,7 +164,7 @@ def show_message(icon_name: str,
     message_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.NoIcon, title, text,
                                         QtWidgets.QMessageBox.NoButton, parent)
 
-    icon_path = os.path.join(data_dir, 'gui', f'{icon_name}.svg')
+    icon_path = os.path.join(gui_dir, f'{icon_name}.svg')
     icon = QtGui.QIcon(icon_path)
     icon_size = message_box.fontMetrics().averageCharWidth() * 6
     message_box.setIconPixmap(icon.pixmap(icon.actualSize(QtCore.QSize(icon_size, icon_size))))
@@ -219,7 +220,7 @@ def show_long_message(icon_name: str, title: str, text: str, parent: QtWidgets.Q
     char_width = message_box.fontMetrics().averageCharWidth()
     char_height = message_box.fontMetrics().height()
 
-    icon_path = os.path.join(data_dir, 'gui', f'{icon_name}.svg')
+    icon_path = os.path.join(gui_dir, f'{icon_name}.svg')
     icon = QtGui.QIcon(icon_path)
     icon_size = char_width * 6
     icon_label = QtWidgets.QLabel()
@@ -368,10 +369,8 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
 
     toggled = QtCore.Signal(bool)
 
-    _arrow_tip_down_icon_path = os.path.join(data_dir, 'gui',
-                                             'arrow_tip_down.svg').replace('\\', '/')
-    _arrow_tip_right_icon_path = os.path.join(data_dir, 'gui',
-                                              'arrow_tip_right.svg').replace('\\', '/')
+    _arrow_tip_down_icon_path = os.path.join(gui_dir, 'arrow_tip_down.svg').replace('\\', '/')
+    _arrow_tip_right_icon_path = os.path.join(gui_dir, 'arrow_tip_right.svg').replace('\\', '/')
 
     def __init__(self, title: str = '', parent: QtWidgets.QWidget = None):
         super().__init__(parent=parent)
@@ -745,11 +744,11 @@ class ASTPlayer(QtWidgets.QWidget):
         self._audio_output = None
 
         if ASTPlayer._play_icon is None:
-            play_icon_path = os.path.join(data_dir, 'gui', 'play.svg')
+            play_icon_path = os.path.join(gui_dir, 'play.svg')
             ASTPlayer._play_icon = QtGui.QIcon(play_icon_path)
 
         if ASTPlayer._pause_icon is None:
-            pause_icon_path = os.path.join(data_dir, 'gui', 'pause.svg')
+            pause_icon_path = os.path.join(gui_dir, 'pause.svg')
             ASTPlayer._pause_icon = QtGui.QIcon(pause_icon_path)
 
         self._play_button = QtWidgets.QPushButton(ASTPlayer._play_icon, '')
@@ -1753,15 +1752,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(f'MKDD Extender {mkdd_extender.__version__}')
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
-        logo_icon_path = os.path.join(data_dir, 'gui', 'logo.svg')
+        logo_icon_path = os.path.join(gui_dir, 'logo.svg')
         logo_icon = QtGui.QIcon(logo_icon_path)
         self.setWindowIcon(logo_icon)
 
-        error_icon_path = os.path.join(data_dir, 'gui', 'error.svg')
+        error_icon_path = os.path.join(gui_dir, 'error.svg')
         self._error_icon = QtGui.QIcon(error_icon_path)
         warning_icon_path = os.path.join(data_dir, 'gui', 'warning.svg')
         self._warning_icon = QtGui.QIcon(warning_icon_path)
-        options_icon_path = os.path.join(data_dir, 'gui', 'options.svg')
+        options_icon_path = os.path.join(gui_dir, 'options.svg')
         options_icon = QtGui.QIcon(options_icon_path)
 
         self._item_text_to_path = {}
@@ -1839,7 +1838,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_filter_edit = QtWidgets.QLineEdit()
         self._custom_tracks_filter_edit.textChanged.connect(self._update_custom_tracks_filter)
         self._custom_tracks_filter_edit.setPlaceholderText('Filter')
-        clear_icon_path = os.path.join(data_dir, 'gui', 'clear.svg')
+        clear_icon_path = os.path.join(gui_dir, 'clear.svg')
         clear_icon = QtGui.QIcon(clear_icon_path)
         self._clear_filter_action = self._custom_tracks_filter_edit.addAction(
             clear_icon, QtWidgets.QLineEdit.TrailingPosition)
@@ -2059,7 +2058,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         hpadding = self._build_button.fontMetrics().averageCharWidth()
         vpadding = self._build_button.fontMetrics().height() // 2
         self._build_button.setStyleSheet(f'QPushButton {{ padding: {vpadding}px {hpadding}px }}')
-        build_icon_path = os.path.join(data_dir, 'gui', 'build.svg')
+        build_icon_path = os.path.join(gui_dir, 'build.svg')
         build_icon = QtGui.QIcon(build_icon_path)
         self._build_button.setIcon(build_icon)
         self._build_button.clicked.connect(self._build)
