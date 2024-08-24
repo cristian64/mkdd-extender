@@ -95,7 +95,7 @@ def set_dark_theme(app: QtWidgets.QApplication):
     # Further global customization for the tool tips.
     padding = QtGui.QFontMetrics(QtGui.QFont()).height() // 2
     app.setStyleSheet(f"""
-        QToolTip {{
+        QToolTip, HelpDialog > QLabel {{
             padding: {padding}px;
             border: 1px solid #202020;
             background: #282828;
@@ -416,6 +416,106 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
 
     def set_expanded(self, expanded: bool):
         self._checkbox.setChecked(expanded)
+
+
+class HelpDialog(QtWidgets.QDialog):
+
+    def __init__(self, text: str, parent: QtWidgets.QWidget | None = None):
+        super().__init__(parent, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
+
+        label = QtWidgets.QLabel()
+        label.setText(text)
+        label.setWordWrap(True)
+        label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        label.setOpenExternalLinks(True)
+
+        # Several of these settings are taken from `qtooltip.cpp`.
+        label.setForegroundRole(QtGui.QPalette.ToolTipText)
+        label.setBackgroundRole(QtGui.QPalette.ToolTipBase)
+        label.setPalette(QtWidgets.QToolTip.palette())
+        label.ensurePolished()
+        label.setMargin(int(label.fontMetrics().height() * 0.75))
+        label.setFrameStyle(QtWidgets.QFrame.NoFrame)
+        label.setAlignment(QtCore.Qt.AlignLeft)
+        label.setIndent(1)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(label)
+
+
+class HelpButton(QtWidgets.QPushButton):
+
+    _normal_icon = None
+    _hover_icon = None
+    _pressed_icon = None
+
+    def __init__(self, text: str, parent: QtWidgets.QWidget | None = None):
+        super().__init__(parent=parent)
+
+        self._text = text
+        self._pressed = False
+
+        if HelpButton._normal_icon is None:
+            HelpButton._normal_icon = QtGui.QIcon(os.path.join(gui_dir, 'help_normal.svg'))
+            HelpButton._hover_icon = QtGui.QIcon(os.path.join(gui_dir, 'help_hover.svg'))
+            HelpButton._pressed_icon = QtGui.QIcon(os.path.join(gui_dir, 'help_pressed.svg'))
+
+        self.setFlat(True)
+        self.setStyleSheet('QPushButton { border-style: outset; border-width: 0px; }')
+
+        font_height = self.fontMetrics().height()
+        size = int(font_height * 0.95) // 2 * 2
+        self.setFixedSize(size, size)
+        self.setIconSize(QtCore.QSize(size, size))
+
+        self.setIcon(HelpButton._normal_icon)
+
+        self.clicked.connect(self._on_clicked)
+
+    def enterEvent(self, event):
+        super().enterEvent(event)
+
+        if not self._pressed:
+            self.setIcon(HelpButton._hover_icon)
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+
+        if not self._pressed:
+            self.setIcon(HelpButton._normal_icon)
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+
+        if event.button() == QtCore.Qt.LeftButton:
+            self.setIcon(HelpButton._pressed_icon)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+
+        if event.button() == QtCore.Qt.LeftButton:
+            contained = self.geometry().contains(event.position().toPoint())
+            self.setIcon(HelpButton._hover_icon if contained else HelpButton._normal_icon)
+
+    def _on_clicked(self):
+        self.setIcon(HelpButton._pressed_icon)
+
+        parent_widget = self.parentWidget()
+        dialog = HelpDialog(self._text, parent_widget)
+        anchor_pos = parent_widget.mapToGlobal(self.geometry().topLeft())
+        char_width = self.fontMetrics().averageCharWidth()
+        dialog.ensurePolished()
+        dialog.move(anchor_pos.x() - dialog.sizeHint().width() - char_width, anchor_pos.y())
+        dialog.deleteLater()
+
+        self._pressed = True
+        dialog.exec()
+        self._pressed = False
+
+        pos = self.mapFromGlobal(QtGui.QCursor.pos())
+        contained = self.geometry().contains(pos)
+        self.setIcon(HelpButton._hover_icon if contained else HelpButton._normal_icon)
 
 
 class CopyableImageWidget(QtWidgets.QLabel):
@@ -3005,6 +3105,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 option_value = getattr(self, option_member_name)
                 option_help = markdown_to_html(option_label, option_help)
 
+                option_layout = QtWidgets.QHBoxLayout()
+                group_box.layout().addLayout(option_layout)
+                if option_help:
+                    option_layout.addWidget(HelpButton(option_help))
+
                 option_widget = None
 
                 if option_type is bool:
@@ -3017,7 +3122,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                     option_widget.toggled.connect(on_toggled)
                     option_widget.toggled.connect(self._update_options_string)
-                    group_box.layout().addWidget(option_widget)
+                    option_layout.addWidget(option_widget)
 
                 if option_type is int:
                     option_widget_label = QtWidgets.QLabel(option_label)
@@ -3040,7 +3145,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                     option_widget.textChanged.connect(on_textChanged)
                     option_widget.textChanged.connect(self._update_options_string)
-                    group_box.layout().addLayout(option_widget_layout)
+                    option_layout.addLayout(option_widget_layout)
 
                 if isinstance(option_type, tuple):
                     option_type, *rest = option_type
@@ -3072,7 +3177,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                         option_widget.currentTextChanged.connect(on_currentTextChanged)
                         option_widget.currentTextChanged.connect(self._update_options_string)
-                        group_box.layout().addLayout(option_widget_layout)
+                        option_layout.addLayout(option_widget_layout)
 
                 if option_widget is not None:
                     option_widget.setObjectName(option_label)
