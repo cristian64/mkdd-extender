@@ -144,6 +144,28 @@ def human_readable_duration(sample_count: int, sample_rate: int) -> str:
     return ' '.join(text)
 
 
+def markdown_to_html(title: str, text: str) -> str:
+    html = f'<h3>{title}</h3>\n'
+    for paragraph in text.split('\n\n'):
+        paragraph = paragraph.strip()
+        if paragraph.startswith('- '):
+            unordered_list = ''
+            for line in paragraph.splitlines():
+                unordered_list += f'<li>{line[1:].strip()}</li>\n'
+            paragraph = f'<ul>{unordered_list}</ul>\n'
+        else:
+            paragraph = paragraph.replace('\n', ' ')
+        paragraph = re.sub(r'^---(.*)', r'<hr/>\1', paragraph)
+        paragraph = re.sub(r'\b_(.+)_\b', r'<em>\1</em>', paragraph)
+        paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
+                           paragraph)
+        paragraph = re.sub(
+            r'`([^`]+)`', r'<code style="background: #1B1B1B; white-space: nowrap;">'
+            r'&nbsp;\1&nbsp;</code>', paragraph)
+        html += f'<p>{paragraph}</p>\n'
+    return html
+
+
 def show_message(icon_name: str,
                  title: str,
                  text: str,
@@ -3051,27 +3073,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         for vertical_layout in vertical_layouts:
             vertical_layout.setSpacing(dialog.fontMetrics().height())
             horizontal_layout.addLayout(vertical_layout)
-
-        def markdown_to_html(title: str, text: str) -> str:
-            html = f'<h3>{title}</h3>\n'
-            for paragraph in text.split('\n\n'):
-                paragraph = paragraph.strip()
-                if paragraph.startswith('- '):
-                    unordered_list = ''
-                    for line in paragraph.splitlines():
-                        unordered_list += f'<li>{line[1:].strip()}</li>\n'
-                    paragraph = f'<ul>{unordered_list}</ul>\n'
-                else:
-                    paragraph = paragraph.replace('\n', ' ')
-                paragraph = re.sub(r'^---(.*)', r'<hr/>\1', paragraph)
-                paragraph = re.sub(r'\b_(.+)_\b', r'<em>\1</em>', paragraph)
-                paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
-                                   paragraph)
-                paragraph = re.sub(
-                    r'`([^`]+)`', r'<code style="background: #1B1B1B; white-space: nowrap;">'
-                    r'&nbsp;\1&nbsp;</code>', paragraph)
-                html += f'<p>{paragraph}</p>\n'
-            return html
 
         group_count = len(mkdd_extender.OPTIONAL_ARGUMENTS.items())
 
