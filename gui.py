@@ -148,6 +148,8 @@ def markdown_to_html(title: str, text: str) -> str:
     html = f'<h3>{title}</h3>\n'
     for paragraph in text.split('\n\n'):
         paragraph = paragraph.strip()
+        paragraph = re.sub(r'\[(.+)\]\((.+)\)', r'<a href="\2">\1</a>', paragraph)
+        paragraph = re.sub(r'(^|\s)(http.+)(\s|$)', r'<a href="\2">\2</a>', paragraph)
         if paragraph.startswith('- '):
             unordered_list = ''
             for line in paragraph.splitlines():
