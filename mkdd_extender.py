@@ -1647,6 +1647,7 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
                                    if name != '---')
     enabled_code_patches = tuple(name for name in SUPPORTED_CODE_PATCHES
                                  if getattr(args, name.replace('-', '_')))
+    automatically_enabled_code_patches = collections.defaultdict(dict)
 
     raise_if_canceled()
 
@@ -1855,6 +1856,9 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
                 if not code_patch or code_patch in enabled_code_patches:
                     continue
                 supported = code_patch in SUPPORTED_CODE_PATCHES
+                if supported and args.code_patching_mode != 'Manual':
+                    automatically_enabled_code_patches[code_patch][nodename] = None
+                    continue
                 message = f'Code patch "{code_patch}", required by "{nodename}", '
                 if supported:
                     message += 'has not been enabled.'
@@ -2324,6 +2328,12 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
         else:
             log.warning('No directory has been melded.')
 
+        # Potentially report which code patches have been automatically enabled.
+        for code_patch, nodenames in automatically_enabled_code_patches.items():
+            setattr(args, code_patch.replace('-', '_'), True)
+            nodenames = ', '.join(f'"{nodename}"' for nodename in nodenames)
+            log.info(f'`{code_patch}` has been automatically enabled as required by: {nodenames}')
+
     return (
         replaces_data,
         minimap_data,
@@ -2791,6 +2801,14 @@ OPTIONAL_ARGUMENTS = {
             'If enabled, the All-Cup Tour will be replaced with the Extender Cup, which features '
             'all the courses included in all the configured course pages.',
         ),
+        ('---', None, None),
+        (
+            'Code Patching Mode',
+            ('choices', ('Automatic', 'Manual'), 'Automatic'),
+            'If set to `Automatic` (default), code patches that are needed by at least one of the '
+            'configured custom courses will be automatically enabled. If set to `Manual`, the user '
+            'is to enable the required code patches manually.',
+        ),
         (
             'Type-specific Item Boxes',
             bool,
@@ -2885,7 +2903,12 @@ OPTIONAL_ARGUMENTS = {
     ),
 }
 
-OPTIONAL_ARGUMENTS_ENABLED_BY = {}
+OPTIONAL_ARGUMENTS_ENABLED_BY = {
+    'Type-specific Item Boxes': ('Code Patching Mode', 'Manual'),
+    'Sectioned Courses': ('Code Patching Mode', 'Manual'),
+    'Tilting Courses': ('Code Patching Mode', 'Manual'),
+    'Bouncy Terrain Type': ('Code Patching Mode', 'Manual'),
+}
 """
 List of arguments that are only enabled in the GUI if the named buddy argument is given the
 established value.
