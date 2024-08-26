@@ -59,12 +59,21 @@ class DolFile:
         self._curraddr = self._text[0][1]
         self.seek(self._curraddr)
 
+    def get_raw_data(self) -> BytesIO:
+        return self._rawdata
+
     @property
     def sections(self):
         for i in self._text:
             yield i
         for i in self._data:
             yield i
+
+    def is_address_resolvable(self, gc_addr: int) -> bool:
+        for _offset, address, size in self.sections:
+            if address <= gc_addr < address + size:
+                return True
+        return False
 
     # Internal function for resolving a gc address
     def _resolve_address(self, gc_addr):
@@ -106,6 +115,9 @@ class DolFile:
         write_uint32(f, self.bsssize)
 
         f.seek(curr)
+
+    def can_write_or_read_in_current_section(self, size: int) -> bool:
+        return self._curraddr + size <= self._current_end
 
     # Unsupported: Reading an entire dol file
     # Assumption: A read should not go beyond the current section
