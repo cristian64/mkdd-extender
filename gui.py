@@ -1017,6 +1017,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         self._ast_metadata_cache = {}
 
+        self._cheat_codes_cache = {}
+
         self._pending_minimap_filepath = None
         self._minimap_loaded.connect(self._on_minimap_loaded)
 
@@ -1062,6 +1064,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self._checksum_cache.clear()
         self._minimap_pixmap_cache.clear()
         self._pixmap_cache.clear()
+        self._cheat_codes_cache.clear()
 
     def show_placeholder_message(self):
         self._build_label('Select a custom course to view its details', QtGui.QColor(100, 100, 100))
@@ -1232,6 +1235,54 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         minimap_box.layout().addWidget(minimap_info_widget)
         self._show_minimap_image(rarc_filepath)  # May load image asynchronously.
         layout.addWidget(minimap_box)
+
+        cheat_codes_by_region = {}
+        for region in 'US', 'PAL', 'JP', 'US_DEBUG':
+            filename = f'cheatcodes_{region}.ini'
+            filepath = os.path.join(dirpath, filename)
+            if filepath in self._cheat_codes_cache:
+                cheat_codes = self._cheat_codes_cache[filepath]
+            else:
+                cheat_codes = None
+                if os.path.isfile(filepath):
+                    try:
+                        with open(filepath, encoding='utf-8') as f:
+                            cheat_codes = f.read()
+                    except Exception as e:
+                        cheat_codes = f'ERROR: Unable to read "{filepath}": {str(e)}'
+                self._cheat_codes_cache[filepath] = cheat_codes
+            if cheat_codes is not None:
+                cheat_codes_by_region[region] = cheat_codes
+        if cheat_codes_by_region:
+            cheat_codes_box_label = f'Cheat Codes ({" - ".join(cheat_codes_by_region.keys())})'
+            cheat_codes_box = CollapsibleGroupBox(cheat_codes_box_label, self)
+            cheat_codes_box.set_expanded(self._expansion_states.get('cheat_codes', False))
+            cheat_codes_box.toggled.connect(
+                lambda expanded: self._expansion_states.update({'cheat_codes': expanded}))
+            cheat_codes_box.setLayout(QtWidgets.QVBoxLayout())
+            cheat_codes_box.layout().setContentsMargins(0, 0, 0, 0)
+            cheat_codes_box.layout().setSpacing(0)
+            label_padding = cheat_codes_box.fontMetrics().height() // 3
+            label_style_sheet = (f'QLabel {{ font-weight: bold; padding: {label_padding}px 0px; '
+                                 'background-color: #080808; }')
+            for region, cheat_codes in cheat_codes_by_region.items():
+                cheat_codes_label = QtWidgets.QLabel(region)
+                cheat_codes_label.setAlignment(QtCore.Qt.AlignCenter)
+                cheat_codes_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                                QtWidgets.QSizePolicy.Expanding)
+                cheat_codes_label.setStyleSheet(label_style_sheet)
+                cheat_codes_edit = QtWidgets.QTextEdit()
+                cheat_codes_edit.setReadOnly(True)
+                cheat_codes_edit.setFrameShape(QtWidgets.QFrame.NoFrame)
+                font_size = round(cheat_codes_edit.font().pointSize() * 0.80)
+                cheat_codes_edit.setStyleSheet(
+                    f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
+                cheat_codes_edit.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                               QtWidgets.QSizePolicy.Fixed)
+                cheat_codes_edit.setText(cheat_codes)
+                cheat_codes_box.layout().addWidget(cheat_codes_label)
+                cheat_codes_box.layout().addWidget(cheat_codes_edit)
+            layout.addWidget(cheat_codes_box)
 
         image_group_boxes = QtWidgets.QWidget(self)
         image_group_boxes.setObjectName('image_group_boxes')
