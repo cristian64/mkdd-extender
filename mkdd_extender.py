@@ -300,7 +300,12 @@ except AttributeError:
 
 
 class MKDDExtenderError(Exception):
-    pass
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.text = None
+        self.detailed_text = None
 
 
 class MKDDExtenderCanceled(Exception):

@@ -895,7 +895,11 @@ class ASTPlayer(QtWidgets.QWidget):
                 progress_dialog.execute_and_wait()
 
             except mkdd_extender.MKDDExtenderError as e:
-                error_message = str(e)
+                if e.text is None or e.detailed_text is None:
+                    error_message = str(e)
+                else:
+                    error_message = e.text
+                    exception_info = e.detailed_text
             except AssertionError as e:
                 error_message = str(e) or 'Assertion error.'
                 exception_info = traceback.format_exc()
@@ -3398,7 +3402,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 progress_dialog.execute_and_wait()
 
             except mkdd_extender.MKDDExtenderError as e:
-                error_message = str(e)
+                if e.text is None or e.detailed_text is None:
+                    error_message = str(e)
+                else:
+                    error_message = e.text
+                    exception_info = e.detailed_text
             except AssertionError as e:
                 error_message = str(e) or 'Assertion error.'
                 exception_info = traceback.format_exc()
@@ -3889,7 +3897,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 progress_dialog.execute_and_wait()
 
             except mkdd_extender.MKDDExtenderError as e:
-                error_message = str(e)
+                if e.text is None or e.detailed_text is None:
+                    error_message = str(e)
+                else:
+                    error_message = e.text
+                    exception_info = e.detailed_text
             except AssertionError as e:
                 error_message = str(e) or 'Assertion error.'
                 exception_info = traceback.format_exc()
@@ -4136,8 +4148,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             mkdd_extender.log.warning(str(e))
             return
         except mkdd_extender.MKDDExtenderError as e:
-            error_message = str(e)
-            mkdd_extender.log.error(error_message)
+            if e.text is None or e.detailed_text is None:
+                error_message = str(e)
+            else:
+                error_message = e.text
+                exception_info = e.detailed_text
+            mkdd_extender.log.error(str(e))
         except AssertionError as e:
             error_message = str(e) or 'Assertion error.'
             mkdd_extender.log.exception(error_message)
