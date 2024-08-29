@@ -21,6 +21,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import warnings
 import wave
@@ -32,6 +33,7 @@ import ast_converter
 import code_patcher
 import rarc
 from tools import bti, gcm
+from tools.gc_c_kit import dolreader
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -1620,6 +1622,7 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
                  iso_tmp_dir: str) -> 'tuple[dict | list]':
     replaces_data = {}
     minimap_data = {}
+    cheat_codes_data = {'US': {}, 'PAL': {}, 'JP': {}, 'US_DEBUG': {}}
     tilt_setting_data = {}
     alternative_audio_data = {}
     matching_audio_override_data = {}
@@ -2226,6 +2229,20 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
                 raise MKDDExtenderError(f'Unable to parse minimap data in "{nodename}": '
                                         f'{str(e)}.') from e
 
+            # Gather cheat codes for each region.
+            for region, cheat_codes_data_region in cheat_codes_data.items():
+                filepath = os.path.join(track_dirpath, f'cheatcodes_{region}.ini')
+                if not os.path.isfile(filepath):
+                    continue
+                try:
+                    with open(filepath, encoding='utf-8') as f:
+                        cheat_codes = f.read()
+                    cheat_codes_data_region[nodename] = cheat_codes
+                except Exception as e:
+                    raise MKDDExtenderError(
+                        f'Unable to read cheat codes file in "{nodename}" ("{filepath}"): '
+                        f'{str(e)}.') from e
+
         raise_if_canceled()
 
         # Copy files into the ISO temporary directory.
@@ -2342,6 +2359,7 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
     return (
         replaces_data,
         minimap_data,
+        cheat_codes_data,
         tilt_setting_data,
         alternative_audio_data,
         matching_audio_override_data,
@@ -2466,10 +2484,238 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
                                     'circumvent this safety measure.')
 
 
-def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: dict,
-                   tilt_setting_data: dict, alternative_audio_data: 'dict[str, str]',
-                   matching_audio_override_data: 'dict[str, str]', battle_stages_enabled: bool,
-                   iso_tmp_dir: str):
+CHEAT_CODE_PATTERN = re.compile(r'^([0-9a-fA-F]{8})\s*([0-9a-fA-F]{8})$')
+
+
+def parse_cheat_codes(
+        text: str,
+        dol: dolreader.DolFile) -> list[tuple[int, str, int, int, int, int, int, bytes]] | str:
+    cheat_codes = []
+
+    in_string_write = False
+    string_write_pending_lines = 0
+
+    for line_index, line in enumerate(text.split('\n')):
+        line_number = line_index + 1
+
+        line = line.strip()
+        if not line:
+            continue
+
+        if line[0] not in '0123456789abcdefABCEDF':
+            # Skips commented lines that start with $, **, --, etc.
+            continue
+
+        matches = CHEAT_CODE_PATTERN.match(line)
+        if matches is None:
+            return (f'Ill-formed code at line #{line_number}:\n\n{line}\n\n'
+                    'Expected layout is `________ ________` (unencrypted).')
+
+        part1 = int(matches.group(1), base=16)
+        part2 = int(matches.group(2), base=16)
+
+        code_subtype = (part1 & 0b11000000000000000000000000000000) >> 30
+        code_type = (part1 & 0b00111000000000000000000000000000) >> 27
+        data_size = (part1 & 0b00000110000000000000000000000000) >> 25
+        address = 0x80000000 | (part1 & 0b00000001111111111111111111111111)
+        value = part2
+
+        if not in_string_write:
+            if (code_subtype, code_type) != (0, 0):
+                return (f'Unsupported code type at line #{line_number}:\n\n    {line}\n\n'
+                        'Only `00______ ________`, `02______ ________`, `04______ ________`, and '
+                        '`06______ ________` codes are supported.')
+
+            if data_size == 0 and value & 0xFFFFFF00 != 0:
+                return (f'Unsupported 8-bit write at line #{line_number}:\n\n    {line}\n\n'
+                        'The implementation of this code type differs between the Action Replay '
+                        'and Gecko code handler: only single-byte writes are supported.')
+
+            if not dol.is_address_resolvable(address):
+                return (f'Unsupported code at line #{line_number}:\n\n    {line}\n\n'
+                        f'Address 0x{address:08X} cannot be resolved.')
+
+            if data_size == 0:  # 8-bit write & fill
+                size = 1  # We only support single-byte writes
+            elif data_size == 1:  # 16-bit write & fill
+                size = ((value >> 16) + 1) * 16 // 8
+            elif data_size == 2:  # 32-bit write
+                size = 4
+            elif data_size == 3:  # String write
+                size = value
+
+            dol.seek(address)
+            if not dol.can_write_or_read_in_current_section(size):
+                return (f'Unsupported code at line #{line_number}:\n\n    {line}\n\n'
+                        f'Write of {size} bytes at 0x{address:08X} goes beyond the section limit.')
+
+            cheat_codes.append((
+                line_number,
+                line,
+                code_subtype,
+                code_type,
+                data_size,
+                address,
+                value,
+                bytearray(),
+            ))
+
+            if data_size == 3:  # String write
+                in_string_write = True
+                string_write_pending_lines = (value + 7 if value % 8 else value) // 8
+                if not string_write_pending_lines:
+                    return (f'Ill-formed code at line #{line_number}:\n\n    {line}\n\n'
+                            'Detected string write code with 0 lines.')
+        else:
+            cheat_codes[-1][7].extend(struct.pack('>II', part1, part2))
+            string_write_pending_lines -= 1
+            if not string_write_pending_lines:
+                in_string_write = False
+
+    if string_write_pending_lines:
+        return f'Expecting {string_write_pending_lines} more lines in string write code.'
+
+    return cheat_codes
+
+
+def bake_cheat_codes(cheat_codes_filename: str, cheat_codes_by_mod: dict[str, list[tuple]],
+                     dol: dolreader.DolFile) -> str:
+    conflicts_message = ''
+
+    memory_map = {}
+    reported = set()
+
+    for mod_name, cheat_codes in cheat_codes_by_mod.items():
+        for (line_number, line, code_subtype, code_type, data_size, address, value,
+             string_payload) in cheat_codes:
+
+            assert (code_subtype, code_type) == (0, 0)
+            assert data_size in (0, 1, 2, 3)
+
+            if data_size == 0:  # 8-bit write & fill
+                # NOTE: Action Replay and Gecko treat the multiplier differently: the former uses
+                # all the leftover bytes, whereas the latter uses only the first 2 bytes, leaving
+                # the 3rd leftover byte unused. Therefore, it is not possible to provide unambiguous
+                # support for this code type (unless all bytes are `0x00`, in which case both
+                # implementations are consistent: a single write is to be written).
+                assert value & 0xFFFFFF00 == 0
+                multiplier = 1
+                value = value & 0x000000FF
+                payload = struct.pack('>B', value) * multiplier
+
+            elif data_size == 1:  # 16-bit write & fill
+                multiplier = (value >> 16) + 1
+                value = value & 0x0000FFFF
+                payload = struct.pack('>H', value) * multiplier
+
+            elif data_size == 2:  # 32-bit write
+                payload = struct.pack('>I', value)
+
+            elif data_size == 3:  # String write
+                assert len(string_payload) % 8 == 0
+                payload = string_payload[:value]
+
+                line += '\n...'
+
+            dol.seek(address)
+            dol.write(payload)
+
+            # All bytes in the payload will be inserted in the memory map. If a previous cheat code
+            # has inserted a different value at the address, that's a conflict that must be
+            # reported.
+            for i, byte in enumerate(payload):
+                byte_address = address + i
+                if byte_address not in memory_map:
+                    memory_map[byte_address] = (byte, mod_name, line_number, line)
+                    continue
+
+                other_byte, other_mod_name, other_line_number, other_line = memory_map[byte_address]
+                if other_byte == byte:
+                    continue
+
+                report_key = (mod_name, line_number, line, other_mod_name, other_line_number,
+                              other_line)
+                if report_key in reported:
+                    continue
+                reported.add(report_key)
+
+                if conflicts_message:
+                    conflicts_message += '\n\n'
+
+                conflicts_message += (
+                    f'"{other_mod_name}" ({cheat_codes_filename}) at line #{other_line_number}:'
+                    f'\n'
+                    f'{textwrap.indent(other_line, " " * 4)}'
+                    f'\n'
+                    f'"{mod_name}" ({cheat_codes_filename}) at line #{line_number}:'
+                    f'\n'
+                    f'{textwrap.indent(line, " " * 4)}')
+
+    return conflicts_message
+
+
+def patch_cheat_codes(args: argparse.Namespace, cheat_codes_data: dict, cheat_codes_region: str,
+                      dol_path: str):
+    cheat_codes_text_by_mod = cheat_codes_data[cheat_codes_region]
+    if not cheat_codes_text_by_mod:
+        return
+
+    cheat_codes_filename = f'cheatcodes_{cheat_codes_region}.ini'
+
+    log.info('Baking cheat codes...')
+
+    with open(dol_path, 'rb') as f:
+        dol = dolreader.DolFile(f)
+
+        # Parse cheat codes.
+        cheat_codes_by_mod = {}
+        for mod_name, cheat_codes_text in cheat_codes_text_by_mod.items():
+            cheat_codes = parse_cheat_codes(cheat_codes_text, dol)
+            if isinstance(cheat_codes, str):
+                message = (
+                    f'Error while parsing cheat codes in "{mod_name}" ({cheat_codes_filename})')
+                e = MKDDExtenderError(f'{message}:\n{cheat_codes}')
+                e.text = f'{message}.'
+                e.detailed_text = cheat_codes
+                raise e
+            cheat_codes_by_mod[mod_name] = cheat_codes
+
+        # Bake cheat codes into DOL file.
+        conflicts_message = bake_cheat_codes(cheat_codes_filename, cheat_codes_by_mod, dol)
+
+        # Report whether conflicts have been encountered (i.e. two cheat codes that attempt to write
+        # different values to the same memory address).
+        if conflicts_message:
+            message = ('The following conflicts were encountered while baking cheat codes:\n'
+                       f'{conflicts_message}')
+            if args.skip_cheat_codes_conflict_check:
+                log.warning(message)
+            else:
+                rerun_message = ('Re-run with --skip-cheat-codes-conflict-check to circumvent '
+                                 'this safety measure.')
+                e = MKDDExtenderError(f'{message}\n\n{rerun_message}')
+                e.text = f'Conflicts were encountered while baking cheat codes. {rerun_message}'
+                e.detailed_text = conflicts_message
+                raise e
+
+        dol.get_raw_data().seek(0)
+        raw_data = dol.get_raw_data().read()
+
+    with open(dol_path, 'wb') as f:
+        f.write(raw_data)
+
+
+def patch_dol_file(
+    args: argparse.Namespace,
+    replaces_data: dict,
+    minimap_data: dict,
+    cheat_codes_data: dict,
+    tilt_setting_data: dict,
+    alternative_audio_data: 'dict[str, str]',
+    matching_audio_override_data: 'dict[str, str]',
+    battle_stages_enabled: bool,
+    iso_tmp_dir: str,
+):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
     bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
@@ -2495,6 +2741,17 @@ def patch_dol_file(args: argparse.Namespace, replaces_data: dict, minimap_data: 
             data = f.read(len(DEBUG_BUILD_DATE))
             if data == DEBUG_BUILD_DATE:
                 game_id += 'dbg'
+
+    if not args.skip_course_cheat_codes:
+        if game_id == 'GM4E01':
+            cheat_codes_region = 'US'
+        elif game_id == 'GM4P01':
+            cheat_codes_region = 'PAL'
+        elif game_id == 'GM4J01':
+            cheat_codes_region = 'JP'
+        else:
+            cheat_codes_region = 'US_DEBUG'
+        patch_cheat_codes(args, cheat_codes_data, cheat_codes_region, dol_path)
 
     initial_page_number = max(1, args.initial_page_number or 0)
 
@@ -2733,6 +2990,11 @@ OPTIONAL_ARGUMENTS = {
             'transforms will likely make some minimaps in custom race tracks be cut off screen.',
         ),
         (
+            'Skip Course Cheat Codes',
+            bool,
+            'If specified, cheat codes in custom courses will _not_ be baked into the DOL file.',
+        ),
+        (
             'Add Description File',
             bool,
             'If specified, a plain text file (`DESCRIPTION.md`) containing the description of the '
@@ -2904,6 +3166,16 @@ OPTIONAL_ARGUMENTS = {
             bool,
             'If specified, missing code patches will not fail the program. Custom courses that '
             'rely on the missing code patches may present unexpected behavior, or crash the game.',
+        ),
+        (
+            'Skip Cheat Codes Conflict Check',
+            bool,
+            'If specified, conflicts between cheat codes from different custom courses will not '
+            'fail the program.\n\n'
+            'A cheat code conflict can occur when one or more cheat codes attempt to write '
+            'different values to the same memory address.\n\n'
+            'Custom courses that rely on the conflicting cheat codes may present unexpected '
+            'behavior, or crash the game.',
         ),
     ),
 }
@@ -3083,6 +3355,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         (
             replaces_data,
             minimap_data,
+            cheat_codes_data,
             tilt_setting_data,
             alternative_audio_data,
             matching_audio_override_data,
@@ -3104,8 +3377,17 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
 
         raise_if_canceled()
 
-        patch_dol_file(args, replaces_data, minimap_data, tilt_setting_data, alternative_audio_data,
-                       matching_audio_override_data, battle_stages_enabled, iso_tmp_dir)
+        patch_dol_file(
+            args,
+            replaces_data,
+            minimap_data,
+            cheat_codes_data,
+            tilt_setting_data,
+            alternative_audio_data,
+            matching_audio_override_data,
+            battle_stages_enabled,
+            iso_tmp_dir,
+        )
 
         raise_if_canceled()
 
