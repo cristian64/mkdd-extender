@@ -3113,6 +3113,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for row, item in enumerate(item_text_to_item.values()):
                 self._custom_tracks_table.setItem(row, 0, item)
 
+            self._update_custom_tracks_filter()
+
     def _on_open_configuration_directory_action_triggered(self):
         open_directory(os.path.dirname(os.path.abspath(self._settings.fileName())))
 
