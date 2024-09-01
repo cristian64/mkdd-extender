@@ -3096,6 +3096,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         # When the sort indicator is unset, Qt won't reset the order to the original; it will be
         # done manually.
         if logical_index == -1:
+            current_item = self._custom_tracks_table.currentItem()
+
             # Initialize dictionary in the correct [insertion] order.
             item_text_to_item = {item_text: None for item_text in self._item_text_to_path}
 
@@ -3112,6 +3114,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             # Reinsert the items back to the table.
             for row, item in enumerate(item_text_to_item.values()):
                 self._custom_tracks_table.setItem(row, 0, item)
+
+            # Restore current item, which may be in a different row now.
+            if current_item is not None:
+                self._custom_tracks_table.setCurrentItem(current_item)
 
             self._update_custom_tracks_filter()
 
