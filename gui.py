@@ -841,6 +841,14 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
         super().dropEvent(event)
 
+    def startDrag(self, supportedActions: QtCore.Qt.DropActions):
+        # Reimplemented to disallow drag start actions on empty cells.
+        model = self.model()
+        for index in self.selectionModel().selectedIndexes():
+            if model.data(index):
+                super().startDrag(supportedActions)
+                break
+
     def _on_itemSelectionChanged(self):
         self._create_missing_items()
 
