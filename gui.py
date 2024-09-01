@@ -274,6 +274,27 @@ def open_directory(dirpath: str):
         subprocess.check_call(('open' if mkdd_extender.macos else 'xdg-open', dirpath))
 
 
+def open_and_select_in_directory(path: str):
+    path = os.path.normpath(path)
+    if mkdd_extender.windows:
+        explorer_path = os.path.join(os.environ['WINDIR'], 'explorer.exe')
+        subprocess.check_call((explorer_path, '/select,', path))
+    elif mkdd_extender.macos:
+        open_directory(os.path.dirname(path))
+        subprocess.check_call(('open', '--reveal', path))
+    else:
+        subprocess.check_call((
+            'dbus-send',
+            '--session',
+            '--dest=org.freedesktop.FileManager1',
+            '--type=method_call',
+            '/org/freedesktop/FileManager1',
+            'org.freedesktop.FileManager1.ShowItems',
+            f'array:string:file://{path}',
+            'string:""',
+        ))
+
+
 class PathEdit(QtWidgets.QWidget):
 
     path_changed = QtCore.Signal(str)
@@ -2267,6 +2288,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         for page_table in self._page_tables + self._page_battle_stages_tables:
             page_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
             page_table.itemChanged.connect(self._on_page_table_itemChanged)
+        self._custom_tracks_table.customContextMenuRequested.connect(
+            self._on_custom_tracks_table_customContextMenuRequested)
+        self._custom_tracks_table.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         self._update_options_string()
 
@@ -2996,6 +3020,22 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         # grouped together as a single undo action.
         self._pending_undo_actions += 1
         QtCore.QTimer.singleShot(0, self._process_undo_action)
+
+    def _on_custom_tracks_table_customContextMenuRequested(self, pos: QtCore.QPoint):
+        item = self._custom_tracks_table.itemAt(pos)
+        if item is None:
+            return
+
+        menu = QtWidgets.QMenu()
+
+        action = menu.addAction('Open Containing Directory...')
+        path = self._item_text_to_path.get(item.text())
+        if path and os.path.exists(path):
+            action.triggered[bool].connect(lambda: open_and_select_in_directory(path))
+        else:
+            action.setEnabled(False)
+
+        menu.exec(self._custom_tracks_table.viewport().mapToGlobal(pos))
 
     def _clear_selection(self):
         with self._blocked_page_signals():
