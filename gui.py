@@ -2051,8 +2051,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._custom_tracks_table.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.Stretch)
         self._custom_tracks_table.horizontalHeader().setSectionsMovable(False)
-        # NOTE: It is important to make the table sortable before making the indicator clearable, or
-        # else the label in the header would be boldified. An odd behavior in Qt that may bite back.
+        self._custom_tracks_table.horizontalHeader().setHighlightSections(False)
         self._custom_tracks_table.setSortingEnabled(True)
         self._custom_tracks_table.horizontalHeader().setSortIndicatorClearable(True)
         self._custom_tracks_table.horizontalHeader().sortIndicatorChanged.connect(
