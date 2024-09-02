@@ -2666,13 +2666,28 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         custom_tracks_filter = custom_tracks_filter.lower()
 
-        for row in range(self._custom_tracks_table.rowCount()):
-            item = self._custom_tracks_table.item(row, 0)
-            visible = custom_tracks_filter in item.text().lower()
-            if visible:
-                self._custom_tracks_table.showRow(row)
-            else:
-                self._custom_tracks_table.hideRow(row)
+        update_required = False
+
+        self._custom_tracks_table.setUpdatesEnabled(False)
+        try:
+            for row in range(self._custom_tracks_table.rowCount()):
+                item = self._custom_tracks_table.item(row, 0)
+                visible = custom_tracks_filter in item.text().lower()
+                was_visible = not self._custom_tracks_table.isRowHidden(row)
+                if visible == was_visible:
+                    continue
+                if visible:
+                    self._custom_tracks_table.showRow(row)
+                else:
+                    self._custom_tracks_table.hideRow(row)
+                update_required = True
+        finally:
+            self._custom_tracks_table.setUpdatesEnabled(True)
+
+        if update_required:
+            QtWidgets.QWidget.update(self._custom_tracks_table)
+            # Note that `QtWidgets.update()` is shadowed by `QAbstractItemView.update(QModelIndex)`
+            # in PySide; the method has to be invoked in a structured programming way.
 
     def _load_custom_tracks_directory(self, dirpath: str = ''):
         selected_items_text = []
