@@ -242,8 +242,9 @@ class Project:
 
         _offset, sectionaddr, size = self.dol.allocate_text_section(len(data), addr=self._address)
 
-        self.dol.seek(sectionaddr)
-        self.dol.write(data)
+        if size > 0:
+            self.dol.seek(sectionaddr)
+            self.dol.write(data)
 
         for addr, func in self.branches:
             if func not in functions:
@@ -257,7 +258,7 @@ class Project:
 
             branchlink(self.dol, addr, functions[func])
 
-        if self.osarena_patcher is not None:
+        if size > 0 and self.osarena_patcher is not None:
             self.osarena_patcher(self.dol, sectionaddr + size)
 
         with open(newdolpath, "wb") as f:
