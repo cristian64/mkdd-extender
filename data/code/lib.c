@@ -45,6 +45,8 @@
 #define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
 #define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
 
+#if PAGE_COUNT > 1
+
 void change_course_page(const int delta)
 {
     const int previous_page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
@@ -212,6 +214,8 @@ void lanselectmode_calcanm_ex()
     LANSelectMode__calcAnm();
     process_course_page_change(LAN_MODE);
 }
+
+#endif
 
 #if EXTENDER_CUP
 

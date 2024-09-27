@@ -1813,10 +1813,11 @@ def patch_dol_file(
                 project.set_osarena_patcher(patch_osarena)
 
                 # Initialize static variables.
-                project.dol.seek(SPAM_FLAG_ADDRESSES[game_id])
-                project.dol.write(b'\0')
-                project.dol.seek(CURRENT_PAGE_ADDRESSES[game_id])
-                project.dol.write(initial_page_index.to_bytes(1, 'big'))
+                if page_count > 1:
+                    project.dol.seek(SPAM_FLAG_ADDRESSES[game_id])
+                    project.dol.write(b'\0')
+                    project.dol.seek(CURRENT_PAGE_ADDRESSES[game_id])
+                    project.dol.write(initial_page_index.to_bytes(1, 'big'))
                 if extender_cup:
                     project.dol.seek(GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id])
                     project.dol.write(b'\0')
@@ -1831,24 +1832,26 @@ def patch_dol_file(
                     project.dol.write(b'\x50\x00\x50\x00')
 
                 # Initialize the strings with the character of the first page ('0').
-                for string, address in string_addresses.items():
-                    char_offset = find_char_offset_in_string(string)
-                    char_address = address + char_offset
-                    project.dol.seek(char_address)
-                    project.dol.write(str(initial_page_index).encode('utf-8'))
+                if page_count > 1:
+                    for string, address in string_addresses.items():
+                        char_offset = find_char_offset_in_string(string)
+                        char_address = address + char_offset
+                        project.dol.seek(char_address)
+                        project.dol.write(str(initial_page_index).encode('utf-8'))
 
                 # Set up minimap coordinates for the selected initial page.
-                for track_index in range(page_course_count):
-                    addresses = course_to_minimap_addresses[COURSES[track_index]]
-                    if initial_page_index == 0:
-                        values = initial_minimap_values[COURSES[track_index]]
-                    else:
-                        values = minimap_data[(initial_page_index, track_index)]
-                    for i in range(4):
-                        project.dol.seek(addresses[i])
-                        project.dol.write(struct.pack('>f', values[i]))
-                    project.dol.seek(addresses[4] + 3)
-                    project.dol.write(struct.pack('>B', values[4]))
+                if page_count > 1:
+                    for track_index in range(page_course_count):
+                        addresses = course_to_minimap_addresses[COURSES[track_index]]
+                        if initial_page_index == 0:
+                            values = initial_minimap_values[COURSES[track_index]]
+                        else:
+                            values = minimap_data[(initial_page_index, track_index)]
+                        for i in range(4):
+                            project.dol.seek(addresses[i])
+                            project.dol.write(struct.pack('>f', values[i]))
+                        project.dol.seek(addresses[4] + 3)
+                        project.dol.write(struct.pack('>B', values[4]))
 
                 if not args.skip_menu_titles:
                     project.dol.seek(LAN_MENU_TITLE_INDEX_INSTRUCTION_ADDRESSES[game_id] + 3)
@@ -1884,18 +1887,19 @@ def patch_dol_file(
                 project.add_file('lib.c')
 
                 # Page selection logic.
-                project.branchlink(SCENECOURSESELECT_CALCANM_CALL_ADDRESSES[game_id],
-                                   'scenecourseselect_calcanm_ex')
-                if battle_stages_enabled:
-                    project.branchlink(SCENEMAPSELECT_CALCANM_CALL_ADDRESSES[game_id],
-                                       'scenemapselect_calcanm_ex')
-                if battle_stages_enabled or tilting_courses:
-                    project.branchlink(IS_TILTING_COURSE_CALL_ADDRESSES[game_id],
-                                       'is_tilting_course')
-                    project.dol.seek(IS_TILTING_COURSE_CALL_ADDRESSES[game_id] + 4)
-                    project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
-                project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
-                                   'lanselectmode_calcanm_ex')
+                if page_count > 1:
+                    project.branchlink(SCENECOURSESELECT_CALCANM_CALL_ADDRESSES[game_id],
+                                       'scenecourseselect_calcanm_ex')
+                    if battle_stages_enabled:
+                        project.branchlink(SCENEMAPSELECT_CALCANM_CALL_ADDRESSES[game_id],
+                                           'scenemapselect_calcanm_ex')
+                    if battle_stages_enabled or tilting_courses:
+                        project.branchlink(IS_TILTING_COURSE_CALL_ADDRESSES[game_id],
+                                           'is_tilting_course')
+                        project.dol.seek(IS_TILTING_COURSE_CALL_ADDRESSES[game_id] + 4)
+                        project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
+                    project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
+                                       'lanselectmode_calcanm_ex')
 
                 if remove_movie_trailer:
                     project.dol.seek(SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES[game_id][0])

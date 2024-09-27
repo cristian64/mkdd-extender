@@ -1618,8 +1618,13 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
     log.info('Cup names patched.')
 
 
-def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
-                 iso_tmp_dir: str) -> 'tuple[dict | list]':
+def meld_courses(
+    args: argparse.Namespace,
+    paths: list[str],
+    tracks_is_dir: bool,
+    raise_if_canceled: callable,
+    iso_tmp_dir: str,
+) -> 'tuple[dict | list]':
     replaces_data = {}
     minimap_data = {}
     cheat_codes_data = {'US': {}, 'PAL': {}, 'JP': {}, 'US_DEBUG': {}}
@@ -1627,28 +1632,31 @@ def meld_courses(args: argparse.Namespace, raise_if_canceled: callable,
     alternative_audio_data = {}
     matching_audio_override_data = {}
     added_course_names = []
+    battle_stages_enabled = False
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
+
+    if not paths:
+        # The existence of the "Cours0" directory is used to determine whether the ISO has been
+        # previously extended; the directory will be created even when no new course will be added.
+        os.mkdir(os.path.join(files_dirpath, 'Cours0'))
+
+        return (
+            replaces_data,
+            minimap_data,
+            cheat_codes_data,
+            tilt_setting_data,
+            alternative_audio_data,
+            matching_audio_override_data,
+            added_course_names,
+            battle_stages_enabled,
+        )
 
     stream_dirpath = os.path.join(files_dirpath, 'AudioRes', 'Stream')
     course_dirpath = os.path.join(files_dirpath, 'Course')
     coursename_dirpath = os.path.join(files_dirpath, 'CourseName')
     staffghosts_dirpath = os.path.join(files_dirpath, 'StaffGhosts')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
-
-    if isinstance(args.tracks, str):
-        paths = tuple(os.path.join(args.tracks, p) for p in sorted(os.listdir(args.tracks)))
-        tracks_is_dir = True
-    elif isinstance(args.tracks, collections.abc.Sequence) and args.tracks:
-        if ((len(args.tracks) % RACE_TRACK_COUNT != 0)
-                and (len(args.tracks) % RACE_AND_BATTLE_COURSE_COUNT != 0)):
-            raise MKDDExtenderError(
-                f'Number of items in the `tracks` argument not a multiple of {RACE_TRACK_COUNT} or '
-                f'{RACE_AND_BATTLE_COURSE_COUNT}: {args.tracks}')
-        paths = args.tracks
-        tracks_is_dir = False
-    else:
-        raise MKDDExtenderError('Unexpected value in `tracks` argument.')
 
     SUPPORTED_CODE_PATCHES = tuple(name.lower().replace(' ', '-')
                                    for name, *_rest in OPTIONAL_ARGUMENTS['Code Patches']
@@ -2780,17 +2788,20 @@ def patch_dol_file(
         bool(args.debug_output),
     )
 
-    for language in LANGUAGES:
-        scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
-        if not os.path.isdir(scenedata_dirpath):
-            continue
-        for blo_path in (os.path.join(scenedata_dirpath, 'courseselect', 'scrn',
-                                      'courseselect_under.blo'),
-                         os.path.join(scenedata_dirpath, 'mapselect', 'scrn',
-                                      'selectmaplayout.blo'),
-                         os.path.join(scenedata_dirpath, 'lanplay', 'scrn', 'lanselectmode.blo')):
-            log.info(f'Patching BLO file ("{blo_path}")...')
-            code_patcher.patch_bti_filenames_in_blo_file(game_id, battle_stages_enabled, blo_path)
+    if replaces_data:
+        for language in LANGUAGES:
+            scenedata_dirpath = os.path.join(iso_tmp_dir, 'files', 'SceneData', language)
+            if not os.path.isdir(scenedata_dirpath):
+                continue
+            for blo_path in (os.path.join(scenedata_dirpath, 'courseselect', 'scrn',
+                                          'courseselect_under.blo'),
+                             os.path.join(scenedata_dirpath, 'mapselect', 'scrn',
+                                          'selectmaplayout.blo'),
+                             os.path.join(scenedata_dirpath, 'lanplay', 'scrn',
+                                          'lanselectmode.blo')):
+                log.info(f'Patching BLO file ("{blo_path}")...')
+                code_patcher.patch_bti_filenames_in_blo_file(game_id, battle_stages_enabled,
+                                                             blo_path)
 
     if args.extended_memory:
         # The simulated memory size in the disk information header needs to be updated to the new
@@ -3269,6 +3280,29 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
     if args.input == args.output:
         raise MKDDExtenderError('Paths to the input and output ISO files must be different.')
 
+    if isinstance(args.tracks, str):
+        paths = tuple(os.path.join(args.tracks, p) for p in sorted(os.listdir(args.tracks)))
+        tracks_is_dir = True
+    elif isinstance(args.tracks, collections.abc.Sequence):
+        if ((len(args.tracks) % RACE_TRACK_COUNT != 0)
+                and (len(args.tracks) % RACE_AND_BATTLE_COURSE_COUNT != 0)):
+            raise MKDDExtenderError(
+                f'Number of items in the `tracks` argument not a multiple of {RACE_TRACK_COUNT} or '
+                f'{RACE_AND_BATTLE_COURSE_COUNT}: {args.tracks}')
+        paths = args.tracks
+        tracks_is_dir = False
+    else:
+        raise MKDDExtenderError('Unexpected value in `tracks` argument.')
+
+    # Reset the options that are not relevant when there are no custom courses in the list.
+    if not paths:
+        log.info('No custom course has been configured.')
+        args.initial_page_number = 1
+        args.extender_cup = False
+        args.skip_cup_names = True
+        args.skip_menu_titles = True
+        args.skip_minimap_transforms_removal = True
+
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as iso_tmp_dir:
         # Extract the ISO file entirely for now. In the future, only extracting the files that need
         # to be read might be ideal performance-wise.
@@ -3361,21 +3395,22 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
             matching_audio_override_data,
             added_course_names,
             battle_stages_enabled,
-        ) = meld_courses(args, raise_if_canceled, iso_tmp_dir)
+        ) = meld_courses(args, paths, tracks_is_dir, raise_if_canceled, iso_tmp_dir)
 
         raise_if_canceled()
 
-        if not args.skip_menu_titles:
-            patch_title_lines(bool(args.use_alternative_buttons), battle_stages_enabled,
-                              iso_tmp_dir)
+        if paths:
+            if not args.skip_menu_titles:
+                patch_title_lines(bool(args.use_alternative_buttons), battle_stages_enabled,
+                                  iso_tmp_dir)
 
-        raise_if_canceled()
+            raise_if_canceled()
 
-        page_count = len(added_course_names) // (RACE_AND_BATTLE_COURSE_COUNT
-                                                 if battle_stages_enabled else RACE_TRACK_COUNT) + 1
-        patch_cup_names(args, page_count, iso_tmp_dir)
+            page_count = len(added_course_names) // (
+                RACE_AND_BATTLE_COURSE_COUNT if battle_stages_enabled else RACE_TRACK_COUNT) + 1
+            patch_cup_names(args, page_count, iso_tmp_dir)
 
-        raise_if_canceled()
+            raise_if_canceled()
 
         patch_dol_file(
             args,

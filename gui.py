@@ -2190,15 +2190,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     page_table.add_companion_table(other_page_table)
             page_table.add_companion_table(self._custom_tracks_table)
         custom_tracks_drop_widget.set_sources(self._page_tables + self._page_battle_stages_tables)
-        pages_scroll_widget = QtWidgets.QScrollArea()
-        pages_scroll_widget.setWidgetResizable(True)
-        pages_scroll_widget.setFrameShape(QtWidgets.QFrame.NoFrame)
-        pages_scroll_widget.setWidget(pages_widget)
+        self._pages_scroll_widget = QtWidgets.QScrollArea()
+        self._pages_scroll_widget.setWidgetResizable(True)
+        self._pages_scroll_widget.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self._pages_scroll_widget.setWidget(pages_widget)
 
         self._extra_pages_count_combobox = QtWidgets.QComboBox()
-        for i in range(mkdd_extender.MAX_EXTRA_PAGES):
-            self._extra_pages_count_combobox.addItem(str(i + 2))
-        self._update_page_visibility(1)
+        for i in range(1 + mkdd_extender.MAX_EXTRA_PAGES):
+            self._extra_pages_count_combobox.addItem(str(i + 1))
         self._extra_pages_count_combobox.currentIndexChanged.connect(
             self._on_extra_pages_count_combobox_currentIndexChanged)
 
@@ -2216,11 +2215,32 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         extra_pages_layout.addWidget(self._total_page_count_label)
         extra_pages_layout.addWidget(self._extra_pages_count_combobox)
 
+        no_pages_message_label = QtWidgets.QLabel(
+            'No extra course page will be added.\n\n'
+            'Manually-enabled code patches and options (where applicable) will still be applied to '
+            'the ISO.',
+        )
+        no_pages_message_label.setFrameStyle(QtWidgets.QFrame.StyledPanel)
+        no_pages_message_label.setAutoFillBackground(True)
+        no_pages_message_label.setWordWrap(True)
+        no_pages_message_label.setMargin(font_height)
+        no_pages_message_label.setAlignment(QtCore.Qt.AlignCenter)
+        palette = no_pages_message_label.palette()
+        palette.setColor(QtGui.QPalette.Window, palette.color(QtGui.QPalette.Base))
+        palette.setColor(QtGui.QPalette.Window, palette.color(QtGui.QPalette.Base))
+        no_pages_message_label.setPalette(palette)
+        self._no_pages_message_widget = QtWidgets.QWidget()
+        no_pages_message_layout = QtWidgets.QVBoxLayout(self._no_pages_message_widget)
+        no_pages_message_layout.setContentsMargins(0, 0, 0, 0)
+        no_pages_message_layout.addWidget(no_pages_message_label)
+        no_pages_message_layout.addStretch()
+
         main_area_widget = QtWidgets.QWidget()
         main_area_layout = QtWidgets.QVBoxLayout(main_area_widget)
         main_area_layout.setContentsMargins(0, 0, 0, 0)
         main_area_layout.addLayout(extra_pages_layout)
-        main_area_layout.addWidget(pages_scroll_widget)
+        main_area_layout.addWidget(self._no_pages_message_widget)
+        main_area_layout.addWidget(self._pages_scroll_widget)
 
         self._info_view = InfoViewWidget()
         self._info_view.shown.connect(self._update_info_view)
@@ -2281,6 +2301,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                          QtWidgets.QSizePolicy.Expanding)
 
         self.setCentralWidget(self._log_splitter)
+
+        self._update_page_visibility(1)
 
         try:
             self._restore_settings()
@@ -2428,24 +2450,32 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._info_view.set_expansion_states(
             self._settings.value('miscellaneous/info_view_expansion_states') or {})
 
-        page_item_values = self._settings.value('miscellaneous/page_item_combined_values')
-        if not page_item_values:
+        has_page_item_values = self._settings.contains('miscellaneous/page_item_combined_values')
+        if has_page_item_values:
+            page_item_values = self._settings.value('miscellaneous/page_item_combined_values')
+        else:
             # Attempt to pick up values from the legacy setting.
-            page_item_values = self._settings.value('miscellaneous/page_item_values')
-        if page_item_values:
+            has_page_item_values = self._settings.contains('miscellaneous/page_item_values')
+            if has_page_item_values:
+                page_item_values = self._settings.value('miscellaneous/page_item_values')
+        if has_page_item_values:
             try:
                 page_item_values = json.loads(page_item_values)
             except json.decoder.JSONDecodeError:
                 pass
             else:
-                if page_item_values:
-                    legacy_format = len(page_item_values[0]) == 5
-                    if legacy_format:
-                        page_item_values = [(i, 0, column, row, value, selected)
-                                            for (i, column, row, value,
-                                                 selected) in page_item_values]
-                    extra_page_count = max(i for i, *_ in page_item_values) + 1
-                    battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+                if has_page_item_values:
+                    if page_item_values:
+                        legacy_format = len(page_item_values[0]) == 5
+                        if legacy_format:
+                            page_item_values = [(i, 0, column, row, value, selected)
+                                                for (i, column, row, value,
+                                                     selected) in page_item_values]
+                        extra_page_count = max(i for i, *_ in page_item_values) + 1
+                        battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+                    else:
+                        extra_page_count = 0
+                        battle_stages_enabled = False
                     self._set_page_item_values(page_item_values, also_selected_state=False)
                     self._update_page_visibility(extra_page_count)
                     self._update_page_battle_stages_visibility(battle_stages_enabled)
@@ -2778,6 +2808,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             for page_widget in self._page_widgets)
 
     def _update_page_visibility(self, extra_page_count: int):
+        self._enable_custom_battle_stages.setEnabled(extra_page_count > 0)
+        self._no_pages_message_widget.setVisible(extra_page_count == 0)
+        self._pages_scroll_widget.setVisible(extra_page_count > 0)
         for page_widget in self._page_widgets[:extra_page_count]:
             page_widget.show()
         for page_widget in self._page_widgets[extra_page_count:]:
@@ -2785,15 +2818,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         for page_index, page_label in enumerate(self._page_labels):
             page_label.setText(f'{page_index + 2} / {extra_page_count + 1}')
         with blocked_signals(self._extra_pages_count_combobox):
-            self._extra_pages_count_combobox.setCurrentIndex(extra_page_count - 1)
+            self._extra_pages_count_combobox.setCurrentIndex(extra_page_count)
 
     def _on_extra_pages_count_combobox_currentIndexChanged(self, index: int):
-        extra_page_count = index + 1
+        extra_page_count = index
         items = self._get_page_item_values_enabled_only()
         items = [entry for entry in items if entry[0] < extra_page_count]
         self._set_page_item_values(items)
 
-        self._update_page_visibility(index + 1)
+        self._update_page_visibility(extra_page_count)
 
         self._sync_emblems()
         self._update_info_view()
@@ -3124,8 +3157,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._redo_history.insert(0, self._undo_history.pop())
             page_item_values = self._undo_history[-1]
             self._set_page_item_values(page_item_values)
-            extra_page_count = max(i for i, *_ in page_item_values) + 1
-            battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+            if page_item_values:
+                extra_page_count = max(i for i, *_ in page_item_values) + 1
+                battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+            else:
+                extra_page_count = 0
+                battle_stages_enabled = False
             self._update_page_visibility(extra_page_count)
             self._update_page_battle_stages_visibility(battle_stages_enabled)
             self._sync_emblems()
@@ -3138,8 +3175,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_item_values = self._redo_history.pop(0)
             self._undo_history.append(page_item_values)
             self._set_page_item_values(page_item_values)
-            extra_page_count = max(i for i, *_ in page_item_values) + 1
-            battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+            if page_item_values:
+                extra_page_count = max(i for i, *_ in page_item_values) + 1
+                battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
+            else:
+                extra_page_count = 0
+                battle_stages_enabled = False
             self._update_page_visibility(extra_page_count)
             self._update_page_battle_stages_visibility(battle_stages_enabled)
             self._sync_emblems()
@@ -4096,6 +4137,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                  f'rowspan="{rowspan}">'
                                  f'{course_name}</td>')
                     html += '</tr>'
+
+            if not pages:
+                html += ('<tr><td style="text-align: center; padding: 0.8em">'
+                         'No extra course page is configured'
+                         '</td></tr>')
+
             html += '</table>'
 
             return html
