@@ -968,9 +968,7 @@ LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES = {
 }
 """
 The address to the `addi` instruction in `Course::getCourseBGM()` where the audio stream for Luigi's
-Mansion (which reuses the audio stream in Bowser's Castle) is selected. When custom battle stages
-are present, reusing that slot's audio stream is not desirable, so it will be changed to use the
-regular audio stream that is used for the other stock battle stages.
+Mansion (which reuses the audio stream in Bowser's Castle) is selected.
 """
 
 LAN_STRUCT_ADDRESSES_AND_OFFSETS = {
@@ -1857,10 +1855,16 @@ def patch_dol_file(
                     project.dol.seek(LAN_MENU_TITLE_INDEX_INSTRUCTION_ADDRESSES[game_id] + 3)
                     project.dol.write(b'\4')
 
-                if battle_stages_enabled:
+                if page_count > 1:
+                    # When custom courses are present, there is no guarantee that the custom courses
+                    # in the Bowser's Castle and Luigi's Mansion slots (which share the same music
+                    # file) would have a similar music theme. To avoid playing an unfit music track
+                    # in the battle stage, the regular battle stage music will be used for the
+                    # Luigi's Mansion slot.
                     project.dol.seek(LUIGIS_MANSION_AUDIO_STREAM_ADDRESSES[game_id] + 3)
                     project.dol.write(b'\x23')
 
+                if battle_stages_enabled:
                     # The four offsets to Pipe Plaza's coordinates array can be seen in a number of
                     # `lfs` instructions near the `li` instruction that defines the orientation.
                     # These instructions need to be tweaked to point to the unused array. The base
