@@ -1539,14 +1539,6 @@ def find_char_offset_in_string(string: str) -> int:
     return len(os.path.splitext(string)[0]) - 1
 
 
-def extended_terrain_types_fail_debug(game_id, bouncy_terrain_type):
-    if game_id == 'GM4E01dbg' and bouncy_terrain_type:
-        raise RuntimeError(
-            f'The patch "Bouncy Terrain Type" is incompatible with the Debug version. Please select a NSTC-U, NTSC-J or PAL .iso.'
-        )
-    return
-
-
 def read_osarena(dol_path, game_id) -> int:
     with open(dol_path, 'rb') as f:
         dol_file = dolreader.DolFile(f)
@@ -1622,7 +1614,11 @@ def patch_dol_file(
 
     log.info('Generating and injecting C code...')
 
-    extended_terrain_types_fail_debug(game_id, bouncy_terrain_type)
+    if bouncy_terrain_type and game_id == 'GM4E01dbg':
+        raise mkdd_extender.MKDDExtenderError(
+            'The **Bouncy Terrain Type** code patch is not currently compatible with the NTSC-U '
+            'Debug build.')
+
     initial_page_index = initial_page_number - 1
     page_count = len(audio_track_data)
     page_course_count = (mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
