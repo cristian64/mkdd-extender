@@ -1092,6 +1092,17 @@ locate in the debugger if a breakpoint is set, or in Ghidra when looking for ref
 This is one of the `bl` instructions that will be hijacked.
 """
 
+SCENETITLE_INIT_VTABLE_INDEX_ADDRESSES = {
+    'GM4E01': 0x8034AB9C,
+    'GM4P01': 0x803549DC,
+    'GM4J01': 0x803651BC,
+    'GM4E01dbg': 0x80394BAC,
+}
+"""
+The address to the vtable index that points to `SceneTitle::init()` symbol. The method will be
+hijacked to reset the course page when the title screen is entered.
+"""
+
 IS_TILTING_COURSE_CALL_ADDRESSES = {
     'GM4E01': 0x80178FAC,
     'GM4P01': 0x80177E50,
@@ -1420,6 +1431,7 @@ SYMBOLS_MAP = {
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
         SceneMapSelect__reset = 0x8017398C;
+        SceneTitle__init = 0x8012D6C8;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801E428C;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
@@ -1439,6 +1451,7 @@ SYMBOLS_MAP = {
         SceneMapSelect__calcAnm = 0x80173974;
         SceneMapSelect__map_init = 0x801730A0;
         SceneMapSelect__reset = 0x80172830;
+        SceneTitle__init = 0x8012D6EC;
         KartChecker__setLapTime = 0x8018570C;
         LANSelectMode__calcAnm = 0x801E4264;
         SequenceInfo__setClrGPCourse = 0x8013FD14;
@@ -1458,6 +1471,7 @@ SYMBOLS_MAP = {
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
         SceneMapSelect__reset = 0x8017398C;
+        SceneTitle__init = 0x8012D6C8;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801E42B4;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
@@ -1477,6 +1491,7 @@ SYMBOLS_MAP = {
         SceneMapSelect__calcAnm = 0x801943D0;
         SceneMapSelect__map_init = 0x80193824;
         SceneMapSelect__reset = 0x80192D44;
+        SceneTitle__init = 0x8013C9A8;
         KartChecker__setLapTime = 0x801AADD0;
         KartChecker__isGoal = 0x801AACD8;
         KartChecker__incLap = 0x801AACE0;
@@ -1748,6 +1763,7 @@ def patch_dol_file(
     # Addresses to symbols that are only known after the first pass.
     extender_cup_cup_filenames_address = None
     extender_cup_preview_filename_address = None
+    scenetitle_init_ex_address = None
 
     for pass_number in range(2):
         # The project is going to be built twice; the size of the new DOL section needs to be known
@@ -1787,6 +1803,8 @@ def patch_dol_file(
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
             ('__USE_ALT_BUTTONS__', str(int(use_alternative_buttons))),
+            ('__RESET_COURSE_PAGE_ON_TITLE_SCREEN__',
+             str(initial_page_index) if args.reset_course_page_on_title_screen else '-1'),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
@@ -1904,6 +1922,10 @@ def patch_dol_file(
                         project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
                     project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
                                        'lanselectmode_calcanm_ex')
+                    if pass_number == 1:
+                        if args.reset_course_page_on_title_screen:
+                            project.dol.seek(SCENETITLE_INIT_VTABLE_INDEX_ADDRESSES[game_id])
+                            doltools.write_uint32(project.dol, scenetitle_init_ex_address)
 
                 if remove_movie_trailer:
                     project.dol.seek(SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES[game_id][0])
@@ -1983,7 +2005,7 @@ def patch_dol_file(
 
                 # Further symbol post-processing once the map is available.
                 if pass_number == 0:
-                    if extender_cup:
+                    if extender_cup or args.reset_course_page_on_title_screen:
                         with open('project.map', 'r', encoding='ascii') as f:
                             for line in f:
                                 if 'g_extender_cup_cup_filenames' in line:
@@ -1992,8 +2014,13 @@ def patch_dol_file(
                                 elif 'g_extender_cup_preview_filenames' in line:
                                     extender_cup_preview_filename_address = int(line.split()[0],
                                                                                 base=16)
+                                elif 'scenetitle_init_ex' in line:
+                                    scenetitle_init_ex_address = int(line.split()[0], base=16)
+                    if extender_cup:
                         assert extender_cup_cup_filenames_address is not None
                         assert extender_cup_preview_filename_address is not None
+                    if args.reset_course_page_on_title_screen:
+                        assert scenetitle_init_ex_address is not None
 
                 # Diagnosis logging only if enabled on the user end.
                 if pass_number == 1 and debug_output:

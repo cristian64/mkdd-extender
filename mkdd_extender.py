@@ -3020,6 +3020,15 @@ OPTIONAL_ARGUMENTS = {
             'page containing the stock courses in the input ISO file.',
         ),
         (
+            'Reset Course Page On Title Screen',
+            bool,
+            'If enabled, the course page will be reset to the initial page number when the title '
+            'screen is entered.\n\n'
+            'This is largely intended to mitigate desyncs in LAN mode: the title screen becomes a '
+            'synchronization point where all consoles switch to the same course page '
+            'automatically.',
+        ),
+        (
             'Use Alternative Buttons',
             bool,
             'By default, `D-pad Up` and `D-pad Down` are used to switch course pages in the game. '
