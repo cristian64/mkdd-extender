@@ -935,14 +935,14 @@ for string in DIR_STRINGS + FILE_STRINGS:
 
 
 def get_string_addresses(game_id: str, battle_stages_enabled: bool):
-    string_adresses = STRING_ADDRESSES[game_id]
+    string_addresses = STRING_ADDRESSES[game_id]
 
     if battle_stages_enabled:
-        return string_adresses
+        return string_addresses
 
     return {
         string: address
-        for string, address in string_adresses.items() if string not in BATTLE_STAGES_FILE_STRINGS
+        for string, address in string_addresses.items() if string not in BATTLE_STAGES_FILE_STRINGS
     }
 
 
@@ -1184,7 +1184,7 @@ instruction will be hijacked to adjust the course index and course page in the E
 end of each race.
 """
 
-ON_GP_ABOUR_TO_START_INSERTION_ADDRESSES = {
+ON_GP_ABOUT_TO_START_INSERTION_ADDRESSES = {
     'GM4E01': 0x8016B27C,
     'GM4P01': 0x8016A120,
     'GM4J01': 0x8016B27C,
@@ -1943,7 +1943,7 @@ def patch_dol_file(
                 if extender_cup:
                     project.dol.seek(GP_TOTAL_COURSE_COUNT_INSTRUCTION_ADDRESSES[game_id])
                     doltools.write_li(project.dol, 24, page_count * 16)
-                    project.branchlink(ON_GP_ABOUR_TO_START_INSERTION_ADDRESSES[game_id],
+                    project.branchlink(ON_GP_ABOUT_TO_START_INSERTION_ADDRESSES[game_id],
                                        'on_gp_about_to_start')
                     project.branchlink(GET_GP_COURSE_INDEX_INSERTION_ADDRESSES[game_id],
                                        'get_gp_course_index')
@@ -2083,8 +2083,8 @@ def patch_dol_file(
 
             # Although the standalone GCKart.bsft file (next to the GCKart.baa file) is not accessed
             # in the game, it will be updated too for correctness.
-            standlone_bsft_filepath = os.path.join(f'{os.path.splitext(baa_filepath)[0]}.bsft')
-            shutil.copy2(bsft_filepath, standlone_bsft_filepath)
+            standalone_bsft_filepath = os.path.join(f'{os.path.splitext(baa_filepath)[0]}.bsft')
+            shutil.copy2(bsft_filepath, standalone_bsft_filepath)
 
             baa.pack_baa(tmp_dir, baa_filepath)
 
