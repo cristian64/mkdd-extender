@@ -41,6 +41,7 @@
 #define USE_ALT_BUTTONS __USE_ALT_BUTTONS__
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
+#define CUSTOMIZABLE_FALLING_STARS __CUSTOMIZABLE_FALLING_STARS__
 #define SECTIONED_COURSES __SECTIONED_COURSES__
 #define BOUNCY_TERRAIN_TYPE __BOUNCY_TERRAIN_TYPE__
 #define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
@@ -328,11 +329,9 @@ void sequenceinfo_setclrgpcourse_ex()
 
 #endif
 
-#if TYPE_SPECIFIC_ITEM_BOXES
-
 struct GeoObject
 {
-    char field_0[232];
+    char unknown[232];
     struct SObject* sobj;
 };
 
@@ -358,15 +357,23 @@ struct SObject
     char proclevel;
     char collisionflag;
     char field_2F;
-    short s16fixedpoint1;
-    short s16fixedpoint2;
+    short field_30;
+    short field_32;
     short field_34;
     short field_36;
-    short s16fixedpoint3;
-    short s16fixedpoint4;
+    short field_38;
+    short field_3A;
     short field_3C;
-    short idk_availability;
+    short field_3E;
 };
+
+struct ItemObj
+{
+    char unknown[288];
+    int kart_index;
+};
+
+#if TYPE_SPECIFIC_ITEM_BOXES
 
 int itemobjmgr_isavailablerollingslot_ex(const unsigned int* const itemobjmgr,
                                          const int player,
@@ -412,6 +419,113 @@ int itemshufflemgr_calcslot_ex(const unsigned int* const itemshufflemgr,
     }
 
     return player_item_type;
+}
+
+#endif
+
+#if CUSTOMIZABLE_FALLING_STARS
+
+void cfs_itemobjmgr_occuritem_ex(const unsigned int* const itemobjmgr,
+                                 int kind,
+                                 void* const p3,
+                                 void* const p4)
+{
+    // In `TMapObjMeteor::showItem()`, it can be seen how the third parameter is `this` with a 4
+    // offset; the pointer to the object can be obtained by subtracting the offset.
+    const struct GeoObject* const obj = p3 - 4;
+    const struct SObject* const sobj = obj->sobj;
+    if (sobj->field_38 != 0)
+    {
+        if (sobj->field_38 == 23)  // Random.
+        {
+            static const char cfs_supported_item_type_ids[] = {
+                0,   // Green Shell
+                1,   // Bowser Shell
+                2,   // Red Shell
+                3,   // Banana
+                4,   // Giant Banana
+                5,   // Mushroom
+                6,   // Star
+                7,   // Chain Chomp
+                8,   // Bob-omb
+                10,  // Lightning
+                11,  // Yoshi / Birdo Egg
+                13,  // Blue Shell
+                15,  // Fake Item Box
+            };
+            // Other item types such as the triple shells or golden mushroom do not work well with
+            // `ItemObjMgr::occurItem()` (no item is dropped) and have not been included in the
+            // list. The heart item, although it gets dropped, nothing happens when collected, so it
+            // has not been included either (to note that in the Debug build an assertion is hit
+            // when collected).
+
+            const unsigned int index =
+                *(unsigned int*)GeographyObj__getGeoRnd() % sizeof(cfs_supported_item_type_ids);
+            kind = (int)cfs_supported_item_type_ids[index];
+        }
+        else
+        {
+            kind = (int)(sobj->field_38 - 1);
+        }
+    }
+
+    ItemObjMgr__occurItem(itemobjmgr, kind, p3, p4);
+}
+
+int cfs_should_drop_item(const struct GeoObject* const obj)
+{
+    const unsigned int value = *(unsigned int*)GeographyObj__getGeoRnd() % 101;
+
+    unsigned int drop_rate;
+
+    const struct SObject* const sobj = obj->sobj;
+    if (sobj->field_3A != 0)
+    {
+        drop_rate = (unsigned int)sobj->field_3A;
+    }
+    else
+    {
+        // In the stock game, 0.3f is used. While we could hardcode it to 30 in this code path, by
+        // reading from the global variable (as seen in `TMapObjMeteor::showItem()`) potential
+        // modifications of the global variable via cheat codes would be respected.
+        register const int r2 asm("r2");
+#if GM4E01_DEBUG_BUILD
+        drop_rate = (unsigned int)(*(float*)(r2 - 0x1EC0) * 100.0f);
+#else
+        drop_rate = (unsigned int)(*(float*)(r2 - 0x3220) * 100.0f);
+#endif
+    }
+
+    return value <= drop_rate;
+}
+
+int cfs_jpeffectmgr_createemt_ex(void* const p1, void* const p2, void* const p3)
+{
+    // In `TMapObjMeteor::showItem()`, and `TMapObjMeteor::initFunc_Crush()` and
+    // `TMapObjMeteor::initFunc_Crush()`, it can be seen how the third parameter is `this` with a 4
+    // offset; the pointer to the object can be obtained by subtracting the offset.
+    const struct GeoObject* const obj = p3 - 4;
+    const struct SObject* const sobj = obj->sobj;
+    if (sobj->field_3C == 1)
+    {
+        return 0x0;
+    }
+
+    return JPEffectMgr__createEmt(p1, p2, p3);
+}
+
+void cfs_kartgame_itemwatchman_ex(void* const p1, const struct ItemObj* const itemobj)
+{
+    if (!itemobj)
+        return;
+
+    // Items initialized by falling stars will not have the kart index set (there is no owner!).
+    // By default, the index is set to -1 in `ItemObj::reset()`; this is an early out to prevent
+    // invalid reads in `KartGame::ItemWatchMan()`.
+    if (itemobj->kart_index == -1)
+        return;
+
+    KartGame__ItemWatchMan(p1, itemobj);
 }
 
 #endif

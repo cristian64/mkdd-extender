@@ -1419,6 +1419,61 @@ hijacked, just in case. It seems the first hijack is enough, but it's better to 
 errant data if it can be helped.
 """
 
+CFS_ITEMOBJMGR_OCCURITEM_CALL_ADDRESSES = {
+    'GM4E01': 0x802889A0,
+    'GM4P01': 0x80288980,
+    'GM4J01': 0x802889C8,
+    'GM4E01dbg': 0x802CAA10,
+}
+"""
+Address to a `bl` instruction in `TMapObjMeteor::showItem()` from where `ItemObjMgr::occurItem()`
+is called. It is hijacked to add support for customizable item types in falling stars.
+"""
+
+CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES = {
+    'GM4E01': 0x80288940,
+    'GM4P01': 0x80288920,
+    'GM4J01': 0x80288968,
+    'GM4E01dbg': 0x802CA9B0,
+}
+"""
+Address to a `bl` instruction in `TMapObjMeteor::showItem()` from where `GeographyObj::getGeoRnd()`
+is called. It is hijacked with a function that returns `true` if the object needs to be dropped
+based on a custom data field (0x3A) in the falling star object. `this` (`r31`) will be put in `r3`
+before the `bl` call.
+
+Note that the instructions between the new `bl` instruction and the preexisting `bne` instruction
+are now redundant and will be turned into no-op. An extra `cmpw` instruction against the `r3`
+register (return value from the new function) will be added immediately above the `bne` instruction
+that determines the jump.
+"""
+
+CFS_JPEFFECTMGR_CREATEEMT_CALLS_ADDRESSES = {
+    'GM4E01': (0x802883DC, 0x8028877C, 0x802889D0),
+    'GM4P01': (0x802883BC, 0x8028875C, 0x802889B0),
+    'GM4J01': (0x80288404, 0x802887A4, 0x802889F8),
+    'GM4E01dbg': (0x802CA424, 0x802CA7EC, 0x802CAA40),
+}
+"""
+Addresses to `bl` instructions in `TMapObjMeteor` from where `JPEffectMgr::createEmt()` is called.
+They are hijacked with a function that checks a custom data field (0x3C) to determine whether
+particles need to be created for the current falling object.
+"""
+
+CFS_KARTGAME_ITEMWATCHMAN_CALLS_ADDRESSES = {
+    'GM4E01': (0x802C39E0, 0x802C40D0, 0x802C8D88, 0x802C9014, 0x802C9860, 0x802C9B84, 0x802C9E58),
+    'GM4P01': (0x802C39A4, 0x802C4094, 0x802C8D4C, 0x802C8FD8, 0x802C9824, 0x802C9B48, 0x802C9E1C),
+    'GM4J01': (0x802C3A08, 0x802C40F8, 0x802C8DB0, 0x802C903C, 0x802C9888, 0x802C9BAC, 0x802C9E80),
+    'GM4E01dbg':
+    (0x80304AD8, 0x80304EC4, 0x80308F04, 0x80309110, 0x8030984C, 0x80309B60, 0x80309E4C),
+}
+"""
+Addresses to `bl` instructions in `KartTumble` and `KartCrash` from where `KartGame::ItemWatchMan()`
+is called. They are hijacked with a function that checks whether the subject item object was dropped
+by a real kart (i.e. it has a kart owner index), or was synthetically generated (e.g. from a falling
+star configured with a custom item type).
+"""
+
 for address in OSARENALO_ADDRESSES.values():
     assert address % 32 == 0
 
@@ -1438,6 +1493,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
         ItemObj__getSpecialKind = 0x8021A024;
+        ItemObjMgr__occurItem = 0x8020929C;
+        GeographyObj__getGeoRnd = 0x801F7E78;
+        JPEffectMgr__createEmt = 0x801FD6B8;
+        KartGame__ItemWatchMan = 0x802AEC2C;
         ObjUtility__getKartZdir = 0x80225864;
         KartStrat__DoSpeedCrl = 0x802a77f4;
         CrsGround__isItemInvalGround = 0x80181524;
@@ -1458,6 +1517,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
         ItemObj__getSpecialKind = 0x8021A008;
+        ItemObjMgr__occurItem = 0x8020926C;
+        GeographyObj__getGeoRnd = 0x801F7E48;
+        JPEffectMgr__createEmt = 0x801FD688;
+        KartGame__ItemWatchMan = 0x802AEBF0;
         ObjUtility__getKartZdir = 0x80225848;
         KartStrat__DoSpeedCrl = 0x802a77d0;
         CrsGround__isItemInvalGround = 0x801803c8;
@@ -1478,6 +1541,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
         ItemObj__getSpecialKind = 0x8021A04C;
+        ItemObjMgr__occurItem = 0x802092C4;
+        GeographyObj__getGeoRnd = 0x801F7EA0;
+        JPEffectMgr__createEmt = 0x801FD6E0;
+        KartGame__ItemWatchMan = 0x802AEC54;
         ObjUtility__getKartZdir = 0x8022588c;
         KartStrat__DoSpeedCrl = 0x802a781c;
         CrsGround__isItemInvalGround = 0x80181524;
@@ -1500,6 +1567,10 @@ SYMBOLS_MAP = {
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
         ItemShuffleMgr__calcSlot = 0x80243508;
         ItemObj__getSpecialKind = 0x802512DC;
+        ItemObjMgr__occurItem = 0x8023E5C4;
+        GeographyObj__getGeoRnd = 0x8022AC14;
+        JPEffectMgr__createEmt = 0x80230544;
+        KartGame__ItemWatchMan = 0x802F09C4;
         ObjUtility__getKartZdir = 0x8025e39c;
         KartStrat__DoSpeedCrl = 0x802ea110;
         CrsGround__isItemInvalGround = 0x801a3204;
@@ -1603,6 +1674,7 @@ def patch_dol_file(
     remove_movie_trailer: bool,
     extender_cup: bool,
     type_specific_item_boxes: bool,
+    customizable_falling_stars: bool,
     sectioned_courses: bool,
     tilting_courses: bool,
     bouncy_terrain_type: bool,
@@ -1803,6 +1875,7 @@ def patch_dol_file(
              str(initial_page_index) if args.reset_course_page_on_title_screen else '-1'),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
+            ('__CUSTOMIZABLE_FALLING_STARS__', str(int(customizable_falling_stars))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
             ('__BOUNCY_TERRAIN_TYPE__', str(int(bouncy_terrain_type))),
             ('__KART_EXTENDED_TERRAIN_FLAG_ADDRESS__',
@@ -1971,6 +2044,32 @@ def patch_dol_file(
                                        'itemobjmgr_isavailablerollingslot_ex')
                     project.branchlink(ITEMSHUFFLEMGR_CALCSLOT_CALL_ADDRESSES[game_id],
                                        'itemshufflemgr_calcslot_ex')
+
+                if customizable_falling_stars:
+                    project.branchlink(CFS_ITEMOBJMGR_OCCURITEM_CALL_ADDRESSES[game_id],
+                                       'cfs_itemobjmgr_occuritem_ex')
+
+                    project.dol.seek(CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] - 4)
+                    doltools.write_nop(project.dol)  # Allow falling stars to drop items in TT mode.
+                    project.dol.seek(CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id])
+                    doltools.write_uint32(project.dol, 0x7FE3FB78)  # or r3, r31, r31
+                    project.branchlink(CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] + 0x04,
+                                       'cfs_should_drop_item')
+                    for i in range(2, 17):
+                        project.dol.seek(CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] +
+                                         0x04 * i)
+                        doltools.write_nop(project.dol)
+                    project.dol.seek(CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] + 0x04 * 17)
+                    doltools.write_uint32(project.dol, 0x2C030001)  # cmpwi r3, 0x1
+
+                    for address in CFS_JPEFFECTMGR_CREATEEMT_CALLS_ADDRESSES[game_id]:
+                        project.branchlink(address, 'cfs_jpeffectmgr_createemt_ex')
+                    if game_id == 'GM4E01dbg':
+                        project.dol.seek(0x802CA42C)
+                        doltools.write_li(project.dol, 0, 1)  # Neutralize assertion.
+
+                    for address in CFS_KARTGAME_ITEMWATCHMAN_CALLS_ADDRESSES[game_id]:
+                        project.branchlink(address, 'cfs_kartgame_itemwatchman_ex')
 
                 if sectioned_courses:
                     project.branchlink(RESET_SECTION_COUNT_CALL_ADDRESSES[game_id],

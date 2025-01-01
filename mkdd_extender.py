@@ -2780,6 +2780,7 @@ def patch_dol_file(
         bool(args.remove_movie_trailer),
         bool(args.extender_cup),
         bool(args.type_specific_item_boxes),
+        bool(args.customizable_falling_stars),
         bool(args.sectioned_courses),
         bool(args.tilting_courses),
         bool(args.bouncy_terrain_type),
@@ -3105,6 +3106,15 @@ OPTIONAL_ARGUMENTS = {
             'specific item type (i.e. players always get the same item type from the item box).',
         ),
         (
+            'Customizable Falling Stars',
+            bool,
+            'If enabled, support for customizable falling stars will be added to the game.'
+            '\n\n'
+            'The patch allows custom courses to include falling star objects that have been '
+            'configured with a custom item type, a custom drop rate, or a custom particles '
+            'visibility.',
+        ),
+        (
             'Sectioned Courses',
             bool,
             'If enabled, support for sectioned courses will be added to the game.'
@@ -3202,6 +3212,7 @@ OPTIONAL_ARGUMENTS = {
 
 OPTIONAL_ARGUMENTS_ENABLED_BY = {
     'Type-specific Item Boxes': ('Code Patching Mode', 'Manual'),
+    'Customizable Falling Stars': ('Code Patching Mode', 'Manual'),
     'Sectioned Courses': ('Code Patching Mode', 'Manual'),
     'Tilting Courses': ('Code Patching Mode', 'Manual'),
     'Bouncy Terrain Type': ('Code Patching Mode', 'Manual'),
