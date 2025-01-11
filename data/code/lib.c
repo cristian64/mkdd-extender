@@ -150,14 +150,39 @@ bool is_tilting_course(const int* const course)
 #define BATTLE_MODE 1
 #define LAN_MODE 2
 
+struct NetGameMgr
+{
+    char unknown[0xC58];
+    char network_console_index;
+    char unknown2[0x12E8 - 0xC59];
+    char network_console_count;
+};
+
 void process_course_page_change(const int mode)
 {
     char next_spam_flag;
     float next_redraw_courseselect_screen;
 
 #if USE_ALT_BUTTONS
-    const char buttons =
-        *(const char*)(mode == LAN_MODE ? ALT_BUTTONS_STATE_ADDRESS : BUTTONS_STATE_ADDRESS);
+    char buttons = *(const char*)(BUTTONS_STATE_ADDRESS);
+    if (mode == LAN_MODE)
+    {
+        // The offset (from r13) to the NetGameMgr instance can be seen in RaceApp::RaceApp(), in
+        // the arguments to the setNetworkMode() call.
+#if GM4E01_DEBUG_BUILD
+        const int offset = 0x5570;
+#elif GM4P01_PAL
+        const int offset = 0x55E8;
+#else
+        const int offset = 0x5608;
+#endif
+        const struct NetGameMgr* const netgamemgr =
+            (const struct NetGameMgr*)(*(int*)(__LAN_STRUCT_ADDRESS__ - offset));
+        if (netgamemgr->network_console_count > 1)
+        {
+            buttons = *(const char*)(ALT_BUTTONS_STATE_ADDRESS);
+        }
+    }
     if (buttons == BUTTON_UP || buttons == BUTTON_DOWN)
 #else
     const unsigned short buttons = *(const unsigned short*)(BUTTONS_STATE_ADDRESS);
