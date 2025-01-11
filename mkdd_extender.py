@@ -39,7 +39,7 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     import audioop  # Deprecated in Python 3.11.
 
-__version__ = '2.2.0'
+__version__ = '2.2.1'
 
 LANGUAGES = ('English', 'French', 'German', 'Italian', 'Japanese', 'Spanish')
 """
