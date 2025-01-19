@@ -3286,6 +3286,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_layout.addWidget(HelpButton(option_help))
 
                 option_widget = None
+                option_widget_label = None
 
                 if option_type is bool:
                     option_widget = QtWidgets.QCheckBox(option_label)
@@ -3371,12 +3372,27 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 option_widget.setEnabled(checked == value))
                             option_widget.setEnabled(enabler_widget.isChecked() == enabled_by_value)
 
+                            if option_widget_label is not None:
+                                enabler_widget.toggled.connect(
+                                    lambda checked, option_widget_label=option_widget_label, value=
+                                    enabled_by_value: option_widget_label.setEnabled(checked ==
+                                                                                     value))
+                                option_widget_label.setEnabled(
+                                    enabler_widget.isChecked() == enabled_by_value)
+
                         if isinstance(enabler_widget, QtWidgets.QComboBox):
                             enabler_widget.currentTextChanged.connect(
                                 lambda text, option_widget=option_widget, value=enabled_by_value:
                                 option_widget.setEnabled(text == value))
                             option_widget.setEnabled(
                                 enabler_widget.currentText() == enabled_by_value)
+
+                            if option_widget_label is not None:
+                                enabler_widget.currentTextChanged.connect(
+                                    lambda text, option_widget_label=option_widget_label, value=
+                                    enabled_by_value: option_widget_label.setEnabled(text == value))
+                                option_widget_label.setEnabled(
+                                    enabler_widget.currentText() == enabled_by_value)
 
             vertical_layouts[int(i >= group_count / 2)].addWidget(group_box)
 
