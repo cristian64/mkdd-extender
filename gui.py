@@ -145,6 +145,10 @@ def human_readable_duration(sample_count: int, sample_rate: int) -> str:
 
 
 def markdown_to_html(title: str, text: str) -> str:
+    default_font_size = QtGui.QFont().pointSize()
+    inline_code_padding = (f'<span style="font-size: {int(default_font_size / 2.5)}px;">'
+                           '&nbsp;</span>')
+
     html = f'<h3>{title}</h3>\n'
     for paragraph in text.split('\n\n'):
         paragraph = paragraph.strip()
@@ -162,8 +166,8 @@ def markdown_to_html(title: str, text: str) -> str:
         paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
                            paragraph)
         paragraph = re.sub(
-            r'`([^`]+)`', r'<code style="background: #1B1B1B; white-space: nowrap;">'
-            r'&nbsp;\1&nbsp;</code>', paragraph)
+            r'`([^`]+)`', '<code style="background: #1B1B1B; white-space: nowrap;">'
+            f'{inline_code_padding}\\1{inline_code_padding}</code>', paragraph)
         html += f'<p>{paragraph}</p>\n'
     return html
 
