@@ -2238,18 +2238,19 @@ def meld_courses(
                                         f'{str(e)}.') from e
 
             # Gather cheat codes for each region.
-            for region, cheat_codes_data_region in cheat_codes_data.items():
-                filepath = os.path.join(track_dirpath, f'cheatcodes_{region}.ini')
-                if not os.path.isfile(filepath):
-                    continue
-                try:
-                    with open(filepath, encoding='utf-8') as f:
-                        cheat_codes = f.read()
-                    cheat_codes_data_region[nodename] = cheat_codes
-                except Exception as e:
-                    raise MKDDExtenderError(
-                        f'Unable to read cheat codes file in "{nodename}" ("{filepath}"): '
-                        f'{str(e)}.') from e
+            if not args.skip_course_cheat_codes:
+                for region, cheat_codes_data_region in cheat_codes_data.items():
+                    filepath = os.path.join(track_dirpath, f'cheatcodes_{region}.ini')
+                    if not os.path.isfile(filepath):
+                        continue
+                    try:
+                        with open(filepath, encoding='utf-8') as f:
+                            cheat_codes = f.read()
+                        cheat_codes_data_region[nodename] = cheat_codes
+                    except Exception as e:
+                        msg = (f'Unable to read cheat codes file in "{nodename}" ("{filepath}"): '
+                               f'{str(e)}.')
+                        raise MKDDExtenderError(msg) from e
 
         raise_if_canceled()
 
