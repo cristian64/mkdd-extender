@@ -145,6 +145,14 @@ def human_readable_duration(sample_count: int, sample_rate: int) -> str:
 
 
 def markdown_to_html(title: str, text: str) -> str:
+    code_blocks = []
+    while text.count('```\n') >= 2:
+        start_offset = text.index('```\n')
+        end_offset = text.index('```\n', start_offset + 4) + 3
+        code_block = text[start_offset + 4:end_offset - 4]
+        text = text[:start_offset] + f'CODE_BLOCK_{len(code_blocks):04}' + text[end_offset:]
+        code_blocks.append(code_block)
+
     default_font_size = QtGui.QFont().pointSize()
     inline_code_padding = (f'<span style="font-size: {int(default_font_size / 2.5)}px;">'
                            '&nbsp;</span>')
@@ -169,6 +177,14 @@ def markdown_to_html(title: str, text: str) -> str:
             r'`([^`]+)`', '<code style="background: #1B1B1B; white-space: nowrap;">'
             f'{inline_code_padding}\\1{inline_code_padding}</code>', paragraph)
         html += f'<p>{paragraph}</p>\n'
+
+    code_block_padding = int(default_font_size / 2.0)
+    open_tag = (f'<table cellpadding="{code_block_padding}" bgcolor="#1B1B1B" width="100%"><tr><td>'
+                f'<pre style="font-size: {int(default_font_size * 0.85)}pt;">')
+    end_tag = '</pre></td></tr></table>'
+    for i, code_block in enumerate(code_blocks):
+        html = html.replace(f'CODE_BLOCK_{i:04}', f'{open_tag}\n{code_block}\n{end_tag}')
+
     return html
 
 
