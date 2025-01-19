@@ -3220,11 +3220,13 @@ established value.
 
 
 def option_label_as_argument_name(option_label: str) -> str:
-    return f'--{option_label.lower().replace(" ", "-")}'
+    option_label = option_label.lower()
+    return f'--{option_label.replace(" ", "-").replace("(", "").replace(")", "")}'
 
 
 def option_label_as_variable_name(option_label: str) -> str:
-    return option_label.lower().replace(' ', '_').replace('-', '_')
+    option_label = option_label.lower()
+    return option_label.replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '')
 
 
 def create_args_parser() -> argparse.ArgumentParser:
