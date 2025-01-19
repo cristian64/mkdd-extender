@@ -2543,6 +2543,7 @@ def parse_cheat_codes(
                 return (f'Unsupported code at line #{line_number}:\n\n    {line}\n\n'
                         f'Address 0x{address:08X} cannot be resolved.')
 
+            size = 0
             if data_size == 0:  # 8-bit write & fill
                 size = 1  # We only support single-byte writes
             elif data_size == 1:  # 16-bit write & fill
@@ -2599,6 +2600,8 @@ def bake_cheat_codes(cheat_codes_filename: str, cheat_codes_by_mod: dict[str, li
 
             assert (code_subtype, code_type) == (0, 0)
             assert data_size in (0, 1, 2, 3)
+
+            payload = bytes()
 
             if data_size == 0:  # 8-bit write & fill
                 # NOTE: Action Replay and Gecko treat the multiplier differently: the former uses
