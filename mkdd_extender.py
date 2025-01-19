@@ -2240,13 +2240,14 @@ def meld_courses(
             # Gather cheat codes for each region.
             if not args.skip_course_cheat_codes:
                 for region, cheat_codes_data_region in cheat_codes_data.items():
+                    filename = f'cheatcodes_{region}.ini'
                     filepath = os.path.join(track_dirpath, f'cheatcodes_{region}.ini')
                     if not os.path.isfile(filepath):
                         continue
                     try:
                         with open(filepath, encoding='utf-8') as f:
                             cheat_codes = f.read()
-                        cheat_codes_data_region[nodename] = cheat_codes
+                        cheat_codes_data_region[(nodename, filename)] = cheat_codes
                     except Exception as e:
                         msg = (f'Unable to read cheat codes file in "{nodename}" ("{filepath}"): '
                                f'{str(e)}.')
@@ -2583,14 +2584,14 @@ def parse_cheat_codes(
     return cheat_codes
 
 
-def bake_cheat_codes(cheat_codes_filename: str, cheat_codes_by_mod: dict[str, list[tuple]],
+def bake_cheat_codes(cheat_codes_by_mod: dict[tuple[str, str], list[tuple]],
                      dol: dolreader.DolFile) -> str:
     conflicts_message = ''
 
     memory_map = {}
     reported = set()
 
-    for mod_name, cheat_codes in cheat_codes_by_mod.items():
+    for (mod_name, cheat_codes_filename), cheat_codes in cheat_codes_by_mod.items():
         for (line_number, line, code_subtype, code_type, data_size, address, value,
              string_payload) in cheat_codes:
 
@@ -2661,13 +2662,9 @@ def bake_cheat_codes(cheat_codes_filename: str, cheat_codes_by_mod: dict[str, li
     return conflicts_message
 
 
-def patch_cheat_codes(args: argparse.Namespace, cheat_codes_data: dict, cheat_codes_region: str,
-                      dol_path: str):
-    cheat_codes_text_by_mod = cheat_codes_data[cheat_codes_region]
+def patch_cheat_codes(args: argparse.Namespace, cheat_codes_text_by_mod: dict, dol_path: str):
     if not cheat_codes_text_by_mod:
         return
-
-    cheat_codes_filename = f'cheatcodes_{cheat_codes_region}.ini'
 
     log.info('Baking cheat codes...')
 
@@ -2676,7 +2673,7 @@ def patch_cheat_codes(args: argparse.Namespace, cheat_codes_data: dict, cheat_co
 
         # Parse cheat codes.
         cheat_codes_by_mod = {}
-        for mod_name, cheat_codes_text in cheat_codes_text_by_mod.items():
+        for (mod_name, cheat_codes_filename), cheat_codes_text in cheat_codes_text_by_mod.items():
             cheat_codes = parse_cheat_codes(cheat_codes_text, dol)
             if isinstance(cheat_codes, str):
                 message = (
@@ -2685,10 +2682,10 @@ def patch_cheat_codes(args: argparse.Namespace, cheat_codes_data: dict, cheat_co
                 e.text = f'{message}.'
                 e.detailed_text = cheat_codes
                 raise e
-            cheat_codes_by_mod[mod_name] = cheat_codes
+            cheat_codes_by_mod[(mod_name, cheat_codes_filename)] = cheat_codes
 
         # Bake cheat codes into DOL file.
-        conflicts_message = bake_cheat_codes(cheat_codes_filename, cheat_codes_by_mod, dol)
+        conflicts_message = bake_cheat_codes(cheat_codes_by_mod, dol)
 
         # Report whether conflicts have been encountered (i.e. two cheat codes that attempt to write
         # different values to the same memory address).
@@ -2758,7 +2755,7 @@ def patch_dol_file(
             cheat_codes_region = 'JP'
         else:
             cheat_codes_region = 'US_DEBUG'
-        patch_cheat_codes(args, cheat_codes_data, cheat_codes_region, dol_path)
+        patch_cheat_codes(args, cheat_codes_data[cheat_codes_region], dol_path)
 
     initial_page_number = max(1, args.initial_page_number or 0)
 
