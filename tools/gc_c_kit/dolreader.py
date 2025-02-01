@@ -1,3 +1,4 @@
+import operator
 import struct
 from io import BytesIO
 
@@ -118,6 +119,89 @@ class DolFile:
 
     def can_write_or_read_in_current_section(self, size: int) -> bool:
         return self._curraddr + size <= self._current_end
+
+    def check_section_and_grow_if_needed(self, gc_addr: int, gc_size: int) -> tuple[bool, str]:
+        assert gc_size > 0
+        gc_end_addr = gc_addr + gc_size
+
+        sections = tuple(self.sections)
+
+        # Check whether the section already exists and can fit the size.
+        for _offset, address, size in sections:
+            end_address = address + size
+            if address <= gc_addr < end_address and address < gc_end_addr <= end_address:
+                return True, ''
+
+        sorted_sections = sorted(sections, key=operator.itemgetter(1))
+
+        # Find the section that precedes the input address; this will be the section that needs to
+        # grow.
+        for section in reversed(sorted_sections):
+            offset, address, size = section
+            if address <= gc_addr:
+                break
+        else:
+            return False, f'Unable to find suitable section for 0x{gc_addr:08X}.'
+
+        # Check how much it needs to grow.
+        end_address = address + size
+        delta = gc_end_addr - end_address
+
+        # Verify that the new section size would not overlap with the next section.
+        if section is not sorted_sections[-1]:
+            next_section = sorted_sections[sorted_sections.index(section) + 1]
+            if end_address + delta > next_section[1]:
+                return (
+                    False,
+                    f'Unable to grow section at 0x{address:08X} to fit {gc_size} bytes at '
+                    f'0x{gc_addr:08X} (overlapping with next section at 0x{next_section[1]:08X}).',
+                )
+
+        # Advance offsets in sections that follow the target section and update section size in the
+        # target section.
+        new_text = []
+        for section in self._text:
+            if section[0] > offset:
+                new_text.append((section[0] + delta, section[1], section[2]))
+            elif section[1] == address:
+                new_text.append((section[0], section[1], section[2] + delta))
+            else:
+                new_text.append(section)
+        self._text.clear()
+        self._text.extend(new_text)
+        new_data = []
+        for section in self._data:
+            if section[0] > offset:
+                new_data.append((section[0] + delta, section[1], section[2]))
+            elif section[1] == address:
+                new_data.append((section[0], section[1], section[2] + delta))
+            else:
+                new_data.append(section)
+        self._data.clear()
+        self._data.extend(new_data)
+
+        # All good to update the DOL header.
+        self._adjust_header()
+
+        # And finally insert zeros at the back of the section.
+        rawdata = bytes(self._rawdata.getbuffer())
+        rawdata = rawdata[:offset + size] + b'\x00' * delta + rawdata[offset + size:]
+        self._rawdata = BytesIO(rawdata)
+
+        # Incapacitate `memset()` in `__init_data()` (same address in all known builds), as
+        # otherwise it is likely that the data that is written to memory outside of the DOL sections
+        # will be zeroed, making this work futile.
+        self.seek(0x800033D8)
+        self.write(struct.pack('>I', 0x60000000))
+        # NOTE: Tests have shown that this should be safe: all the data that the `memset()` calls
+        # would clear, except for one single 32-bit word written by `OSSetErrorHandler()`, is
+        # already null. The word that `OSSetErrorHandler()` writes holds the address to the previous
+        # error handler, which is returned to the caller in r3 (to allow the caller to restore the
+        # previous handler, presumably). However, the next call to `OSSetErrorHandler()` does not
+        # consume the return value (in fact, the value is discarded in absolutely all calls, even in
+        # the debug build), therefore not zeroing the value is not an issue.
+
+        return True, ''
 
     # Unsupported: Reading an entire dol file
     # Assumption: A read should not go beyond the current section
