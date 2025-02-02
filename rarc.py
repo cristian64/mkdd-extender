@@ -107,7 +107,7 @@ def _decompress(data: memoryview) -> memoryview:
                 n += 2
 
             assert 3 <= n <= 0x111
-            assert written_data + n < uncompressed_data_size
+            assert written_data + n <= uncompressed_data_size
 
             overlap = ((written_data <= temp_index < written_data + n)
                        or (temp_index <= written_data < temp_index + n))
