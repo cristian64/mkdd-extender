@@ -1598,6 +1598,106 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         label.show()
 
 
+class CheatCodeSyntaxHighlighter(QtGui.QSyntaxHighlighter):
+
+    def __init__(self, document: QtGui.QTextDocument, cheat_code_color: QtGui.QColor):
+        super().__init__(document)
+
+        self.__base_color = QtGui.QColor(241, 76, 76)
+        self.__cheat_code_color = cheat_code_color
+        self.__comment_color = QtGui.QColor(106, 153, 85)
+        self.__path_color = QtGui.QColor(86, 156, 214)
+
+        rules = (
+            (r'^\s*([a-zA-Z0-9]{8}\s+[a-zA-Z0-9]{8})\s*$', 1, self.__cheat_code_color),
+            (r'^\s*([^a-zA-Z0-9]+.*)', 1, self.__comment_color),
+            (r'^\s*(/+[^/]+/+[^/]+.*)', 1, self.__path_color),  # Unix
+            (r'^\s*([a-zA-Z]:[/\\]+[^/]+.*)', 1, self.__path_color),  # Windows
+        )
+
+        self.__rules = tuple(
+            (re.compile(pattern), group_index, style) for pattern, group_index, style in rules)
+
+    def highlightBlock(self, text):
+        self.setFormat(0, len(text), self.__base_color)
+
+        for pattern, group_index, style in self.__rules:
+            match = pattern.search(text)
+            while match is not None:
+                index = match.start(group_index)
+                length = len(match.group(group_index))
+                self.setFormat(index, length, style)
+                match = pattern.search(text, index + length)
+
+
+class CheatCodesDialog(QtWidgets.QDialog):
+
+    def __init__(
+        self,
+        label: str,
+        text: str,
+        help_text: str,
+        callback: callable,
+        parent: QtWidgets.QWidget = None,
+    ):
+        super().__init__(parent)
+
+        self.setWindowTitle(label)
+        self.setMinimumWidth(self.fontMetrics().averageCharWidth() * 45)
+        self.setMinimumHeight(self.fontMetrics().height() * 30)
+
+        heading_layout = QtWidgets.QHBoxLayout()
+        heading_layout.addWidget(HelpButton(help_text))
+        heading_layout.addWidget(QtWidgets.QLabel(label))
+
+        self.__text_edit = QtWidgets.QTextEdit(text)
+        font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+        font.setPointSizeF(font.pointSizeF() * 0.9)
+        self.__text_edit.setFont(font)
+        self.__text_edit.setAcceptRichText(False)
+        self.__text_edit.setWordWrapMode(QtGui.QTextOption.NoWrap)
+        self.__text_edit.setPlainText(text)
+        self.__text_edit.textChanged.connect(lambda: callback(self.__text_edit.toPlainText()))
+        CheatCodeSyntaxHighlighter(self.__text_edit.document(),
+                                   self.__text_edit.palette().text().color())
+
+        close_button = QtWidgets.QPushButton('Close')
+        close_button.clicked.connect(self.close)
+        buttons_layout = QtWidgets.QHBoxLayout()
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(close_button)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addLayout(heading_layout)
+        layout.addWidget(self.__text_edit)
+        layout.addLayout(buttons_layout)
+
+    def _build_identifier(self) -> int:
+        geometry = self.geometry()
+        return mkdd_extender.stablehash((
+            self.__text_edit.toPlainText(),
+            geometry.x(),
+            geometry.y(),
+            geometry.width(),
+        ))
+
+    def save_state(self) -> tuple[int, int, int, int]:
+        return (
+            self._build_identifier(),
+            self.__text_edit.horizontalScrollBar().value(),
+            self.__text_edit.verticalScrollBar().value(),
+            self.__text_edit.textCursor().position(),
+        )
+
+    def restore_state(self, identifier: int, horizontal_scroll_value: int,
+                      vertical_scroll_value: int, cursor_position: int):
+        if self._build_identifier() != identifier:
+            return
+        self.__text_edit.horizontalScrollBar().setValue(horizontal_scroll_value)
+        self.__text_edit.verticalScrollBar().setValue(vertical_scroll_value)
+        self.__text_edit.textCursor().setPosition(cursor_position)
+
+
 class ProgressDialog:
 
     class _ProgressDialog(QtWidgets.QProgressDialog):
@@ -1985,6 +2085,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._directory_watcher = DelayedDirectoryWatcher()
         self._directory_watcher.changed.connect(self._load_custom_tracks_directory)
+
+        self._cheat_codes_dialog_geometry = None
+        self._cheat_codes_dialog_state = None
 
         self._undo_history = []
         self._redo_history = []
@@ -2420,6 +2523,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('miscellaneous/clear_log_before_each_run',
                                 self._log_table.get_clear_log_before_each_run())
 
+        if self._cheat_codes_dialog_geometry is not None:
+            self._settings.setValue('cheat_codes/geometry', self._cheat_codes_dialog_geometry)
+
     def _restore_settings(self):
         geometry = self._settings.value('window/geometry')
         if geometry:
@@ -2514,6 +2620,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._log_table.set_last_log_path(self._settings.value('miscellaneous/last_log_path', ''))
         self._log_table.set_clear_log_before_each_run(
             self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true')
+
+        self._cheat_codes_dialog_geometry = self._settings.value('cheat_codes/geometry') or None
 
     def _get_shelf_items(self) -> 'tuple[tuple[str, list[tuple[int, int, int, int, str, bool]]]]':
         return tuple(self._settings.value('shelf/items', tuple()))
@@ -3355,6 +3463,44 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         option_widget.currentTextChanged.connect(self._update_options_string)
                         option_layout.addLayout(option_widget_layout)
 
+                    elif option_type == 'cheatcodes':
+                        option_widget_label = QtWidgets.QLabel(
+                            option_label.replace('Cheat Codes', '').strip())
+                        option_widget_label.setToolTip(option_help)
+                        option_widget = QtWidgets.QPushButton("Edit")
+                        option_widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
+                                                    QtWidgets.QSizePolicy.Preferred)
+                        option_widget.setToolTip(option_help)
+                        option_widget_layout = QtWidgets.QHBoxLayout()
+                        option_widget_layout.addWidget(option_widget_label)
+                        option_widget_layout.addWidget(option_widget, 1)
+
+                        def update_cheat_codes(value: str, option_member_name=option_member_name):
+                            setattr(self, option_member_name, value)
+                            self._update_options_string()
+
+                        def on_edit_button_clicked(_checked,
+                                                   option_label=option_label,
+                                                   option_help=option_help,
+                                                   option_member_name=option_member_name,
+                                                   update_cheat_codes=update_cheat_codes):
+                            option_value = getattr(self, option_member_name)
+                            dialog = CheatCodesDialog(option_label, option_value, option_help,
+                                                      update_cheat_codes, self)
+                            if self._cheat_codes_dialog_geometry is not None:
+                                dialog.restoreGeometry(self._cheat_codes_dialog_geometry)
+                            if self._cheat_codes_dialog_state is not None:
+                                QtCore.QTimer.singleShot(
+                                    0,
+                                    lambda: dialog.restore_state(*self._cheat_codes_dialog_state))
+                            dialog.deleteLater()
+                            dialog.exec()
+                            self._cheat_codes_dialog_geometry = dialog.saveGeometry()
+                            self._cheat_codes_dialog_state = dialog.save_state()
+
+                        option_widget.clicked.connect(on_edit_button_clicked)
+                        option_layout.addLayout(option_widget_layout)
+
                 if option_widget is not None:
                     option_widget.setObjectName(option_label)
 
@@ -3435,6 +3581,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         _option_values, default_value = rest
                         if option_value != default_value:
                             options_strings.append(f'{option_as_argument}={option_value}')
+
+                    elif option_type == 'cheatcodes':
+                        if option_value:
+                            truncated_option_value = option_value.strip()
+                            if len(truncated_option_value) > 10:
+                                truncated_option_value = f'{truncated_option_value[:10].strip()}...'
+                            options_strings.append(f'{option_as_argument}={truncated_option_value}')
 
         self._options_edit.setText(' '.join(options_strings))
 

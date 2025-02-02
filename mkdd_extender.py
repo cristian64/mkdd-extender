@@ -14,6 +14,7 @@ import json
 import logging
 import math
 import os
+import pathlib
 import platform
 import re
 import shutil
@@ -408,6 +409,14 @@ def run(command: list, verbose: bool = False, cwd: str = None) -> int:
 
 def md5sum(filepath: str) -> str:
     return hashlib.md5(open(filepath, 'rb').read()).hexdigest()
+
+
+def stablehash(obj: object) -> int:
+    if isinstance(obj, str):
+        obj = hashlib.md5(obj.encode()).digest()
+    if isinstance(obj, collections.abc.Iterable):
+        obj = tuple(map(stablehash, obj))
+    return hash(obj)
 
 
 def build_file_list(dirpath: str) -> 'tuple[str]':
@@ -2746,16 +2755,48 @@ def patch_dol_file(
             if data == DEBUG_BUILD_DATE:
                 game_id += 'dbg'
 
-    if not args.skip_course_cheat_codes:
-        if game_id == 'GM4E01':
-            cheat_codes_region = 'US'
-        elif game_id == 'GM4P01':
-            cheat_codes_region = 'PAL'
-        elif game_id == 'GM4J01':
-            cheat_codes_region = 'JP'
-        else:
-            cheat_codes_region = 'US_DEBUG'
-        patch_cheat_codes(args, cheat_codes_data[cheat_codes_region], dol_path)
+    if game_id == 'GM4E01':
+        cheat_codes_region = 'US'
+        general_cheat_codes_region = 'NTSC-U'
+        general_cheat_codes = args.ntsc_u_cheat_codes
+    elif game_id == 'GM4P01':
+        cheat_codes_region = 'PAL'
+        general_cheat_codes_region = 'PAL'
+        general_cheat_codes = args.pal_cheat_codes
+    elif game_id == 'GM4J01':
+        cheat_codes_region = 'JP'
+        general_cheat_codes_region = 'NTSC-J'
+        general_cheat_codes = args.ntsc_j_cheat_codes
+    else:
+        cheat_codes_region = 'US_DEBUG'
+        general_cheat_codes_region = 'NTSC-J (Debug)'
+        general_cheat_codes = args.ntsc_u_debug_cheat_codes
+
+    # These are the potential cheat codes sourced from each course mod.
+    cheat_codes_text_by_mod = cheat_codes_data[cheat_codes_region]
+
+    # ...and these are the general cheat codes defined at the application level.
+    if args.bake_general_cheat_codes and general_cheat_codes:
+        general_cheat_codes_modname = f'General {general_cheat_codes_region} Cheat Codes'
+        general_cheat_codes_filepath = 'defined in options'
+
+        # If there is a single line, it can potentially be a filepath to a plain-text file.
+        if len(general_cheat_codes.strip().splitlines()) == 1:
+            try:
+                potential_filepath = pathlib.Path(general_cheat_codes.strip())
+                if potential_filepath.is_absolute():
+                    with open(potential_filepath, 'r', encoding='utf-8') as f:
+                        general_cheat_codes = f.read()
+                    general_cheat_codes_filepath = potential_filepath
+            except Exception:
+                pass
+
+        if general_cheat_codes:
+            general_cheat_codes_key = (general_cheat_codes_modname, general_cheat_codes_filepath)
+            cheat_codes_text_by_mod[general_cheat_codes_key] = general_cheat_codes
+
+    if cheat_codes_text_by_mod:
+        patch_cheat_codes(args, cheat_codes_text_by_mod, dol_path)
 
     initial_page_number = max(1, args.initial_page_number or 0)
 
@@ -2964,6 +3005,74 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
             f.write(f'{line}\n')
 
 
+_EXAMPLE_CHEAT_CODES = {
+    'NTSC-U':
+    textwrap.dedent("""
+    $Invisible Karts
+    041908B4 4E800020
+
+    $Red Shells Bounce Off Walls [Ralf]
+    04355C38 80218A90
+    """).strip(),
+    'PAL':
+    textwrap.dedent("""
+    $Invisible Karts
+    0418F744 4E800020
+
+    $Red Shells Bounce Off Walls [Ralf]
+    0435FA78 80218A6C
+    """).strip(),
+    'NTSC-J':
+    textwrap.dedent("""
+    $Invisible Karts
+    041908B4 4E800020
+
+    $Red Shells Bounce Off Walls [Ralf]
+    04370258 80218AB8
+    """).strip(),
+    'NTSC-U (Debug)':
+    textwrap.dedent("""
+    $Invisible Karts
+    041B96A4 4E800020
+
+    $Red Shells Bounce Off Walls [Ralf]
+    043A0058 8024FC38
+    """).strip(),
+}
+
+_CHEAT_CODES_DESCRIPTION_TEMPLATE = """
+This option holds the Action Replay / Gecko cheat codes for the {region} region that will be baked
+into the game.
+
+Unlike other tools, MKDD Extender will not install a cheat code handler, limiting the supported
+cheat code types to a reduced subset. The supported cheat code types are:
+
+- `00______ ________` 8-bit write and fill (only single-byte writes)
+- `02______ ________` 16-bit write and fill
+- `04______ ________` 32-bit write
+- `06______ ________` String write
+
+The encrypted `____-____-_____` form that is commonly used in Action Replay codes is not supported.
+
+Lines that do no start with an alphanumeric character will be ignored (e.g. lines starting with `$`,
+`*`, or `[...]`).
+
+An example with a couple of cheat codes for the {region} region to demonstrate how this option can
+be set:
+
+```
+{examples}
+```
+
+Alternatively, if the value for this option is set to a single line that contains a filepath in the
+file system, the content of the file will be loaded when cheat codes are applied.
+
+**IMPORTANT:** Cheat codes are often developed with the assumption that a code handler will be
+installed in the game. Since MKDD Extender does not install a code handler, it is possible that some
+cheat codes do not function as expected. The only way to verify whether a certain cheat code is
+supported is to test it.
+"""
+
 OPTIONAL_ARGUMENTS = {
     'General Options': (
         (
@@ -3148,6 +3257,68 @@ OPTIONAL_ARGUMENTS = {
             '- [Extended Terrain Types](https://github.com/lance-o/extended_terrain_types)\n',
         ),
     ),
+    'General Cheat Codes': (
+        (
+            'Bake General Cheat Codes',
+            bool,
+            'If enabled, the configured cheat codes (see related options below) will be baked into '
+            'the output ISO file.'
+            '\n\n'
+            'These general cheat codes are supplementary to those that may be present in custom '
+            'courses.'
+            '\n\n'
+            'Cheat codes are developed for specific versions of the game, named after the region '
+            'where the game was originally released:'
+            '\n\n'
+            '- NTSC-U'
+            '\n'
+            '- PAL'
+            '\n'
+            '- NTSC-J'
+            '\n'
+            '- NTSC-U (Debug)'
+            '\n\n'
+            'It is paramount not to mix cheat codes between versions. If the wrong cheat codes '
+            'were specified for a mismatched version, the game will likely behave erratically or '
+            'crash at a random point.'
+            '\n\n'
+            'For convenience, each region has its own dedicated field. This allows the user to '
+            'safely swap the input ISO file with one of a different region without risking a '
+            'catastrophic mismatch.',
+        ),
+        (
+            'NTSC-U Cheat Codes',
+            ('cheatcodes', ),
+            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
+                region='NTSC-U',
+                examples=_EXAMPLE_CHEAT_CODES['NTSC-U'],
+            ),
+        ),
+        (
+            'PAL Cheat Codes',
+            ('cheatcodes', ),
+            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
+                region='PAL',
+                examples=_EXAMPLE_CHEAT_CODES['PAL'],
+            ),
+        ),
+        (
+            'NTSC-J Cheat Codes',
+            ('cheatcodes', ),
+            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
+                region='NTSC-J',
+                examples=_EXAMPLE_CHEAT_CODES['NTSC-J'],
+            ),
+        ),
+        (
+            'NTSC-U (Debug) Cheat Codes',
+            ('cheatcodes', ),
+            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
+                region='NTSC-U (Debug)',
+                examples=_EXAMPLE_CHEAT_CODES['NTSC-U (Debug)'],
+            ),
+        ),
+    ),
     'Expert Options': (
         (
             'Extended Memory',
@@ -3212,6 +3383,10 @@ OPTIONAL_ARGUMENTS_ENABLED_BY = {
     'Sectioned Courses': ('Code Patching Mode', 'Manual'),
     'Tilting Courses': ('Code Patching Mode', 'Manual'),
     'Bouncy Terrain Type': ('Code Patching Mode', 'Manual'),
+    'NTSC-U Cheat Codes': ('Bake General Cheat Codes', True),
+    'PAL Cheat Codes': ('Bake General Cheat Codes', True),
+    'NTSC-J Cheat Codes': ('Bake General Cheat Codes', True),
+    'NTSC-U (Debug) Cheat Codes': ('Bake General Cheat Codes', True),
 }
 """
 List of arguments that are only enabled in the GUI if the named buddy argument is given the
@@ -3282,6 +3457,12 @@ def create_args_parser() -> argparse.ArgumentParser:
                                                 type=type(default_value),
                                                 default=default_value,
                                                 choices=option_values,
+                                                help=option_help)
+
+                elif option_type == 'cheatcodes':
+                    argument_group.add_argument(option_as_argument,
+                                                type=str,
+                                                default='',
                                                 help=option_help)
 
     return parser
