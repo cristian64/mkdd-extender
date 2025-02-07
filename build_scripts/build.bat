@@ -11,23 +11,23 @@ git clone https://github.com/cristian64/mkdd-extender.git --depth=1
 cd mkdd-extender
 
 @REM Install dependencies.
-python3 -m venv venv
+python3.12 -m venv venv
 call venv/Scripts/activate.bat
 set PYTHONNOUSERSITE=1
-python3 -m pip install -r requirements.txt
-python3 -m pip install -r requirements-build-windows.txt
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-build-windows.txt
 
 @REM Create standalone Python application.
 pyinstaller mkdd_extender.spec
 
 @REM Remove unnecessary files and copy license.
 cd dist
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, '_internal', 'data', 'extender_cup', 'model'))"
-python3 -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, '_internal', 'data', 'extender_cup', 'cup_logo.svg'))"
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.copyfile(os.path.join(d, '_internal', 'COPYING'), os.path.join(d, 'COPYING'))"
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.copyfile(os.path.join(d, '_internal', 'README.md'), os.path.join(d, 'README.md'))"
+python -c "import os, shutil; d = os.listdir()[0]; shutil.rmtree(os.path.join(d, '_internal', 'data', 'extender_cup', 'model'))"
+python -c "import os; d = os.listdir()[0]; os.remove(os.path.join(d, '_internal', 'data', 'extender_cup', 'cup_logo.svg'))"
+python -c "import os, shutil; d = os.listdir()[0]; shutil.copyfile(os.path.join(d, '_internal', 'COPYING'), os.path.join(d, 'COPYING'))"
+python -c "import os, shutil; d = os.listdir()[0]; shutil.copyfile(os.path.join(d, '_internal', 'README.md'), os.path.join(d, 'README.md'))"
 
 @REM Create tarball.
-python3 -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'zip', '.', d)"
+python -c "import os, shutil; d = os.listdir()[0]; shutil.make_archive(d, 'zip', '.', d)"
 
 start .

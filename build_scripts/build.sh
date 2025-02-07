@@ -16,11 +16,11 @@ git clone https://github.com/cristian64/mkdd-extender.git --depth=1
 cd mkdd-extender
 
 # Install dependencies.
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 export PYTHONNOUSERSITE=1
-python3 -m pip install -r requirements.txt
-python3 -m pip install -r requirements-build-linux.txt
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-build-linux.txt
 
 # Create standalone Python application.
 pyinstaller mkdd_extender.spec
@@ -35,7 +35,7 @@ cp COPYING README.md ..
 cd -
 
 # Create tarball.
-python3 -c "import shutil; d = '$bundle_name'; shutil.make_archive(d, 'xztar', '.', d)"
+python -c "import shutil; d = '$bundle_name'; shutil.make_archive(d, 'xztar', '.', d)"
 
 # Create AppImage.
 mkdir -p "$bundle_name.AppDir/usr"

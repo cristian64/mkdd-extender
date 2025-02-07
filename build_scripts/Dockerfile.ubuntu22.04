@@ -2,11 +2,15 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
+RUN apt update && apt install software-properties-common -y
+RUN apt update && add-apt-repository ppa:deadsnakes/ppa
 RUN apt update && apt install \
     curl \
     git \
     libxcb-cursor0 \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
     python3-pip \
-    python3-venv \
     ubuntu-gnome-desktop \
     -y
