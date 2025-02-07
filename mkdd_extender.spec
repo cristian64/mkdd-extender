@@ -27,7 +27,10 @@ else:
     raise RuntimeError('Unable to parse product version.')
 
 system = platform.system().lower()
-arch = platform.machine().lower()
+
+ARCH_USER_FRIENDLY_ALIASES = {'AMD64': 'x64', 'x86_64': 'x64'}
+machine = platform.machine()
+arch = ARCH_USER_FRIENDLY_ALIASES.get(machine) or machine.lower()
 
 collection_name = f'mkdd-extender-{version}-{system}-{arch}'
 
