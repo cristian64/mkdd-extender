@@ -15,7 +15,7 @@ python3 -m venv venv
 call venv/Scripts/activate.bat
 set PYTHONNOUSERSITE=1
 python3 -m pip install -r requirements.txt
-python3 -m pip install altgraph==0.17.4 packaging==24.1 pefile==2024.8.26 pyinstaller==6.10.0 pyinstaller-hooks-contrib==2024.8 pywin32-ctypes==0.2.3
+python3 -m pip install -r requirements-build-windows.txt
 
 @REM Create standalone Python application.
 pyinstaller mkdd_extender.spec
