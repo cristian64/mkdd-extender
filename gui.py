@@ -180,7 +180,7 @@ def markdown_to_html(title: str, text: str) -> str:
 
     code_block_padding = int(default_font_size / 2.0)
     open_tag = (f'<table cellpadding="{code_block_padding}" bgcolor="#1B1B1B" width="100%"><tr><td>'
-                f'<pre style="font-size: {int(default_font_size * 0.85)}pt;">')
+                f'<pre style="font-size: {int(default_font_size * 0.9)}pt;">')
     end_tag = '</pre></td></tr></table>'
     for i, code_block in enumerate(code_blocks):
         html = html.replace(f'CODE_BLOCK_{i:04}', f'{open_tag}\n{code_block}\n{end_tag}')
