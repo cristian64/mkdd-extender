@@ -1092,6 +1092,17 @@ locate in the debugger if a breakpoint is set, or in Ghidra when looking for ref
 This is one of the `bl` instructions that will be hijacked.
 """
 
+LANPLAYINFO_INIT_CALL_ADDRESSES = {
+    'GM4E01': 0x801731D8,
+    'GM4P01': 0x8017207C,
+    'GM4J01': 0x801731D8,
+    'GM4E01dbg': 0x80192590,
+}
+"""
+The address to the one place from where `LANPlayInfo::init()` is called. The function will be
+hijacked to reset the course page when the LAN session is initialized.
+"""
+
 SCENETITLE_INIT_VTABLE_INDEX_ADDRESSES = {
     'GM4E01': 0x8034AB9C,
     'GM4P01': 0x803549DC,
@@ -1489,6 +1500,7 @@ SYMBOLS_MAP = {
         SceneTitle__init = 0x8012D6C8;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801E428C;
+        LANPlayInfo__init = 0x801E66E4;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
@@ -1513,6 +1525,7 @@ SYMBOLS_MAP = {
         SceneTitle__init = 0x8012D6EC;
         KartChecker__setLapTime = 0x8018570C;
         LANSelectMode__calcAnm = 0x801E4264;
+        LANPlayInfo__init = 0x801E66B4;
         SequenceInfo__setClrGPCourse = 0x8013FD14;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
@@ -1537,6 +1550,7 @@ SYMBOLS_MAP = {
         SceneTitle__init = 0x8012D6C8;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801E42B4;
+        LANPlayInfo__init = 0x801E670C;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
@@ -1563,6 +1577,7 @@ SYMBOLS_MAP = {
         KartChecker__isGoal = 0x801AACD8;
         KartChecker__incLap = 0x801AACE0;
         LANSelectMode__calcAnm = 0x80216028;
+        LANPlayInfo__init = 0x80218580;
         SequenceInfo__setClrGPCourse = 0x801517D0;
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
         ItemShuffleMgr__calcSlot = 0x80243508;
@@ -1871,6 +1886,8 @@ def patch_dol_file(
              f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}'),
             ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
             ('__USE_ALT_BUTTONS__', str(int(use_alternative_buttons))),
+            ('__RESET_COURSE_PAGE_ON_LAN_INITIALIZATION__',
+             str(initial_page_index) if args.reset_course_page_on_lan_initialization else '-1'),
             ('__RESET_COURSE_PAGE_ON_TITLE_SCREEN__',
              str(initial_page_index) if args.reset_course_page_on_title_screen else '-1'),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
@@ -1991,6 +2008,9 @@ def patch_dol_file(
                         project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
                     project.branchlink(LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
                                        'lanselectmode_calcanm_ex')
+                    if args.reset_course_page_on_lan_initialization:
+                        project.branchlink(LANPLAYINFO_INIT_CALL_ADDRESSES[game_id],
+                                           'lanplayinfo_init_ex')
                     if pass_number == 1:
                         if args.reset_course_page_on_title_screen:
                             project.dol.seek(SCENETITLE_INIT_VTABLE_INDEX_ADDRESSES[game_id])

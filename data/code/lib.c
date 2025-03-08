@@ -19,6 +19,7 @@
 #define COURSE_TO_STREAM_FILE_INDEX_ADDRESS __COURSE_TO_STREAM_FILE_INDEX_ADDRESS__
 #define CURRENT_PAGE_ADDRESS __CURRENT_PAGE_ADDRESS__
 #define EXTENDER_CUP __EXTENDER_CUP__
+#define RESET_COURSE_PAGE_ON_LAN_INITIALIZATION __RESET_COURSE_PAGE_ON_LAN_INITIALIZATION__
 #define RESET_COURSE_PAGE_ON_TITLE_SCREEN __RESET_COURSE_PAGE_ON_TITLE_SCREEN__
 #define GAMEAUDIO_MAIN_ADDRESS __GAMEAUDIO_MAIN_ADDRESS__
 #define GM4E01_DEBUG_BUILD __GM4E01_DEBUG_BUILD__
@@ -49,7 +50,7 @@
 
 #if PAGE_COUNT > 1
 
-#if RESET_COURSE_PAGE_ON_TITLE_SCREEN >= 0
+#if RESET_COURSE_PAGE_ON_TITLE_SCREEN >= 0 || RESET_COURSE_PAGE_ON_LAN_INITIALIZATION >= 0
 void set_course_page(int page);
 #endif
 
@@ -58,7 +59,7 @@ void change_course_page(const int delta)
     const int previous_page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
     const int page = (previous_page + delta + PAGE_COUNT) % PAGE_COUNT;
 
-#if RESET_COURSE_PAGE_ON_TITLE_SCREEN >= 0
+#if RESET_COURSE_PAGE_ON_TITLE_SCREEN >= 0 || RESET_COURSE_PAGE_ON_LAN_INITIALIZATION >= 0
     set_course_page(page);
 }
 
@@ -259,6 +260,14 @@ void scenetitle_init_ex()
 {
     SceneTitle__init();
     set_course_page(RESET_COURSE_PAGE_ON_TITLE_SCREEN);
+}
+#endif
+
+#if RESET_COURSE_PAGE_ON_LAN_INITIALIZATION >= 0
+void lanplayinfo_init_ex()
+{
+    LANPlayInfo__init();
+    set_course_page(RESET_COURSE_PAGE_ON_LAN_INITIALIZATION);
 }
 #endif
 

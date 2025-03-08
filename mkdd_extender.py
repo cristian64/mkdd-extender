@@ -3135,6 +3135,15 @@ OPTIONAL_ARGUMENTS = {
             'automatically.',
         ),
         (
+            'Reset Course Page On LAN Initialization',
+            bool,
+            'If enabled, the course page will be reset to the initial page number when a LAN '
+            'session is about to start.\n\n'
+            'This is largely intended to mitigate desyncs in LAN mode: the connection '
+            'initialization becomes a synchronization point where all consoles switch to the same '
+            'course page automatically.',
+        ),
+        (
             'Use Alternative Buttons',
             bool,
             'By default, `D-pad Up` and `D-pad Down` are used to switch course pages in the game. '
