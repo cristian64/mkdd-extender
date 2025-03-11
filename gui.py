@@ -1562,7 +1562,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                     minimap_filepath = None
                     for rootpath, _dirnames, filenames in os.walk(tmp_dir):
                         for filename in filenames:
-                            if filename.endswith('_map.bti'):
+                            if filename.endswith('_map.bti') and filename.count('_') == 1:
                                 minimap_filepath = os.path.join(rootpath, filename)
                                 break
                         if minimap_filepath is not None:
