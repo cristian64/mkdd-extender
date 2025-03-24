@@ -287,7 +287,11 @@ def extract(src_filepath: str, dst_dirpath: str):
                 assert entry_data_offset % __ALIGNMENT == 0
                 assert entry_data_offset + entry_data_size <= entry_data_section_size
             else:
-                assert entry_index == 0xFFFF
+                # NOTE: Yet another case where some tool in the wild generates RARC archives with
+                # the entry index for directory nodes set to 0x0000 instead of 0xFFFF.
+                if entry_index != 0xFFFF:
+                    log.warning(f'Entry index in header is 0x{entry_index:04X}, but 0xFFFF was '
+                                'expected for a directory node.')
                 assert entry_data_size == __NODE_SIZE
 
         name = get_string(string_offset)
