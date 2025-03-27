@@ -3203,6 +3203,12 @@ OPTIONAL_ARGUMENTS = {
             'If enabled, the All-Cup Tour will be replaced with the Extender Cup, which features '
             'all the courses included in all the configured course pages.',
         ),
+        (
+            'LAN Choose Character and Kart',
+            bool,
+            'If enabled, the LAN Choose Character & Kart code patch will be added to the game, '
+            'allowing character and kart selection in LAN mode.',
+        ),
         ('---', None, None),
         (
             'Code Patching Mode',

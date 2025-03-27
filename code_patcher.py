@@ -21,6 +21,7 @@ import baa
 from tools.gc_c_kit import devkit_tools
 from tools.gc_c_kit import dolreader
 from tools.gc_c_kit import doltools
+from tools.lan_choose_character_kart import lan_choose_character_kart
 
 script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
@@ -30,13 +31,17 @@ tools_dir = os.path.join(script_dir, 'tools')
 
 # Set up the GC-C-Kit module with the paths to the compiler.
 if (not devkit_tools.GCCPATH and not devkit_tools.LDPATH and not devkit_tools.OBJDUMPPATH
-        and not devkit_tools.OBJCOPYPATH):
+        and not devkit_tools.OBJCOPYPATH and not devkit_tools.ASPATH):
     devkitppc_dir = os.path.join(tools_dir, 'devkitPPC', platform.system().lower(), 'bin')
     exe_extension = '.exe' if platform.system() == 'Windows' else ''
     devkit_tools.GCCPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-gcc{exe_extension}')
     devkit_tools.LDPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-ld{exe_extension}')
     devkit_tools.OBJDUMPPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-objdump{exe_extension}')
     devkit_tools.OBJCOPYPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-objcopy{exe_extension}')
+
+    powerpc_eabi_dir = os.path.join(tools_dir, 'devkitPPC',
+                                    platform.system().lower(), 'powerpc-eabi', 'bin')
+    devkit_tools.ASPATH = os.path.join(powerpc_eabi_dir, f'as{exe_extension}')
 
 BUTTONS_STATE_ADDRESSES = {
     'GM4E01': 0x803A4D6C,
@@ -1705,6 +1710,16 @@ def patch_dol_file(
         raise mkdd_extender.MKDDExtenderError(
             'The **Bouncy Terrain Type** code patch is not currently compatible with the NTSC-U '
             'Debug build.')
+
+    if args.lan_choose_character_and_kart:
+        with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as temp_dir:
+            asm_dir = os.path.join(tools_dir, 'lan_choose_character_kart', 'asm')
+            data_file = lan_choose_character_kart.make_data_file(game_id, temp_dir, asm_dir)
+
+            with open(os.path.join(iso_tmp_dir, 'files', 'DATA'), 'wb') as f:
+                f.write(data_file)
+
+            lan_choose_character_kart.patch_maindol(game_id, dol_path, temp_dir, asm_dir)
 
     initial_page_index = initial_page_number - 1
     page_count = len(audio_track_data)
