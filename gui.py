@@ -157,7 +157,7 @@ def markdown_to_html(title: str, text: str) -> str:
     inline_code_padding = (f'<span style="font-size: {int(default_font_size / 2.5)}px;">'
                            '&nbsp;</span>')
 
-    html = f'<h3>{title}</h3>\n'
+    html = f'<h3 style="white-space: nowrap;">{title}</h3>\n'
     for paragraph in text.split('\n\n'):
         paragraph = paragraph.strip()
         paragraph = re.sub(r'\[(.+)\]\((.+)\)', r'<a href="\2">\1</a>', paragraph)
