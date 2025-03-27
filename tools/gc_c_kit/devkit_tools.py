@@ -10,6 +10,7 @@ GCCPATH = os.environ.get("GCCKIT_GCCPATH")
 LDPATH = os.environ.get("GCCKIT_LDPATH")
 OBJDUMPPATH = os.environ.get("GCCKIT_OBJDUMPPATH")
 OBJCOPYPATH = os.environ.get("GCCKIT_OBJCOPYPATH")
+ASPATH = os.environ.get("GCCKIT_ASPATH")
 
 
 def run(args):

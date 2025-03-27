@@ -58,6 +58,7 @@ datas.append((f'tools/devkitPPC/{platform.system().lower()}',
               f'tools/devkitPPC/{platform.system().lower()}'))
 datas.append(('tools/devkitPPC/buildscripts-devkitPPC_r41.tar.gz', 'tools/devkitPPC/'))
 datas.append(('tools/devkitPPC/README.txt', 'tools/devkitPPC/'))
+datas.append(('tools/lan_choose_character_kart/asm', 'tools/lan_choose_character_kart/asm'))
 
 block_cipher = None
 
