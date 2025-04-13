@@ -669,6 +669,9 @@ class DropWidget(QtWidgets.QWidget):
         if id(event.source()) in self._source_ids:
             event.accept()
 
+            if self._overlay_widget is not None:
+                self._overlay_widget.deleteLater()
+
             self._overlay_widget = QtWidgets.QWidget(self)
             self._overlay_widget.setAutoFillBackground(True)
             palette = self._overlay_widget.palette()
@@ -688,14 +691,16 @@ class DropWidget(QtWidgets.QWidget):
     def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent):
         _ = event
 
-        self._overlay_widget.deleteLater()
-        self._overlay_widget = None
+        if self._overlay_widget is not None:
+            self._overlay_widget.deleteLater()
+            self._overlay_widget = None
 
     def dropEvent(self, event: QtGui.QDropEvent):
         event.accept()
 
-        self._overlay_widget.deleteLater()
-        self._overlay_widget = None
+        if self._overlay_widget is not None:
+            self._overlay_widget.deleteLater()
+            self._overlay_widget = None
 
 
 class DragTableWidget(QtWidgets.QTableWidget):
