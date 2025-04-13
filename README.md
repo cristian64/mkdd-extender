@@ -19,6 +19,11 @@ Screenshot of the graphical user interface:
 
 Further details on how the tool is used can be found under the **Help > Instructions** menu.
 
+> **NOTE:** Like other tools in the community (e.g. Dolphin Emulator), MKDD Extender has a portable
+mode that can be enabled by creating an empty `portable.txt` file in the same directory that
+contains the MKDD Extender executable. When portable mode is enabled, the application configuration
+file will be saved next to the executable, instead of in the global user directory.
+
 > **NOTE:** The tool can be used also in command-line mode. Run with `--help` to print a list of the
 available arguments. On Windows, use `mkdd-extender-cli.exe` to launch the application in
 command-line mode.

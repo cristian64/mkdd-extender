@@ -46,6 +46,11 @@ data_dir = os.path.join(script_dir, 'data')
 gui_dir = os.path.join(data_dir, 'gui')
 placeholder_race_track_dir = os.path.join(data_dir, 'courses', 'dstestcircle')
 placeholder_battle_stage_dir = os.path.join(data_dir, 'courses', 'dstestcircle_battlestage')
+executable_path = (os.getenv('APPIMAGE')
+                   or (sys.executable if mkdd_extender.frozen else mkdd_extender.script_path))
+executable_dir = os.path.dirname(executable_path)
+portable_path = os.path.join(executable_dir, 'portable.txt')
+is_portable = os.path.isfile(portable_path)
 
 
 def set_dark_theme(app: QtWidgets.QApplication):
@@ -2067,9 +2072,18 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 setattr(self, option_member_name, None)
 
-        organization = application = 'mkdd-extender'
-        self._settings = QtCore.QSettings(QtCore.QSettings.IniFormat, QtCore.QSettings.UserScope,
-                                          organization, application)
+        ORGANIZATION = APPLICATION = 'mkdd-extender'
+
+        if is_portable:
+            config_path = os.path.join(executable_dir, f'{APPLICATION}.ini')
+            self._settings = QtCore.QSettings(config_path, QtCore.QSettings.IniFormat)
+        else:
+            self._settings = QtCore.QSettings(
+                QtCore.QSettings.IniFormat,
+                QtCore.QSettings.UserScope,
+                ORGANIZATION,
+                APPLICATION,
+            )
 
         self.resize(1100, 700)
         self.setWindowTitle(f'MKDD Extender {mkdd_extender.__version__}')
