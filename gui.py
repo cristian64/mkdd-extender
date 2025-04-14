@@ -4357,10 +4357,33 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         items = self._get_shelf_items()
 
+        screen_geometry = shelf_menu.screen().availableGeometry()
+        available_width = screen_geometry.width() * 0.80
+        available_height = screen_geometry.height() * 0.80
+
         for i, (name, course_names) in enumerate(items):
             shelf_item_widget = QtWidgets.QWidget()
             shelf_item_layout = QtWidgets.QVBoxLayout(shelf_item_widget)
-            shelf_item_layout.addWidget(QtWidgets.QLabel(generate_html(course_names)))
+
+            html = generate_html(course_names)
+
+            text_document = QtGui.QTextDocument()
+            text_document.setHtml(html)
+            text_document_width = text_document.size().width()
+            text_document_height = text_document.size().height()
+
+            if text_document_width > available_width or text_document_height > available_height:
+                text_edit = QtWidgets.QTextEdit()
+                text_edit.setReadOnly(True)
+                text_edit.setFrameStyle(QtWidgets.QFrame.NoFrame)
+                text_edit.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
+                text_edit.setFixedWidth(int(min(text_document_width, available_width) * 1.05))
+                text_edit.setFixedHeight(int(min(text_document_height, available_height) * 1.05))
+                text_document.setDocumentMargin(0.0)
+                text_edit.setDocument(text_document)
+                shelf_item_layout.addWidget(text_edit)
+            else:
+                shelf_item_layout.addWidget(QtWidgets.QLabel(html))
 
             delete_button = QtWidgets.QPushButton('Delete')
             delete_button.clicked.connect(lambda _checked=False, i=i: self._delete_shelf_item(i))
