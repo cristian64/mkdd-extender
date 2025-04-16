@@ -4365,6 +4365,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             shelf_item_widget = QtWidgets.QWidget()
             shelf_item_layout = QtWidgets.QVBoxLayout(shelf_item_widget)
 
+            load_button = QtWidgets.QPushButton('Load')
+            load_button.clicked.connect(lambda _checked=False, i=i: self._load_shelf_item(i))
+            load_button.clicked.connect(shelf_menu.close)
+            delete_button = QtWidgets.QPushButton('Delete')
+            delete_button.clicked.connect(lambda _checked=False, i=i: self._delete_shelf_item(i))
+            buttons_layout = QtWidgets.QHBoxLayout()
+            buttons_layout.addWidget(load_button)
+            buttons_layout.addWidget(delete_button)
+            buttons_layout.addStretch()
+            shelf_item_layout.addLayout(buttons_layout)
+
             html = generate_html(course_names)
 
             text_document = QtGui.QTextDocument()
@@ -4384,18 +4395,6 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 shelf_item_layout.addWidget(text_edit)
             else:
                 shelf_item_layout.addWidget(QtWidgets.QLabel(html))
-
-            delete_button = QtWidgets.QPushButton('Delete')
-            delete_button.clicked.connect(lambda _checked=False, i=i: self._delete_shelf_item(i))
-            load_button = QtWidgets.QPushButton('Load')
-            load_button.clicked.connect(lambda _checked=False, i=i: self._load_shelf_item(i))
-            load_button.clicked.connect(shelf_menu.close)
-            buttons_layout = QtWidgets.QHBoxLayout()
-            buttons_layout.addStretch()
-            buttons_layout.addWidget(delete_button)
-            buttons_layout.addWidget(load_button)
-
-            shelf_item_layout.addLayout(buttons_layout)
 
             shelf_item_menu = shelf_menu.addMenu(name)
             shelf_item_widget_action = QtWidgets.QWidgetAction(shelf_item_menu)
