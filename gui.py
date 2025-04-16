@@ -4399,6 +4399,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             shelf_item_menu = shelf_menu.addMenu(name)
             shelf_item_widget_action = QtWidgets.QWidgetAction(shelf_item_menu)
             shelf_item_widget_action.setDefaultWidget(shelf_item_widget)
+            shelf_item_widget_action.triggered.connect(load_button.clicked)
             shelf_item_menu.addAction(shelf_item_widget_action)
 
         if items:
