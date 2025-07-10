@@ -4428,6 +4428,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             if input_path == output_path:
                 raise mkdd_extender.MKDDExtenderError('Input and output paths cannot be identical.')
 
+            _stem, ext = os.path.splitext(output_path)
+            if ext not in ('.iso', '.gcm'):
+                raise mkdd_extender.MKDDExtenderError(
+                    'File extension in output path should be either `.iso` or `.gcm`.')
+
             args = argparse.Namespace()
             args.input = input_path
             args.output = output_path
