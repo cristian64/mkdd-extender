@@ -3,6 +3,7 @@
 PyInstaller specification file for generating the bundles for the MKDD Extender.
 """
 
+import datetime
 import platform
 import re
 
@@ -33,6 +34,14 @@ machine = platform.machine()
 arch = ARCH_USER_FRIENDLY_ALIASES.get(machine) or machine.lower()
 
 collection_name = f'mkdd-extender-{version}-{system}-{arch}'
+
+# Insert build date.
+with open('gui.py', 'r', encoding='utf-8') as f:
+    data = f.read()
+build_date = datetime.datetime.now().strftime('%Y-%m-%d')
+data = data.replace("build_date = ''", f"build_date = '{build_date}'")
+with open('gui.py', 'w', encoding='utf-8') as f:
+    f.write(data)
 
 # Data files that will be copied verbatim.
 datas = [

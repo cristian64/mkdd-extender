@@ -2798,6 +2798,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         show_long_message('info', 'Instructions', text, self)
 
     def _open_about_dialog(self):
+        build_date = ''  # To be replaced at build time.
+        if not build_date:
+            # If not provided (normally when running from source code), current date is used.
+            build_date = datetime.datetime.now().strftime('%Y-%m-%d')
+
         forward_slashes_script_dir = '/'.join(script_dir.split('\\'))
         if not forward_slashes_script_dir.startswith('/'):
             forward_slashes_script_dir = f'/{forward_slashes_script_dir}'
@@ -2807,6 +2812,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         text = textwrap.dedent(f"""\
             <h1 style="white-space: nowrap">MKDD Extender {mkdd_extender.__version__}</h1>
+            <small>{build_date}</small>
+            <br/>
+            <br/>
             <br/>
             <small><a href="https://github.com/cristian64/mkdd-extender">
                 github.com/cristian64/mkdd-extender
