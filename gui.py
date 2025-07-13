@@ -2084,6 +2084,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 ORGANIZATION,
                 APPLICATION,
             )
+        first_run = not os.path.exists(self._settings.fileName())
 
         self.resize(1100, 700)
         self.setWindowTitle(f'MKDD Extender {mkdd_extender.__version__}')
@@ -2472,6 +2473,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._pending_undo_actions = 1
         QtCore.QTimer.singleShot(0, self._process_undo_action)
 
+        if first_run:
+            QtCore.QTimer.singleShot(500,
+                                     lambda: self._save_settings() or self._open_first_run_dialog())
+
     def closeEvent(self, event: QtGui.QCloseEvent):
         self._save_settings()
 
@@ -2735,6 +2740,42 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             self._pending_undo_actions += 1
             self._process_undo_action()
+
+    def _open_first_run_dialog(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle('Hello!')
+        dialog.deleteLater()
+
+        message = (
+            '🌱 This is the first time that MKDD Extender is launched. Would you like to see the '
+            '<b>Instructions</b> dialog?')
+        post_message = (
+            '<small><small>(The dialog can always be accessed via the <b>Help > Instructions</b> '
+            'menu action.)</small></small>')
+
+        no_button = QtWidgets.QPushButton('No')
+        no_button.setAutoDefault(False)
+        no_button.clicked.connect(dialog.close)
+
+        show_button = QtWidgets.QPushButton('Show Instructions')
+        show_button.setAutoDefault(True)
+        show_button.clicked.connect(dialog.close)
+        show_button.clicked.connect(self._open_instructions_dialog)
+
+        buttons_layout = QtWidgets.QHBoxLayout()
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(no_button)
+        buttons_layout.addWidget(show_button)
+        buttons_layout.addStretch()
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.addWidget(QtWidgets.QLabel(message))
+        layout.addSpacing(dialog.fontMetrics().height() * 2)
+        layout.addLayout(buttons_layout)
+        layout.addSpacing(dialog.fontMetrics().height() * 3)
+        layout.addWidget(QtWidgets.QLabel(post_message))
+
+        dialog.exec_()
 
     def _open_instructions_dialog(self):
         text = textwrap.dedent(f"""\
