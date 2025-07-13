@@ -15,7 +15,7 @@ the left-hand side pane onto each of the empty slots in the main area.
 
 Screenshot of the graphical user interface:
 
-![MKDD Extender](https://user-images.githubusercontent.com/1853278/178599784-8b3c92c4-46bc-4794-9742-1ef4ae35455b.png)
+![MKDD Extender](https://github.com/user-attachments/assets/708256c1-4cc8-4a3e-a91f-ef5baab6c6f1)
 
 Further details on how the tool is used can be found under the **Help > Instructions** menu.
 
