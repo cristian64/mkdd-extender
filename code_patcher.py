@@ -1332,13 +1332,15 @@ executed.
 """
 
 KART_EXTENDED_TERRAIN_FLAG_ADDRESSES = {
-    'GM4E01': 0x802ed672,
-    'GM4P01': 0x802f9d06,
-    'GM4J01': 0x8030a786,
-    'GM4E01dbg': 0x8032b1d2,
+    'GM4E01': 0x802EDFC8,
+    'GM4P01': 0x80308588,
+    'GM4J01': 0x80319008,
+    'GM4E01dbg': 0x8032BB28,
 }
 """
 Padding used to store a Char that functions as a flag for every Kart in the race.
+
+This is the address to the "This is padding to SCRNblo2" string.
 """
 
 KART_BOUNCE_DEFAULT_READ_ADDRESSES = {
