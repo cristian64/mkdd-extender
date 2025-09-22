@@ -59,8 +59,12 @@ def make_data_file(region: str, temp_dir: tempfile.TemporaryDirectory, asm_dir: 
         curasmfile="patchlogoapp_part2.s",
         blockstartname="NewCalcCodeBlockStart",
         startoffset=symbols.symbols[region]["OsakoM____sinit_ResMgr_cpp"],
-        addressestoresolve=("NetGateAppAfterCt", "NewDrawCodeBlockStart",
-                            "SetRandSeedAfterLanEntryCt"),
+        addressestoresolve=(
+            "NetGateAppAfterCt",
+            "NewDrawCodeBlockStart",
+            "LANEntrySkipEntryCheck",
+            "LANPlayInfoConditionallyResetConsoleKartEntryArray",
+        ),
         funcaddressestoresolve=("LANEntryCalcPrintMenu", "ResolveConsoleAndControllerIDs",
                                 "PrepareKartInfo", "CheckIfAllKartsHaveFinished"),
         tablerowdata=[]),
@@ -206,13 +210,16 @@ def patch_maindol(region: str, dol_path: str, temp_dir: tempfile.TemporaryDirect
         ("LANEntry__calc_LANEntry__setRaceInfo_call", patchcmd_asmfile,
          "lanentrycalc_setraceinfo.s"),
         ("LANEntry_alloc_size", patchcmd_asm,
-         "li r3, 0x33a"),  # Adjust alloc size to account for new fields used by character/kart menu
+         "li r3, 0x33c"),  # Adjust alloc size to account for new fields used by character/kart menu
         ("LANEntry__draw_LANEntry_blo_draw", patchcmd_bl, "LANEntryDrawBeforeSecondDrawResolved"),
         ("LANEntry__calcAnm_lwz_JUTFader_vtable", patchcmd_asmfile, "lanentrycalcanm_timerup.s"),
         ("NetGateApp__NetGateApp_blr", patchcmd_b, "NetGateAppAfterCtResolved"),
-        ("NetGateApp_alloc_size", patchcmd_asm,
-         "li r3, 0x34+0x4"),  # Adjust alloc size to account for pointer to arrow texture
-        ("LANEntry__LANEntry_epilogue", patchcmd_bl, "SetRandSeedAfterLanEntryCtResolved"),
+        ("NetGateApp_alloc_size", patchcmd_asm, "li r3, 0x34+0x8"
+         ),  # Adjust alloc size to account for pointer to arrow and B button textures
+        ("LANEntry__start_blr", patchcmd_b, "LANEntrySkipEntryCheckResolved"),
+        ("NetGameMgr_alloc_size", patchcmd_asm, "li r3, 0x1310"),
+        ("LANPlayInfo__saveInfo_consoleKartCount_stbx", patchcmd_b,
+         "LANPlayInfoConditionallyResetConsoleKartEntryArrayResolved"),
     )
 
     with open(dol_path, 'rb') as dol:
@@ -244,7 +251,7 @@ def patchcmd_asm(_adr: int, instructions: str | tuple[str], _region: str,
         asmfileobj_path
     ])
 
-    devkit_tools.objcopy(asmfileobj_path, '-O', 'binary', '-g', '-S')
+    run_subprocess([devkit_tools.OBJCOPYPATH, asmfileobj_path, '-O', 'binary', '-g', '-S'])
     with open(asmfileobj_path, 'rb') as asmbin:
         return asmbin.read()
 

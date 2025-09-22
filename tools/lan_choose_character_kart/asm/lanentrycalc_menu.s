@@ -18,13 +18,29 @@
     lwz r3, progress(r31)
     cmpwi r3, MENUPROGRESS_INIT
     beq DoInit
+    cmpwi r3, MENUPROGRESS_INITNOSOUND
+    beq DoInitWithoutSound
 
+    cmpwi r3, MENUPROGRESS_WAITFORFADE
+    bne NotWaitingForFadeIn
+
+    lwz r3, System_mspDisplay(r13)
+    lwz r3, fader(r3)
+    lwz r3, JUTFader_hasFadedIn(r3)
+    cmpwi r3, 0x1
+    bne StillWaitingForFadeIn
+
+    li r3, MENUPROGRESS_CANMAKESELECTIONS
+    stw r3, progress(r31)
+    b StillWaitingForFadeIn
+
+NotWaitingForFadeIn:
     cmpwi r3, MENUPROGRESS_RACEBATTLEWAIT
     blt DontWaitForFade
 
     lwz r4, System_mspDisplay(r13)
     lwz r4, fader(r4)
-    lwz r4, 0x4(r4)
+    lwz r4, JUTFader_hasFadedIn(r4)
     cmpwi r4, 0x0
     bne WaitingForFadeOut
 
@@ -75,8 +91,23 @@ CheckDBStoreLoop:
 DBStoreFinished:
     li r3, MENUPROGRESS_STARTRACEBATTLE
     stw r3, progress(r31)
-    li r3, 1
 
+#################################################################################################
+# Remember consoleEnteredBitfield so that it can be retrieved to skip Race Entry screen next time
+# and remember coop and screen division settings to also potentially skip Race Entry screen
+#################################################################################################
+    lbz r3, consoleEnteredBitfield(r31)
+    lwz r4, NetGameMgr_mspNetGameMgr(r13)
+    stb r3, NetGameMgr_consoleEnteredBitfield(r4)
+
+    lbz r3, isCoopMode(r31)
+    stb r3, NetGameMgr_prevSessionCoopMode(r4)
+
+    lis r3, gLANPlayInfo@h
+    ori r3, r3, gLANPlayInfo@l
+    lbz r3, LANPlayInfo_divisionCount(r3)
+    stb r3, NetGameMgr_prevSessionScreenDivision(r4)
+    li r3, 1
     b FadeComplete
 
 NotGoingToRaceBattle:
@@ -86,25 +117,33 @@ NotGoingToRaceBattle:
     sth r4, gRaceInfo_kartNumber(r5) # Set the Kart number to 0 to prevent the Reuse Selection code from being executed on non-pointer values
     stb r4, selectionsHaveBeenUsed(r31)
     stb r4, consoleEnteredBitfield(r31)
+    li r4, 0x1
+    stb r4, (LANEntry_blo + visible)(r31)
     b FadeComplete
 
 
 DoInit:
+###############################################################
+# Play the same sound effect when window opens for all consoles
+###############################################################
+    lwz r3, GameAudio_Main_msBasic(r13)
+    lis r4, SE_SHOWMENU@h
+    addi r4, r4, SE_SHOWMENU@l
+    bl GameAudio_Main_startSystemSe
+DoInitWithoutSound:
 .include "./lanentrycalc_menu_initgraphics.s"
 #########################################################################################
 # Store character and kart selections from previous race/battle if kart count is the same
 #########################################################################################
     li r3, 0x0
     stb r3, selectionsHaveBeenUsed(r31)
-    lis r5, KaneshigeM_gRaceInfo@h
-    ori r5, r5, KaneshigeM_gRaceInfo@l
-    lhz r3, gRaceInfo_kartNumber(r5)
-    lwz r4, kartCount(r31)
-    cmpw r3, r4
+    sth r3, LANEntry_bTimer(r31)
+
+    lwz r3, progress(r31)
+    cmpwi r3, MENUPROGRESS_INITNOSOUND
     bne DontStoreSelectionsToReuse
     li r3, 0x1
     stb r3, selectionsHaveBeenUsed(r31)
-
 
     li r29, 0x0
 CheckReuseSelectionLoop:
@@ -145,7 +184,7 @@ DontStoreSelectionsToReuse:
     mr r3, r31
     bl LANEntry_setRaceInfo
 
-    li r3, MENUPROGRESS_CANMAKESELECTIONS
+    li r3, MENUPROGRESS_WAITFORFADE
     stw r3, progress(r31)
     li r3, 0x0
     stw r3, kartProgressArr(r31)
@@ -221,7 +260,6 @@ LoadRememberedSelectionLoop:
     b LoadRememberedSelectionLoop
 KartInitDone:
 
-
     lbz r3, curConsoleID(r31)
     li r4, 0x1
     slw r4, r4, r3 #  1 << curConsoleID
@@ -232,27 +270,27 @@ KartInitDone:
 
     lwz r3, NetGateApp_mspNetGateApp(r13)
     lwz r3, printMemoryCard(r3)
-    li r4, 0x0
-    stb r4, 0xc(r3) /*  Reset sound effect  */
-    stb r4, 0xe(r3) /*  Reset sound effect */
+    li r4, 0x1
+    # Don't play sound effect
+    stb r4, 0xc(r3)
+    stb r4, 0xe(r3)
     li r4, 0x6
     bl PrintMemoryCard_init
     b WindowInitDone
 DontInitWindowForThisConsole:
-###############################################################
-# Play the same sound effect when window opens for all consoles
-###############################################################
-    lwz r3, GameAudio_Main_msBasic(r13)
-    lis r4, SE_SHOWMENU@h
-    addi r4, r4, SE_SHOWMENU@l
-    bl GameAudio_Main_startSystemSe
 DontWaitForFade:
 WindowInitDone:
 
 ##############################################
 # Check if first pad has pressed B to go back
 # Only valid if all karts are at progress 0
+# Or if B had been held for a period of time
+# which would discard players' selections
 ##############################################
+    lhz r3, LANEntry_bTimer(r31)
+    cmpwi r3, B_BUTTON_WAIT_LENGTH
+    bge BButtonHeldForForceBack
+
     lwz r3, kartProgressArr(r31)
     lwz r4, (kartProgressArr+4)(r31)
     add r3, r3, r4
@@ -266,6 +304,8 @@ WindowInitDone:
     andi. r3, r3, bButton
     beq BButtonNotPressedToGoBack
 
+
+BButtonHeldForForceBack:
     lwz r3, GameAudio_Main_msBasic(r13)
     lis r4, SE_GO_BACK@h
     addi r4, r4, SE_GO_BACK@l
@@ -338,6 +378,7 @@ AllKartsNotAtProgress0:
 
 
 WontStartRaceOrBattle:
+
 ##########################################################################
 # Loop through the karts to read their progress and character/kart changes
 ##########################################################################
@@ -350,10 +391,10 @@ PlayerInputLoop:
     mr r3, r29
     bl PrepareKartInfo
     mr r28, r3
-#############################################
-# Check if kart has move stick left or right
-#############################################
 
+#################################################
+# Check if kart has moved the stick left or right
+#################################################
     addi r4, r29, kartProgressArr
     lbzx r4, r31, r4
 
@@ -361,33 +402,18 @@ PlayerInputLoop:
     li r5, GET_STICK
     bl GetKartPadField
 
-    lbz r6, consoleIDStart(r1)
-    lbz r7, curConsoleID(r31)
-
     andi. r0, r3, triggerLeft
-    beq LeftNotPressed
-
-    mr r3, r31
-    mr r4, r29
-    mr r5, r28
     li r6, PARAM_LEFTINPUT
-    bl ChangeCharKartOrderIDFromStickInput
-
-    lbz r3, consoleIDStart(r1)
-    lis r4, SE_MENU_STICK@h
-    ori r4, r4, SE_MENU_STICK@l
-    lbz r5, curConsoleID(r31)
-    bl PlaySoundEffectOnlyForCurConsole
-    b LeftPressDone
-LeftNotPressed:
+    bne LeftOrRightStickInput
 
     andi. r0, r3, triggerRight
-    beq RightNotPressed
+    li r6, PARAM_RIGHTINPUT
+    beq DontChangeCharKart
 
+LeftOrRightStickInput:
     mr r3, r31
     mr r4, r29
     mr r5, r28
-    li r6, PARAM_RIGHTINPUT
     bl ChangeCharKartOrderIDFromStickInput
 
     lbz r3, consoleIDStart(r1)
@@ -395,8 +421,8 @@ LeftNotPressed:
     ori r4, r4, SE_MENU_STICK@l
     lbz r5, curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
-RightNotPressed:
-LeftPressDone:
+
+DontChangeCharKart:
 ######################################
 # Check if kart has made any A presses
 # also play voice clip for character
@@ -449,7 +475,6 @@ KartNotProgressedToChar2:
 # Use the heavier character's assigned kart
 # Unless unrestricted mode has been set
 ###########################################
-
     mr r3, r28
     bl GetKartInfoWeight
     mr r27, r3
@@ -464,8 +489,14 @@ KartNotProgressedToChar2:
     li r4, char1DB
     cmpw r3, r27
     beq Char1MatchesKartWeight
+
+    lbz r5, UnrestrictedModeSet(r31)
+    cmpwi r5, 0x1
+    beq UnrestrictedModeSetForKartWeight
+
     li r4, char2DB
 Char1MatchesKartWeight:
+UnrestrictedModeSetForKartWeight:
     lwzx r3, r28, r4
     lis r4, CharOrderTableResolved@h
     ori r4, r4, CharOrderTableResolved@l
@@ -622,14 +653,15 @@ RandomiseUnrestrictedModeOffForChar:
 #####################################################################
 # Uses the same randomising logic that is used elsewhere in base game
 #####################################################################
-    lwz r4, randSeed(r31)
+    lwz r9, NetGameMgr_mspNetGameMgr(r13)
+    lwz r4, NetGameMgr_randSeedWord(r9)
     lis r5, randomConstantA@h
     ori r5, r5, randomConstantA@l
     mullw r4, r4, r5
     lis r5, randomConstantB@h
     ori r5, r5, randomConstantB@l
     add r4, r4, r5
-    stw r4, randSeed(r31)
+    stw r4, NetGameMgr_randSeedWord(r9)
 #############################
 # below equivalent to r4 % r6
 #############################
@@ -673,8 +705,26 @@ XButtonNotPressed:
     cmpw r29, r3
     blt PlayerInputLoop
 
+#######################
+# Update B button Timer
+#######################
+    lhz r3, LANEntry_bTimer(r31)
+    addi r3, r3, 0x1
+    sth r3, LANEntry_bTimer(r31)
+
+    lis r3, OsakoM_gpaKartPad@h
+    ori r3, r3, OsakoM_gpaKartPad@l
+    lwz r3, 0x0(r3) #  Read from host's pad
+    lwz r3, buttonHold(r3)
+    andi. r3, r3, bButton
+    bne DontResetBButtonTimer
+    li r3, 0x0
+    sth r3, LANEntry_bTimer(r31)
+DontResetBButtonTimer:
+
     /*  Function epilogue  */
 WaitingForFadeOut:
+StillWaitingForFadeIn:
     li r3, 0
 FadeComplete:
     lmw 32-regCount, (stackSize-regCount*4)(r1)

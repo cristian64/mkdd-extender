@@ -277,7 +277,6 @@ BackgroundScale:
 ArrowColourTable:
 .4byte SOLIDRED_RGBA, YELLOW_RGBA
 .4byte SOLIDGREEN_RGBA, CYAN_RGBA # Used for unrestricted mode
-
 XPositionsForPicture:
 .float 98 # Char 1 for Progress 2
 .float 278 # Char 2 for Progress 2 and Char 1 for Progress 0
@@ -296,6 +295,7 @@ XPositionsForRightArrow:
 .float 523
 .float 253
 .float 433
+
 TextXCoordinate:
 .float 0
 PressStartYCoordinateDiff:
