@@ -3207,7 +3207,12 @@ OPTIONAL_ARGUMENTS = {
             'LAN Choose Character and Kart',
             bool,
             'If enabled, the LAN Choose Character & Kart code patch will be added to the game, '
-            'allowing character and kart selection in LAN mode.',
+            'allowing character and kart selection in LAN mode.\n\n'
+            'Since version v1.1, there is a counter that shows the number of ready karts out of '
+            'all participating karts. The host can force the Character Selection screen to be '
+            'exited by holding `B`. Finally, the LAN entry screen is skipped for subsequent '
+            'races/battles.\n\n'
+            'Code patch version: v1.1',
         ),
         ('---', None, None),
         (

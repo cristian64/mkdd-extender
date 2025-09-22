@@ -1,8 +1,4 @@
 .include "./symbols.inc"
-.global NewCalcCodeBlockStart
-.global LanguageTextStart
-.global LANEntryCalcPrintMenu
-.global NetGateAppAfterCt
 
 .equ regCount, 5
 .equ stackSize, 0x8 + regCount*4
@@ -98,6 +94,13 @@ PutNewDrawCode:
     mtctr r12
     bctrl
 
+###########################################################################################
+# Set random seed for NetGameMgr to avoid using the same random seed after consequent races
+###########################################################################################
+   lwz r3, NetGameMgr_mspNetGameMgr(r13)
+   lbz r4, NetGameMgr_randSeed(r3)
+   stw r4, NetGameMgr_randSeedWord(r3)
+
 /* ------------------------------------------------------------------------------------------------------------- */
 /*  Perform instructions in SceneLanEntry's constructor that have been overwritten by code that loads DATA file. */
 /* ------------------------------------------------------------------------------------------------------------- */
@@ -178,16 +181,36 @@ LogoApp_createMoviePlayer: /*  This was copied */
 LANEntryCalcPrintMenu:
     .include "./lanentrycalc_menu.s"
 .align 4
-SetRandSeedAfterLanEntryCt:
-    lwz r3, NetGameMgr_mspNetGameMgr(r13)
-    lbz r3, netRandSeed(r3)
-    stw r3, randSeed(r31)
-    mr r3, r31 # readd instruction
-    blr
-.align 4
 NetGateAppAfterCt:
     .include "./netgateapp_afterct.s"
 .align 4
+LANEntrySkipEntryCheck:
+    .include "./lanentrystart_skipentry.s"
+LANPlayInfoConditionallyResetConsoleKartEntryArray:
+# Function prologue
+    stwu r1, -stackSize(r1)
+    mfspr r0, LR
+    stw r0, (stackSize+4)(r1)
+
+    bl CoopAndScreenDivisionSameAsPrevSession
+    cmpwi r3, 0x1
+    beq DontResetConsoleKartEntryArray
+
+# set all byte values to 1
+    lis r3, 0x0101
+    ori r3, r3, 0x1010 # r3 = 0x01010101
+    lis r4, gLANPlayInfo@h
+    ori r4, r4, gLANPlayInfo@l
+    stw r3, LANPlayInfo_consoleKartEntryArr(r4)
+    stw r3, (LANPlayInfo_consoleKartEntryArr+4)(r4)
+
+DontResetConsoleKartEntryArray:
+# Function epilogue
+    lwz r0, (stackSize+4)(r1)
+    mtspr LR, r0
+    addi r1, r1, stackSize
+    blr
+
 
 /* ----------------------------------------------------------------------------------------------------------------------------------- */
 /*  Table is only read by this method to load the DATA file but is kept here to preserve the correct offset for KartStringOffsetTable,  */

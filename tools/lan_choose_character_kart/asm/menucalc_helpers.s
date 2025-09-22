@@ -281,9 +281,9 @@ NotAllKartsHaveFinished:
     li r3, 0x0
     blr
 #############################################################
-# SUBROUTINE - Close window only for consoles with no entries
-# Parameters
-# r3 = LANEntry this object
+# SUBROUTINE - close window only for consoles with no entries
+# parameters
+# r3 = lanentry this object
 #############################################################
 CloseWindowForConsolesWithNoEntries:
 
@@ -301,6 +301,60 @@ CloseWindowForConsolesWithNoEntries:
 
 DontCloseWindowForThisConsole:
     blr
+
+#############################################################################################
+# SUBROUTINE - check if options for Coop and screen division are the same as previous session
+# Following criteria are used
+# 1. If the RaceInfo kart number is not 0
+#    this is set to 0 at the beginning of every LAN session
+#    and when the character/kart menu is exited
+# 2. If the stored Coop mode value differs to the current one.
+# 3. If the stored screen division value differs from the current one.
+#
+# returns
+# r3 = 1 if values are the same as prev session, 0 if different or there is no prev session
+#############################################################################################
+.equ stackSize, 0x8
+CoopAndScreenDivisionSameAsPrevSession:
+# Function prologue
+    stwu r1, -stackSize(r1)
+    mfspr r0, LR
+    stw r0, (stackSize+4)(r1)
+
+    li r3, 0x1
+    lis r4, KaneshigeM_gRaceInfo@h
+    ori r4, r4, KaneshigeM_gRaceInfo@l
+    lhz r4, gRaceInfo_kartNumber(r4)
+
+    cmpwi r4, 0x0
+    beq NoPreviousSessionYet
+
+    lwz r5, NetGameMgr_mspNetGameMgr(r13)
+    lis r6, gLANPlayInfo@h
+    ori r6, r6, gLANPlayInfo@l
+
+    lbz r7, NetGameMgr_prevSessionCoopMode(r5)
+    lbz r8, LANPlayInfo_isCoop(r6)
+
+    cmpw r7, r8
+    bne ValuesNotSameAsPrevSession
+
+    lbz r7, NetGameMgr_prevSessionScreenDivision(r5)
+    lbz r8, LANPlayInfo_divisionCount(r6)
+
+    cmpw r7, r8
+    beq ValuesSameAsPrevSession
+
+NoPreviousSessionYet:
+ValuesNotSameAsPrevSession:
+    li r3, 0x0
+ValuesSameAsPrevSession:
+# Function epilogue
+    lwz r0, (stackSize+4)(r1)
+    mtspr LR, r0
+    addi r1, r1, stackSize
+    blr
+
 
 
 # Index order for the below three tables

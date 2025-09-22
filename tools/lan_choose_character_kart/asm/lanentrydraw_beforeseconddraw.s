@@ -31,7 +31,7 @@ LANEntryDrawBeforeSecondDraw:
     bl J2DScreen_draw
 DontDrawLANEntryJ2DScreen:
     lwz r5, progress(r30)
-    cmpwi r5, MENUPROGRESS_INIT
+    cmpwi r5, MENUPROGRESS_INITNOSOUND
     ble DontDrawPortraits
     cmpwi r5, MENUPROGRESS_STARTRACEBATTLE
     beq DontDrawPortraits
@@ -142,10 +142,10 @@ NonCoopPlayerTextDone:
     addi r4, r1, sprintfStringStart
     bl PrintColouredText
 
-#################################################################
+############################################################################
 # Draw the Selection Boxes:
 # Each box has portrait, window, potential arrows along with char/kart names
-#################################################################
+############################################################################
 .include "./lanentrydraw_menu_selectiongroup.s"
 
 ########################################################################
@@ -261,6 +261,97 @@ DontUseWindowForThisConsole:
     li r3, 0x0
     stw r3, timer(r30)
 DontResetArrowTimer:
+#################################################################################
+# Draw the B button if the Host is holding the button for a third of the duration
+#################################################################################
+    lhz r3, LANEntry_bTimer(r30)
+    cmpwi r3, B_BUTTON_WAIT_LENGTH/3
+    blt DontDrawBButton
+
+    lis r3, BButtonScaleResolved@h
+    ori r3, r3, BButtonScaleResolved@l
+    lfs f3, 0x0(r3)
+    fmr f4, f3
+    lfs f1, BButtonCoordinate-BButtonScale(r3)
+    fmr f2, f1
+
+    lwz r3, j2dPicture(r30)
+    lwz r4, NetGateApp_mspNetGateApp(r13)
+    lwz r4, bButtonBtiPtr(r4)
+    lis r5, FLOAT_32@h
+    li r6, -1 # i.e. FFFFFFFF
+    li r7, -1
+    bl DrawMenuImage
+
+DontDrawBButton:
+    lbz r3, curConsoleID(r30)
+    addi r4, r3, entriesForConsole
+    lbzx r4, r30, r4
+
+    cmpwi r4, 0x4
+    blt EnoughSpaceToPrintReadyKartCount
+    cmpwi r3, 0x0
+    bgt EnoughSpaceToPrintReadyKartCount # Press Start text only appears for "host"
+
+    mr r3, r30
+    bl CheckIfAllKartsHaveFinishedResolved
+    cmpwi r3, 0x0
+    bne NotEnoughSpaceToPrintReadyKartCount
+
+EnoughSpaceToPrintReadyKartCount:
+    lwz r3, System_mspJ2DOrtho(r13)
+    bl J2DOrthoGraph_setPort
+    lwz r3, j2dPrintForFont(r30)
+    bl J2DPrint_initiate
+
+############################################################################
+# Display a count of ready participants against total number of participants
+# e.g. 3/8 means 3 karts are ready out of the 8 participating karts
+# Don't print this text if the "Press Start" text needs to be printed
+# when there are 4 controller connected to console due to lack of space
+############################################################################
+    li r7, 0x0 # Deliberately starting from r7 as r3-r6 needed for snprintf call below
+    lwz r8, kartCount(r30)
+    li r9, 0x0
+ReadyKartCountLoop:
+    cmpw r9, r8
+    beq ReadyKartCountLoopComplete
+
+    addi r10, r9, kartProgressArr
+    lbzx r10, r30, r10
+    cmpwi r10, KARTPROGRESS_COMPLETE
+    bne KartIsNotReadyForCount
+    addi r7, r7, 0x1
+KartIsNotReadyForCount:
+    addi r9, r9, 0x1
+    b ReadyKartCountLoop
+
+ReadyKartCountLoopComplete:
+    addi r3, r1, sprintfStringStart
+    li r4, 0x100
+    lis r5, KartCountFormatStringResolved@h
+    ori r5, r5, KartCountFormatStringResolved@l
+    lis r6, YellowColourCodeResolved@h
+    ori r6, r6, YellowColourCodeResolved@l
+    cmpw r7, r8
+    bne ReadyKartCountNotCompleteForColour
+    lis r6, GreenColourCodeResolved@h
+    ori r6, r6, GreenColourCodeResolved@l
+ReadyKartCountNotCompleteForColour:
+# r7 and r8 prepared in "ReadyKartCountLoop"
+    bl Dolphin_snprintf
+
+    lis r3, ReadyKartCountCoordinatesResolved@h
+    ori r3, r3, ReadyKartCountCoordinatesResolved@l
+    lfs f1, 0x0(r3)
+    lfs f2, 0x4(r3)
+    lfs f3, 0x8(r3)
+    lwz r3, j2dPrintForFont(r30)
+    addi r4, r1, sprintfStringStart
+    bl PrintColouredText
+
+NotEnoughSpaceToPrintReadyKartCount:
+
 DontDrawPortraits:
     /*  Function epilogue */
     lwz r0, (stackSize+4)(r1)
@@ -270,14 +361,26 @@ DontDrawPortraits:
     addi r1, r1, stackSize
     blr
 TimerIncrement:
+BButtonScale:
 .float 1.0
+BButtonCoordinate:
+.float 20
 TimerBoundary:
 .float 30.0
+ReadyKartCountCoordinates:
+.float 0
+.float 20
+.float 968
 ColouredTextFormatString:
 .asciz "%s%s"
 YellowColourCode:
 .byte 0x1b
 .ascii "CC[FFFF00FF]"
+.byte 0x1b
+.asciz "GC[FFFFFFFF]"
+GreenColourCode:
+.byte 0x1b
+.ascii "CC[00FF00FF]"
 .byte 0x1b
 .asciz "GC[FFFFFFFF]"
 OrangeColourCode:
@@ -290,13 +393,9 @@ MagentaColourCode:
 .ascii "CC[FF00FFFF]"
 .byte 0x1b
 .asciz "GC[FFA0FFFF]"
+KartCountFormatString:
+.asciz "%s%d/%d"
 .align  4
-DebugCoordinates:
-.float 0
-.float 100
-.float 200
-.float 300
-.float 400
 .include "./menudraw_helpers.s"
 
 NewDrawCodeBlockEnd:

@@ -42,6 +42,13 @@ symbols = {
         "LANEntry__calcAnm_lwz_JUTFader_vtable": 0x80217fac,
         "NetGateApp_alloc_size": 0x80209440,
         "LANEntry__LANEntry_epilogue": 0x80217178,
+        "LANEntry__calc_progress0": 0x80217bf8,
+        "LANEntry__calc_set_progress1": 0x80217c0c,
+        "LANSelectMode__start_blr": 0x80216354,
+        "NetGameMgr_alloc_size": 0x80205dd0,
+        "LANEntry__start_blr": 0x80218438,
+        "gLANPlayInfo": 0x804117a0,
+        "LANPlayInfo__saveInfo_consoleKartCount_stbx": 0x80218a3c,
     },
     "GM4E01": {
         "regionID": "REGION_US",
@@ -87,6 +94,13 @@ symbols = {
         "LANEntry__calcAnm_lwz_JUTFader_vtable": 0x801e6110,
         "NetGateApp_alloc_size": 0x801d9b24,
         "LANEntry__LANEntry_epilogue": 0x801e53dc,
+        "LANEntry__calc_progress0": 0x801e5d5c,
+        "LANEntry__calc_set_progress1": 0x801e5d70,
+        "LANSelectMode__start_blr": 0x801e45b8,
+        "NetGameMgr_alloc_size": 0x801d6710,
+        "LANEntry__start_blr": 0x801e659c,
+        "gLANPlayInfo": 0x803c6c40,
+        "LANPlayInfo__saveInfo_consoleKartCount_stbx": 0x801e6ba0,
     },
     "GM4J01": {
         "regionID": "REGION_JP",
@@ -132,6 +146,13 @@ symbols = {
         "LANEntry__calcAnm_lwz_JUTFader_vtable": 0x801e6138,
         "NetGateApp_alloc_size": 0x801d9b4c,
         "LANEntry__LANEntry_epilogue": 0x801e5404,
+        "LANEntry__calc_progress0": 0x801e5d84,
+        "LANEntry__calc_set_progress1": 0x801e5d98,
+        "LANSelectMode__start_blr": 0x801e45e0,
+        "NetGameMgr_alloc_size": 0x801d6710,
+        "LANEntry__start_blr": 0x801e65c4,
+        "gLANPlayInfo": 0x803e1260,
+        "LANPlayInfo__saveInfo_consoleKartCount_stbx": 0x801e6bc8,
     },
     "GM4P01": {
         "regionID": "REGION_EU",
@@ -177,6 +198,13 @@ symbols = {
         "LANEntry__calcAnm_lwz_JUTFader_vtable": 0x801e60e0,
         "NetGateApp_alloc_size": 0x801d9b08,
         "LANEntry__LANEntry_epilogue": 0x801e53b4,
+        "LANEntry__calc_progress0": 0x801e5d2c,
+        "LANEntry__calc_set_progress1": 0x801e5d40,
+        "LANSelectMode__start_blr": 0x801e4590,
+        "NetGameMgr_alloc_size": 0x801d66c4,
+        "LANEntry__start_blr": 0x801e656c,
+        "gLANPlayInfo": 0x803d0a60,
+        "LANPlayInfo__saveInfo_consoleKartCount_stbx": 0x801e6bc8,
     },
 }
 
@@ -223,7 +251,7 @@ asmfuncsymbols = {
         "JKRArchive_mount_for_SceneFactory": 0x8007cb10,  # The one used by SceneFactory::loadData
         "JKRMemArchive_dt": 0x80085518,
         "JSystemM_operator_new_aligned": 0x80084e28,
-        "Dolphin_memcpy": 0x80003540
+        "Dolphin_memcpy": 0x80003540,
     },
     "GM4E01": {
         "JKRDvdFile_ct": 0x8000faec,
