@@ -3517,6 +3517,8 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
     if not paths:
         log.info('No custom course has been configured.')
         args.initial_page_number = 1
+        args.reset_course_page_on_title_screen = False
+        args.reset_course_page_on_lan_initialization = False
         args.extender_cup = False
         args.skip_cup_names = True
         args.skip_menu_titles = True
