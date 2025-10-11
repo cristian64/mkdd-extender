@@ -2220,6 +2220,9 @@ def patch_dol_file(
 
             baa.pack_baa(tmp_dir, baa_filepath)
 
-    log.info(f'Injected {injected_code_size} bytes of new code. '
-             f'OS Arena: 0x{aligned(unaligned_previous_osarena_value):08X} (previous) -> '
-             f'0x{aligned(unaligned_new_osarena_value):08X} (new).')
+    if injected_code_size > 0:
+        log.info(f'Injected {injected_code_size} bytes of new code. '
+                 f'OS Arena: 0x{aligned(unaligned_previous_osarena_value):08X} (previous) -> '
+                 f'0x{aligned(unaligned_new_osarena_value):08X} (new).')
+    else:
+        log.info('No new code has been injected.')
