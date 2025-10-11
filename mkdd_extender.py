@@ -2503,6 +2503,34 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
                                     'circumvent this safety measure.')
 
 
+def get_game_id(iso_tmp_dir: str) -> str:
+    sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
+    dol_path = os.path.join(sys_dirpath, 'main.dol')
+
+    assert os.path.isfile(dol_path)
+
+    with open(dol_path, 'rb') as f:
+        data = f.read()
+        game_id_offset = data.find(b'DOL-GM4')
+        assert game_id_offset >= 0
+        game_id_offset += len('DOL-')
+        game_id = data[game_id_offset:game_id_offset + len('GM4x')] + b'01'
+        game_id = game_id.decode('ascii')
+        assert game_id in ('GM4E01', 'GM4P01', 'GM4J01')
+
+    if game_id == 'GM4E01':
+        boot_path = os.path.join(sys_dirpath, 'boot.bin')
+
+        with open(boot_path, 'rb') as f:
+            f.seek(0x23)
+            DEBUG_BUILD_DATE = b'2004.07.05'
+            data = f.read(len(DEBUG_BUILD_DATE))
+            if data == DEBUG_BUILD_DATE:
+                game_id += 'dbg'
+
+    return game_id
+
+
 CHEAT_CODE_PATTERN = re.compile(r'^([0-9a-fA-F]{8})\s*([0-9a-fA-F]{8})$')
 
 
@@ -2728,6 +2756,7 @@ def patch_dol_file(
     matching_audio_override_data: 'dict[str, str]',
     battle_stages_enabled: bool,
     iso_tmp_dir: str,
+    game_id: str,
 ):
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
@@ -2735,25 +2764,6 @@ def patch_dol_file(
 
     assert os.path.isfile(dol_path)
     assert os.path.isfile(bi2_path)
-
-    with open(dol_path, 'rb') as f:
-        data = f.read()
-        game_id_offset = data.find(b'DOL-GM4')
-        assert game_id_offset >= 0
-        game_id_offset += len('DOL-')
-        game_id = data[game_id_offset:game_id_offset + len('GM4x')] + b'01'
-        game_id = game_id.decode('ascii')
-        assert game_id in ('GM4E01', 'GM4P01', 'GM4J01')
-
-    if game_id == 'GM4E01':
-        boot_path = os.path.join(sys_dirpath, 'boot.bin')
-
-        with open(boot_path, 'rb') as f:
-            f.seek(0x23)
-            DEBUG_BUILD_DATE = b'2004.07.05'
-            data = f.read(len(DEBUG_BUILD_DATE))
-            if data == DEBUG_BUILD_DATE:
-                game_id += 'dbg'
 
     if game_id == 'GM4E01':
         cheat_codes_region = 'US'
@@ -3543,6 +3553,11 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
 
         raise_if_canceled()
 
+        game_id = get_game_id(iso_tmp_dir)
+        log.info(f'Detected game ID: {game_id}')
+
+        raise_if_canceled()
+
         # Verify whether the DOL file is authentic or has been externally modified already.
         verify_dol_checksum(args, iso_tmp_dir)
 
@@ -3643,6 +3658,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
             matching_audio_override_data,
             battle_stages_enabled,
             iso_tmp_dir,
+            game_id,
         )
 
         raise_if_canceled()
