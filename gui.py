@@ -329,6 +329,7 @@ class PathEdit(QtWidgets.QWidget):
                  accept_mode: QtWidgets.QFileDialog.AcceptMode,
                  file_mode: QtWidgets.QFileDialog.FileMode,
                  name_filters: 'tuple[str]' = tuple(),
+                 use_small_button: bool = False,
                  parent: QtWidgets.QWidget = None):
         super().__init__(parent=parent)
 
@@ -340,14 +341,26 @@ class PathEdit(QtWidgets.QWidget):
         self._last_dir = ''
 
         self._line_edit = QtWidgets.QLineEdit()
-        browse_button = QtWidgets.QPushButton('Browse')
-        browse_button.setAutoDefault(False)
-        browse_button.clicked.connect(self._show_file_dialog)
+
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
         layout.addWidget(self._line_edit)
-        layout.addWidget(browse_button)
+
+        if use_small_button:
+            browse_icon_path = os.path.join(gui_dir, 'browse.svg')
+            browse_icon = QtGui.QIcon(browse_icon_path)
+            browse_action = self._line_edit.addAction(
+                browse_icon,
+                QtWidgets.QLineEdit.TrailingPosition,
+            )
+            browse_action.setToolTip('Browse')
+            browse_action.triggered.connect(self._show_file_dialog)
+        else:
+            browse_button = QtWidgets.QPushButton('Browse')
+            browse_button.setAutoDefault(False)
+            browse_button.clicked.connect(self._show_file_dialog)
+            layout.addWidget(browse_button)
 
         self._line_edit.textChanged.connect(self._on_line_edit_textChanged)
 
@@ -363,6 +376,9 @@ class PathEdit(QtWidgets.QWidget):
 
     def set_last_dir(self, last_dir: str):
         self._last_dir = os.path.normpath(last_dir) if last_dir else last_dir
+
+    def set_placeholder_text(self, text: str) -> None:
+        self._line_edit.setPlaceholderText(text)
 
     def _show_file_dialog(self):
         path = self._line_edit.text()
@@ -3569,6 +3585,31 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         option_widget.clicked.connect(on_edit_button_clicked)
                         option_layout.addLayout(option_widget_layout)
 
+                    elif option_type == 'filepath':
+                        hints = rest[0]
+                        option_widget = PathEdit(
+                            caption=hints['title'],
+                            accept_mode=QtWidgets.QFileDialog.AcceptOpen,
+                            file_mode=QtWidgets.QFileDialog.ExistingFile,
+                            name_filters=[hints['filter']],
+                            use_small_button=True,
+                        )
+                        option_widget.set_path(option_value)
+                        option_widget.set_placeholder_text(option_label)
+                        option_widget.setToolTip(option_help)
+
+                        def on_path_changed(
+                            path: str,
+                            option_member_name: str = option_member_name,
+                        ) -> None:
+                            setattr(self, option_member_name, path.strip())
+
+                        option_widget.path_changed.connect(on_path_changed)
+                        option_widget.path_changed.connect(
+                            lambda _path: self._update_options_string(),
+                        )
+                        option_layout.addWidget(option_widget)
+
                 if option_widget is not None:
                     option_widget.setObjectName(option_label)
 
@@ -3656,6 +3697,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                             if len(truncated_option_value) > 10:
                                 truncated_option_value = f'{truncated_option_value[:10].strip()}...'
                             options_strings.append(f'{option_as_argument}={truncated_option_value}')
+
+                    elif option_type == 'filepath':
+                        if option_value:
+                            filepath = f'...{os.path.sep}{os.path.basename(option_value.strip())}'
+                            options_strings.append(f'{option_as_argument}={filepath}')
 
         self._options_edit.setText(' '.join(options_strings))
 
