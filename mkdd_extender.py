@@ -21,6 +21,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import traceback
 import tempfile
 import textwrap
 import time
@@ -1625,6 +1626,31 @@ def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str)
                     image, 0, LABEL_IMAGE_SIZE[0] - limited_width))
 
     log.info('Cup names patched.')
+
+
+def execute_script(filepath: str, exec_locals: dict) -> None:
+    try:
+        with open(filepath, encoding='utf-8') as f:
+            script = f.read()
+    except Exception as e:
+        message = f'Unable to open "{filepath}" script file'
+        detailed_text = str(e)
+        e = MKDDExtenderError(f'{message}: {e}')
+        e.text = f'{message}.'
+        e.detailed_text = detailed_text
+        raise e
+
+    exec_locals['__file__'] = os.path.normpath(filepath)
+
+    try:
+        exec(script, globals(), exec_locals)  # pylint: disable=exec-used
+    except Exception as e:
+        message = f'Unhandled exception while executing "{filepath}" script'
+        detailed_text = f'{e}:\n\n{traceback.format_exc()}'
+        e = MKDDExtenderError(f'{message}:\n\n{detailed_text}')
+        e.text = f'{message}.'
+        e.detailed_text = detailed_text
+        raise e
 
 
 def meld_courses(
@@ -3373,6 +3399,54 @@ OPTIONAL_ARGUMENTS = {
             'If specified, extra debug information (e.g. preprocessor, compiler, and linker '
             'output) will be printed to the terminal/console.',
         ),
+        (
+            'Pre-patching Script',
+            (
+                'filepath',
+                {
+                    'title': 'Select Python script',
+                    'filter': '*.py',
+                },
+            ),
+            'This is the filepath to a Python script that will be executed immediately after the '
+            'input ISO image has been unpacked. It allows users to perform some pre-patching '
+            'operations (e.g. replacing images or any other arbitrary file) before MKDD Extender '
+            'applies custom courses or injects code patches.'
+            '\n\n'
+            'The script will be evaluated in the context of MKDD Extender\'s main program: regular '
+            'Python code can be used, and the same modules and local variables that are available '
+            'to MKDD Extender will be available to the user. `globals()` and `locals()` can be '
+            'used in the script to inspect what globals and locals are available; some of the most '
+            'relevant modules and variables would be:'
+            '\n\n'
+            '- `rarc`: A Python module to unpack and pack RARC archives.\n'
+            '- `iso_tmp_dir`: Path to the directory that holds the unpacked ISO image.\n'
+            '- `game_id`: The game ID of the input ISO image.\n',
+        ),
+        (
+            'Post-patching Script',
+            (
+                'filepath',
+                {
+                    'title': 'Select Python script',
+                    'filter': '*.py',
+                },
+            ),
+            'This is the filepath to a Python script that will be executed after MKDD Extender has '
+            'finished applying custom courses and injected code patches. It allows users to '
+            'perform some post-patching operations (e.g. replacing images or any other arbitrary '
+            'file) before the final ISO image is packaged.'
+            '\n\n'
+            'The script will be evaluated in the context of MKDD Extender\'s main program: regular '
+            'Python code can be used, and the same modules and local variables that are available '
+            'to MKDD Extender will be available to the user. `globals()` and `locals()` can be '
+            'used in the script to inspect what globals and locals are available; some of the most '
+            'relevant modules and variables would be:'
+            '\n\n'
+            '- `rarc`: A Python module to unpack and pack RARC archives.\n'
+            '- `iso_tmp_dir`: Path to the directory that holds the unpacked ISO image.\n'
+            '- `game_id`: The game ID of the input ISO image.\n',
+        ),
     ),
     'Dangerous Options': (
         (
@@ -3555,6 +3629,20 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
 
         game_id = get_game_id(iso_tmp_dir)
         log.info(f'Detected game ID: {game_id}')
+
+        raise_if_canceled()
+
+        if args.pre_patching_script:
+            log.info(f'Executing "{args.pre_patching_script}" pre-patching script...')
+            execute_script(
+                args.pre_patching_script,
+                {
+                    'all_locals': locals(),
+                    'args': args,
+                    'iso_tmp_dir': iso_tmp_dir,
+                    'game_id': game_id,
+                },
+            )
 
         raise_if_canceled()
 
@@ -3744,6 +3832,20 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         # Generate description file.
         if args.add_description_file:
             write_description_file(args, added_course_names, battle_stages_enabled, iso_tmp_dir)
+
+        raise_if_canceled()
+
+        if args.post_patching_script:
+            log.info(f'Executing "{args.post_patching_script}" post-patching script...')
+            execute_script(
+                args.post_patching_script,
+                {
+                    'all_locals': locals(),
+                    'args': args,
+                    'iso_tmp_dir': iso_tmp_dir,
+                    'game_id': game_id,
+                },
+            )
 
         raise_if_canceled()
 
