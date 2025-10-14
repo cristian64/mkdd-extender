@@ -1,5 +1,6 @@
 import itertools
 import os
+import platform
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -9,6 +10,12 @@ from tools.lan_choose_character_kart import symbols
 
 
 def run_subprocess(arguments: list[str]) -> subprocess.CompletedProcess:
+    if platform.system() == 'Windows':
+        return subprocess.check_output(arguments,
+                                       creationflags=subprocess.CREATE_NO_WINDOW,
+                                       stderr=subprocess.STDOUT,
+                                       text=True)
+
     return subprocess.check_output(arguments, text=True)
 
 
