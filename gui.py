@@ -96,9 +96,26 @@ def set_dark_theme(app: QtWidgets.QApplication):
             background: #282828;
         }}
 
+        QFrame[frameShape="1"][frameShadow="16"],
         QFrame[frameShape="4"][frameShadow="16"],
         QFrame[frameShape="5"][frameShadow="16"] {{
-            color: rgb(70, 70, 70);
+            color: rgb(75, 75, 75);
+        }}
+
+        QGroupBox {{
+            border: 1px solid rgb(75, 75, 75);
+            margin-top: 0.6em;
+            padding-top: 0.5em;
+            padding-bottom: 0;
+            padding-left: 1px;
+            padding-right: 1px;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 0.7em;
+            padding-top: 1px;
+            min-width: 0;
         }}
     """)
 
@@ -473,7 +490,9 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
             }}
         """))
 
-        self._widget = QtWidgets.QGroupBox()
+        self._widget = QtWidgets.QFrame()
+        self._widget.setFrameShape(QtWidgets.QFrame.Box)
+        self._widget.setFrameShadow(QtWidgets.QFrame.Plain)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
