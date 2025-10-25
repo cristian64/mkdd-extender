@@ -48,6 +48,7 @@ datas = [
     ('COPYING', '.'),
     ('README.md', '.'),
     ('data', 'data'),
+    ('tools/GeckoLoader/bin', 'bin'),
 ]
 wimgt_filenames = []
 if linux:

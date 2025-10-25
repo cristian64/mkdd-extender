@@ -12,7 +12,7 @@ mkdir MKDDEXT_BUNDLE_TMP
 cd MKDDEXT_BUNDLE_TMP
 
 # Check out code.
-git clone https://github.com/cristian64/mkdd-extender.git --depth=1
+git clone https://github.com/cristian64/mkdd-extender.git --depth=1 --recurse-submodules --shallow-submodules
 cd mkdd-extender
 
 # Install dependencies.

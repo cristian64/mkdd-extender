@@ -37,10 +37,10 @@ Stand-alone precompiled bundles for Linux and Windows can be found in the
 
 ### Development Version
 
-Clone the Git repository:
+Clone the Git repository along with its submodules:
 
 ```shell
-git clone https://github.com/cristian64/mkdd-extender.git
+git clone https://github.com/cristian64/mkdd-extender.git --recurse-submodules
 cd mkdd-extender
 ```
 
@@ -78,6 +78,7 @@ python mkdd_extender.py
 
 - https://github.com/RenolY2/mkdd-track-patcher
 - https://github.com/RenolY2/gc-c-kit
+- https://github.com/JoshuaMKW/GeckoLoader
 - https://szs.wiimm.de/wimgt/
 - https://github.com/LagoLunatic/wwrando
 - https://devkitpro.org
