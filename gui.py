@@ -2610,6 +2610,21 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 option_value = getattr(self, option_member_name)
                 if option_value:
                     options.append((option_variable_name, option_value))
+
+                    # Store values also with the old option name.
+                    # TODO(CA): Revert commit once a sensible amount of time has passed.
+                    if option_variable_name == 'basic_cheat_codes':
+                        options.append(('bake_general_cheat_codes', option_value))
+                    if option_variable_name == 'ntsc_u_basic_cheat_codes':
+                        options.append(('ntsc_u_cheat_codes', option_value))
+                    if option_variable_name == 'pal_basic_cheat_codes':
+                        options.append(('pal_cheat_codes', option_value))
+                    if option_variable_name == 'ntsc_j_basic_cheat_codes':
+                        options.append(('ntsc_j_cheat_codes', option_value))
+                    if option_variable_name == 'ntsc_u_debug_basic_cheat_codes':
+                        options.append(('ntsc_u_debug_cheat_codes', option_value))
+                    # pylint: enable=access-member-before-definition
+
         self._settings.setValue('miscellaneous/options', json.dumps(options))
 
         self._settings.setValue('miscellaneous/last_log_path', self._log_table.get_last_log_path())
@@ -2709,6 +2724,22 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 for option_variable_name, option_value in options:
                     option_member_name = f'_{option_variable_name}'
                     setattr(self, option_member_name, option_value)
+
+            # Attempt to migrate cheat codes-related settings from the previous version.
+            # TODO(CA): Revert commit once a sensible amount of time has passed.
+            # pylint: disable=access-member-before-definition
+            if not self._basic_cheat_codes and hasattr(self, '_bake_general_cheat_codes'):
+                self._basic_cheat_codes = self._bake_general_cheat_codes
+            if not self._ntsc_u_basic_cheat_codes and hasattr(self, '_ntsc_u_cheat_codes'):
+                self._ntsc_u_basic_cheat_codes = self._ntsc_u_cheat_codes
+            if not self._pal_basic_cheat_codes and hasattr(self, '_pal_cheat_codes'):
+                self._pal_basic_cheat_codes = self._pal_cheat_codes
+            if not self._ntsc_j_basic_cheat_codes and hasattr(self, '_ntsc_j_cheat_codes'):
+                self._ntsc_j_basic_cheat_codes = self._ntsc_j_cheat_codes
+            if (not self._ntsc_u_debug_basic_cheat_codes
+                    and hasattr(self, '_ntsc_u_debug_cheat_codes')):
+                self._ntsc_u_debug_basic_cheat_codes = self._ntsc_u_debug_cheat_codes
+            # pylint: enable=access-member-before-definition
 
         self._log_table.set_last_log_path(self._settings.value('miscellaneous/last_log_path', ''))
         self._log_table.set_clear_log_before_each_run(
