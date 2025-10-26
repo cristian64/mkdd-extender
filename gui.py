@@ -601,8 +601,26 @@ class HelpButton(QtWidgets.QPushButton):
         anchor_pos = parent_widget.mapToGlobal(self.geometry().topLeft())
         char_width = self.fontMetrics().averageCharWidth()
         dialog.ensurePolished()
-        dialog.move(anchor_pos.x() - dialog.sizeHint().width() - char_width, anchor_pos.y())
+        dialog.move(anchor_pos.x() - dialog.frameGeometry().width() - char_width, anchor_pos.y())
         dialog.deleteLater()
+
+        screen_geometry = self.screen().availableGeometry()
+        widget_geometry = dialog.frameGeometry()
+        x = max(
+            screen_geometry.left(),
+            min(
+                widget_geometry.x(),
+                screen_geometry.right() - widget_geometry.width(),
+            ),
+        )
+        y = max(
+            screen_geometry.top(),
+            min(
+                widget_geometry.y(),
+                screen_geometry.bottom() - widget_geometry.height(),
+            ),
+        )
+        dialog.move(x, y)
 
         self._pressed = True
         dialog.exec()
