@@ -538,6 +538,27 @@ class HelpDialog(QtWidgets.QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(label)
 
+        label_size = label.sizeHint()
+        available_geometry = self.screen().availableGeometry().size()
+
+        fixed_size = QtCore.QSize(
+            min(label_size.width(), int(available_geometry.width() * 0.9)),
+            min(label_size.height(), int(available_geometry.height() * 0.9)),
+        )
+
+        needs_scroll_area = (fixed_size.width() < label_size.width()
+                             or fixed_size.height() < label_size.height())
+        if needs_scroll_area:
+            layout.removeWidget(label)
+
+            scroll_area = QtWidgets.QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setWidget(label)
+            scroll_area.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
+            layout.addWidget(scroll_area)
+
+        self.setFixedSize(fixed_size)
+
 
 class HelpButton(QtWidgets.QPushButton):
 
