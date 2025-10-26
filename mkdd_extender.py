@@ -36,6 +36,7 @@ import code_patcher
 import rarc
 from tools import bti, gcm
 from tools.gc_c_kit import dolreader
+from tools.GeckoLoader import GeckoLoader
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -2772,6 +2773,57 @@ def patch_cheat_codes(args: argparse.Namespace, cheat_codes_text_by_mod: dict, d
         f.write(raw_data)
 
 
+def inject_gecko_cheat_codes(text: str, dol_path: str) -> None:
+    log.info('Injecting Gecko cheat codes via GeckoLoader...')
+
+    parsed_lines = []
+
+    for line_index, line in enumerate(text.split('\n')):
+        line_number = line_index + 1
+
+        line = line.strip()
+        if not line:
+            continue
+
+        if line[0] not in '0123456789abcdefABCEDF':
+            # Skips commented lines that start with $, **, --, etc.
+            continue
+
+        matches = CHEAT_CODE_PATTERN.match(line)
+        if matches is None:
+            msg = (f'Ill-formed code at line #{line_number}:\n\n{line}\n\n'
+                   'Expected layout is `________ ________` (unencrypted).')
+            raise MKDDExtenderError(msg)
+
+        part1 = int(matches.group(1), base=16)
+        part2 = int(matches.group(2), base=16)
+
+        parsed_lines.append(f'{part1:08X} {part2:08X}')
+
+    text = '\n'.join(parsed_lines)
+    if not text:
+        log.warning('Gecko cheat codes are empty or are invalid; no cheat code will be injected.')
+        return
+
+    with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
+        tmp_filepath = pathlib.Path(tmp_dir) / 'general_gecko_cheat_codes.txt'
+        tmp_filepath.write_text(text, encoding='utf-8')
+
+        cli = GeckoLoader.GeckoLoaderCli('GeckoLoader')
+        args = cli.parse_args((
+            dol_path,
+            str(tmp_filepath),
+            '--dest',
+            dol_path,
+            '--hooktype',
+            'GX',
+            '--txtcodes',
+            'ALL',
+            '--quiet',
+        ))
+        cli._exec(args, tmp_dir)  # pylint: disable=protected-access
+
+
 def patch_dol_file(
     args: argparse.Namespace,
     replaces_data: dict,
@@ -2794,45 +2846,63 @@ def patch_dol_file(
     if game_id == 'GM4E01':
         cheat_codes_region = 'US'
         general_cheat_codes_region = 'NTSC-U'
-        general_cheat_codes = args.ntsc_u_cheat_codes
+        general_basic_cheat_codes = args.ntsc_u_basic_cheat_codes
+        general_gecko_cheat_codes = args.ntsc_u_gecko_cheat_codes
     elif game_id == 'GM4P01':
         cheat_codes_region = 'PAL'
         general_cheat_codes_region = 'PAL'
-        general_cheat_codes = args.pal_cheat_codes
+        general_basic_cheat_codes = args.pal_basic_cheat_codes
+        general_gecko_cheat_codes = args.pal_gecko_cheat_codes
     elif game_id == 'GM4J01':
         cheat_codes_region = 'JP'
         general_cheat_codes_region = 'NTSC-J'
-        general_cheat_codes = args.ntsc_j_cheat_codes
+        general_basic_cheat_codes = args.ntsc_j_basic_cheat_codes
+        general_gecko_cheat_codes = args.ntsc_j_gecko_cheat_codes
     else:
         cheat_codes_region = 'US_DEBUG'
         general_cheat_codes_region = 'NTSC-J (Debug)'
-        general_cheat_codes = args.ntsc_u_debug_cheat_codes
+        general_basic_cheat_codes = args.ntsc_u_debug_basic_cheat_codes
+        general_gecko_cheat_codes = args.ntsc_u_debug_gecko_cheat_codes
 
     # These are the potential cheat codes sourced from each course mod.
     cheat_codes_text_by_mod = cheat_codes_data[cheat_codes_region]
 
     # ...and these are the general cheat codes defined at the application level.
-    if args.bake_general_cheat_codes and general_cheat_codes:
+    if args.basic_cheat_codes and general_basic_cheat_codes:
         general_cheat_codes_modname = f'General {general_cheat_codes_region} Cheat Codes'
         general_cheat_codes_filepath = 'defined in options'
 
         # If there is a single line, it can potentially be a filepath to a plain-text file.
-        if len(general_cheat_codes.strip().splitlines()) == 1:
+        if len(general_basic_cheat_codes.strip().splitlines()) == 1:
             try:
-                potential_filepath = pathlib.Path(general_cheat_codes.strip())
+                potential_filepath = pathlib.Path(general_basic_cheat_codes.strip())
                 if potential_filepath.is_absolute():
                     with open(potential_filepath, 'r', encoding='utf-8') as f:
-                        general_cheat_codes = f.read()
+                        general_basic_cheat_codes = f.read()
                     general_cheat_codes_filepath = potential_filepath
             except Exception:
                 pass
 
-        if general_cheat_codes:
+        if general_basic_cheat_codes:
             general_cheat_codes_key = (general_cheat_codes_modname, general_cheat_codes_filepath)
-            cheat_codes_text_by_mod[general_cheat_codes_key] = general_cheat_codes
+            cheat_codes_text_by_mod[general_cheat_codes_key] = general_basic_cheat_codes
 
     if cheat_codes_text_by_mod:
         patch_cheat_codes(args, cheat_codes_text_by_mod, dol_path)
+
+    # ...and also Gecko cheat codes to be injected with GeckoLoader.
+    if args.gecko_cheat_codes and general_gecko_cheat_codes:
+        # If there is a single line, it can potentially be a filepath to a plain-text file.
+        if len(general_gecko_cheat_codes.strip().splitlines()) == 1:
+            try:
+                potential_filepath = pathlib.Path(general_gecko_cheat_codes.strip())
+                if potential_filepath.is_absolute():
+                    general_gecko_cheat_codes = potential_filepath.read_text(encoding='utf-8')
+            except Exception:
+                pass
+
+        if general_gecko_cheat_codes:
+            inject_gecko_cheat_codes(general_gecko_cheat_codes, dol_path)
 
     initial_page_number = max(1, args.initial_page_number or 0)
 
@@ -3041,72 +3111,22 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
             f.write(f'{line}\n')
 
 
-_EXAMPLE_CHEAT_CODES = {
-    'NTSC-U':
-    textwrap.dedent("""
-    $Invisible Karts
-    041908B4 4E800020
+_COMMON_REGIONBASED_CHEAT_CODES_NODE = """\
+---
 
-    $Red Shells Bounce Off Walls [Ralf]
-    04355C38 80218A90
-    """).strip(),
-    'PAL':
-    textwrap.dedent("""
-    $Invisible Karts
-    0418F744 4E800020
+**IMPORTANT**: Cheat codes are developed for specific versions of the game, named after the region
+where the game was originally released:
 
-    $Red Shells Bounce Off Walls [Ralf]
-    0435FA78 80218A6C
-    """).strip(),
-    'NTSC-J':
-    textwrap.dedent("""
-    $Invisible Karts
-    041908B4 4E800020
+- NTSC-U
+- PAL
+- NTSC-J
+- NTSC-U (Debug)
 
-    $Red Shells Bounce Off Walls [Ralf]
-    04370258 80218AB8
-    """).strip(),
-    'NTSC-U (Debug)':
-    textwrap.dedent("""
-    $Invisible Karts
-    041B96A4 4E800020
+It is paramount not to mix cheat codes between versions. If the wrong cheat codes were specified for
+a mismatched version, the game will likely behave erratically or crash at a random point.
 
-    $Red Shells Bounce Off Walls [Ralf]
-    043A0058 8024FC38
-    """).strip(),
-}
-
-_CHEAT_CODES_DESCRIPTION_TEMPLATE = """
-This option holds the Action Replay / Gecko cheat codes for the {region} region that will be baked
-into the game.
-
-Unlike other tools, MKDD Extender will not install a cheat code handler, limiting the supported
-cheat code types to a reduced subset. The supported cheat code types are:
-
-- `00______ ________` 8-bit write and fill (only single-byte writes)
-- `02______ ________` 16-bit write and fill
-- `04______ ________` 32-bit write
-- `06______ ________` String write
-
-The encrypted `____-____-_____` form that is commonly used in Action Replay codes is not supported.
-
-Lines that do no start with an alphanumeric character will be ignored (e.g. lines starting with `$`,
-`*`, or `[...]`).
-
-An example with a couple of cheat codes for the {region} region to demonstrate how this option can
-be set:
-
-```
-{examples}
-```
-
-Alternatively, if the value for this option is set to a single line that contains a filepath in the
-file system, the content of the file will be loaded when cheat codes are applied.
-
-**IMPORTANT:** Cheat codes are often developed with the assumption that a code handler will be
-installed in the game. Since MKDD Extender does not install a code handler, it is possible that some
-cheat codes do not function as expected. The only way to verify whether a certain cheat code is
-supported is to test it.
+For convenience, each region has its own dedicated field. This allows the user to safely swap the
+input ISO file with one of a different region without risking a catastrophic mismatch.
 """
 
 OPTIONAL_ARGUMENTS = {
@@ -3315,65 +3335,97 @@ OPTIONAL_ARGUMENTS = {
     ),
     'General Cheat Codes': (
         (
-            'Bake General Cheat Codes',
+            'Basic Cheat Codes',
             bool,
-            'If enabled, the configured cheat codes (see related options below) will be baked into '
-            'the output ISO file.'
+            'If enabled, the configured _basic_ cheat codes (see region-specific options '
+            'underneath) will be baked into the output ISO file.'
             '\n\n'
-            'These general cheat codes are supplementary to those that may be present in custom '
-            'courses.'
+            'In this modality, unlike in the **Gecko Cheat Codes** modality, no cheat code handler '
+            'will be installed in the game, limiting the supported cheat code types to a reduced '
+            'subset of the Action Replay / Gecko feature set. The supported cheat code types are:'
             '\n\n'
-            'Cheat codes are developed for specific versions of the game, named after the region '
-            'where the game was originally released:'
+            '- `00______ ________` 8-bit write and fill (only single-byte writes)\n'
+            '- `02______ ________` 16-bit write and fill\n'
+            '- `04______ ________` 32-bit write\n'
+            '- `06______ ________` String write\n'
             '\n\n'
-            '- NTSC-U'
+            'The encrypted `____-____-_____` form that is commonly used in Action Replay codes is '
+            'not supported.'
+            '\n\n'
+            'Lines that do no start with an alphanumeric character will be ignored (e.g. lines '
+            'starting with `$`, `*`, or `[...]`).'
+            '\n\n'
+            'Here is an example with a couple of cheat codes for the NTSC-U region to demonstrate '
+            'how these options can be set:'
+            '\n\n'
+            '```\n'
+            '$Invisible Karts\n'
+            '041908B4 4E800020\n'
             '\n'
-            '- PAL'
-            '\n'
-            '- NTSC-J'
-            '\n'
-            '- NTSC-U (Debug)'
+            '$Red Shells Bounce Off Walls [Ralf]\n'
+            '04355C38 80218A90\n'
+            '```\n'
             '\n\n'
-            'It is paramount not to mix cheat codes between versions. If the wrong cheat codes '
-            'were specified for a mismatched version, the game will likely behave erratically or '
-            'crash at a random point.'
+            'Alternatively, if the value for these options is set to a single line that contains a '
+            'filepath in the file system, the content of the file will be loaded when cheat codes '
+            'are applied.'
             '\n\n'
-            'For convenience, each region has its own dedicated field. This allows the user to '
-            'safely swap the input ISO file with one of a different region without risking a '
-            'catastrophic mismatch.',
+            '**IMPORTANT:** Cheat codes are often developed with the assumption that a code '
+            'handler will be installed in the game. For rich cheat codes that require the presence '
+            'of a code handler, use the **Gecko Cheat Codes** modality.'
+            '\n\n'
+            f'{_COMMON_REGIONBASED_CHEAT_CODES_NODE}',
         ),
+        ('NTSC-U Basic Cheat Codes', ('cheatcodes', ), None),
+        ('PAL Basic Cheat Codes', ('cheatcodes', ), None),
+        ('NTSC-J Basic Cheat Codes', ('cheatcodes', ), None),
+        ('NTSC-U (Debug) Basic Cheat Codes', ('cheatcodes', ), None),
+        ('---', None, None),
         (
-            'NTSC-U Cheat Codes',
-            ('cheatcodes', ),
-            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
-                region='NTSC-U',
-                examples=_EXAMPLE_CHEAT_CODES['NTSC-U'],
-            ),
+            'Gecko Cheat Codes',
+            bool,
+            'If enabled, the configured Gecko cheat codes (see region-specific options underneath) '
+            'will be injected into the output ISO file.'
+            '\n\n'
+            'In this modality, unlike with the **Basic Cheat Codes** modality, a code handler will '
+            'be installed in the game, allowing for fully-featured Gecko cheat codes.'
+            '\n\n'
+            'MKDD Extender uses <a href="https://github.com/JoshuaMKW/GeckoLoader">GeckoLoader</a> '
+            'for injecting the Gecko cheat codes.'
+            '\n\n'
+            'Lines that do no start with an alphanumeric character will be ignored (e.g. lines '
+            'starting with `$`, `*`, or `[...]`).'
+            '\n\n'
+            'Here is an example with one Gecko cheat code for the NTSC-U region to demonstrate how '
+            'these options can be set:'
+            '\n\n'
+            '```\n'
+            '$Low Gravity [Ralf]\n'
+            'C2252098 00000002\n'
+            '3C803F74 9082D5A8\n'
+            '3C800040 00000000\n'
+            'C2252180 00000002\n'
+            '3C803FA0 9082D5A8\n'
+            '881F0249 00000000\n'
+            '203D1B48 3F7FF972\n'
+            '043D1B48 3FA00000\n'
+            'E2000001 80008000\n'
+            '```\n'
+            '\n\n'
+            'Alternatively, if the value for these options is set to a single line that contains a '
+            'filepath in the file system, the content of the file will be loaded when cheat codes '
+            'are applied.'
+            '\n\n'
+            '**NOTE:** For basic cheat codes that do not require a code handler to function, it is '
+            'recommended to use the **Basic Cheat Codes** modality, as it is a less invasive '
+            'approach that is less likely to cause issues in-game.'
+            '\n\n'
+            f'{_COMMON_REGIONBASED_CHEAT_CODES_NODE}',
         ),
-        (
-            'PAL Cheat Codes',
-            ('cheatcodes', ),
-            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
-                region='PAL',
-                examples=_EXAMPLE_CHEAT_CODES['PAL'],
-            ),
-        ),
-        (
-            'NTSC-J Cheat Codes',
-            ('cheatcodes', ),
-            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
-                region='NTSC-J',
-                examples=_EXAMPLE_CHEAT_CODES['NTSC-J'],
-            ),
-        ),
-        (
-            'NTSC-U (Debug) Cheat Codes',
-            ('cheatcodes', ),
-            _CHEAT_CODES_DESCRIPTION_TEMPLATE.format(
-                region='NTSC-U (Debug)',
-                examples=_EXAMPLE_CHEAT_CODES['NTSC-U (Debug)'],
-            ),
-        ),
+        ('NTSC-U Gecko Cheat Codes', ('cheatcodes', ), None),
+        ('PAL Gecko Cheat Codes', ('cheatcodes', ), None),
+        ('NTSC-J Gecko Cheat Codes', ('cheatcodes', ), None),
+        ('NTSC-U (Debug) Gecko Cheat Codes', ('cheatcodes', ), None),
     ),
     'Expert Options': (
         (
@@ -3487,10 +3539,14 @@ OPTIONAL_ARGUMENTS_ENABLED_BY = {
     'Sectioned Courses': ('Code Patching Mode', 'Manual'),
     'Tilting Courses': ('Code Patching Mode', 'Manual'),
     'Bouncy Terrain Type': ('Code Patching Mode', 'Manual'),
-    'NTSC-U Cheat Codes': ('Bake General Cheat Codes', True),
-    'PAL Cheat Codes': ('Bake General Cheat Codes', True),
-    'NTSC-J Cheat Codes': ('Bake General Cheat Codes', True),
-    'NTSC-U (Debug) Cheat Codes': ('Bake General Cheat Codes', True),
+    'NTSC-U Basic Cheat Codes': ('Basic Cheat Codes', True),
+    'PAL Basic Cheat Codes': ('Basic Cheat Codes', True),
+    'NTSC-J Basic Cheat Codes': ('Basic Cheat Codes', True),
+    'NTSC-U (Debug) Basic Cheat Codes': ('Basic Cheat Codes', True),
+    'NTSC-U Gecko Cheat Codes': ('Gecko Cheat Codes', True),
+    'PAL Gecko Cheat Codes': ('Gecko Cheat Codes', True),
+    'NTSC-J Gecko Cheat Codes': ('Gecko Cheat Codes', True),
+    'NTSC-U (Debug) Gecko Cheat Codes': ('Gecko Cheat Codes', True),
 }
 """
 List of arguments that are only enabled in the GUI if the named buddy argument is given the

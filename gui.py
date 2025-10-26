@@ -1720,7 +1720,6 @@ class CheatCodesDialog(QtWidgets.QDialog):
         self,
         label: str,
         text: str,
-        help_text: str,
         callback: callable,
         parent: QtWidgets.QWidget = None,
     ):
@@ -1729,10 +1728,6 @@ class CheatCodesDialog(QtWidgets.QDialog):
         self.setWindowTitle(label)
         self.setMinimumWidth(self.fontMetrics().averageCharWidth() * 45)
         self.setMinimumHeight(self.fontMetrics().height() * 30)
-
-        heading_layout = QtWidgets.QHBoxLayout()
-        heading_layout.addWidget(HelpButton(help_text))
-        heading_layout.addWidget(QtWidgets.QLabel(label))
 
         self.__text_edit = QtWidgets.QTextEdit(text)
         font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
@@ -1752,7 +1747,7 @@ class CheatCodesDialog(QtWidgets.QDialog):
         buttons_layout.addWidget(close_button)
 
         layout = QtWidgets.QVBoxLayout(self)
-        layout.addLayout(heading_layout)
+        layout.addWidget(QtWidgets.QLabel(label))
         layout.addWidget(self.__text_edit)
         layout.addLayout(buttons_layout)
 
@@ -3610,7 +3605,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                     elif option_type == 'cheatcodes':
                         option_widget_label = QtWidgets.QLabel(
-                            option_label.replace('Cheat Codes', '').strip())
+                            option_label.removesuffix('Gecko Cheat Codes').removesuffix(
+                                'Basic Cheat Codes').strip())
                         option_widget_label.setToolTip(option_help)
                         option_widget = QtWidgets.QPushButton("Edit")
                         option_widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
@@ -3626,12 +3622,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                         def on_edit_button_clicked(_checked,
                                                    option_label=option_label,
-                                                   option_help=option_help,
                                                    option_member_name=option_member_name,
                                                    update_cheat_codes=update_cheat_codes):
                             option_value = getattr(self, option_member_name)
-                            dialog = CheatCodesDialog(option_label, option_value, option_help,
-                                                      update_cheat_codes, self)
+                            dialog = CheatCodesDialog(
+                                option_label,
+                                option_value,
+                                update_cheat_codes,
+                                self,
+                            )
                             if self._cheat_codes_dialog_geometry is not None:
                                 dialog.restoreGeometry(self._cheat_codes_dialog_geometry)
                             if self._cheat_codes_dialog_state is not None:
