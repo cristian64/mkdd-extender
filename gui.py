@@ -3528,7 +3528,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                 option_member_name = f'_{mkdd_extender.option_label_as_variable_name(option_label)}'
                 option_value = getattr(self, option_member_name)
-                option_help = markdown_to_html(option_label, option_help)
+                if option_help is not None:
+                    option_help = markdown_to_html(option_label, option_help)
+                else:
+                    option_help = ''
 
                 option_layout = QtWidgets.QHBoxLayout()
                 group_box.layout().addLayout(option_layout)
