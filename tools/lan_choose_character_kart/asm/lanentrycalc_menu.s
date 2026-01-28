@@ -89,6 +89,22 @@ CheckDBStoreLoop:
     b CheckDBStoreLoop
 
 DBStoreFinished:
+############################################################
+# Set FPS cap to match vanilla
+# as this has been overwritten by lanentrycalc_setraceinfo.s
+############################################################
+    li r3, 0x0
+    lwz r4, displayNum(r31)
+    cmpwi r4, 4
+    bne DontSetFPSCap
+    lwz r4, kartCount(r31)
+    cmpwi r4, 6
+    blt DontSetFPSCap
+    li r3, 0x1
+DontSetFPSCap:
+    lwz r4, NetGameMgr_mspNetGameMgr(r13)
+    stb r3, NetGameMgr_capFps(r4)
+
     li r3, MENUPROGRESS_STARTRACEBATTLE
     stw r3, progress(r31)
 

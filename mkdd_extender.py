@@ -3268,7 +3268,7 @@ OPTIONAL_ARGUMENTS = {
             'all participating karts. The host can force the Character Selection screen to be '
             'exited by holding `B`. Finally, the LAN entry screen is skipped for subsequent '
             'races/battles.\n\n'
-            'Code patch version: v1.1',
+            'Code patch version: v1.1.1',
         ),
         ('---', None, None),
         (
