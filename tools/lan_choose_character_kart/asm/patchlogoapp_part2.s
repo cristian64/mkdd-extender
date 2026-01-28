@@ -198,7 +198,7 @@ LANPlayInfoConditionallyResetConsoleKartEntryArray:
 
 # set all byte values to 1
     lis r3, 0x0101
-    ori r3, r3, 0x1010 # r3 = 0x01010101
+    ori r3, r3, 0x0101 # r3 = 0x01010101
     lis r4, gLANPlayInfo@h
     ori r4, r4, gLANPlayInfo@l
     stw r3, LANPlayInfo_consoleKartEntryArr(r4)

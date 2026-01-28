@@ -105,6 +105,7 @@
 /*  NetGameMgr field */
 /* ----------------- */
 .equ NetGameMgr_randSeed, 0x12e9
+.equ NetGameMgr_capFps, 0x12ee
 /* new fields */
 .equ NetGameMgr_consoleEnteredBitfield, 0x1308 /* byte */
 .equ NetGameMgr_prevSessionScreenDivision, 0x1309 /* byte */
