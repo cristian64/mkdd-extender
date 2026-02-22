@@ -1499,6 +1499,7 @@ SYMBOLS_MAP = {
     'GM4E01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        OSReport = 0x800E8078;
         GameAudio_Main_startSystemSe = 0x80115E74;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
@@ -1524,6 +1525,7 @@ SYMBOLS_MAP = {
     'GM4P01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        OSReport = 0x800E803C;
         GameAudio_Main_startSystemSe = 0x80115EA4;
         SceneCourseSelect__calcAnm = 0x8016A584;
         SceneMapSelect__calcAnm = 0x80173974;
@@ -1549,6 +1551,7 @@ SYMBOLS_MAP = {
     'GM4J01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        OSReport = 0x800E8078;
         GameAudio_Main_startSystemSe = 0x80115E74;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
@@ -1574,6 +1577,7 @@ SYMBOLS_MAP = {
     'GM4E01dbg':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        OSReport = 0x800EEA6C;
         GameAudio_Main_startSystemSe = 0x8011E540;
         SceneCourseSelect__calcAnm = 0x80189448;
         SceneMapSelect__calcAnm = 0x801943D0;
