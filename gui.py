@@ -2208,6 +2208,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         tools_menu = menu.addMenu('&Tools')
         pack_generator_action = tools_menu.addAction('Pack Generator')
         pack_generator_action.triggered.connect(self._on_pack_generator_action_triggered)
+        course_ripper_action = tools_menu.addAction('Course Ripper')
+        course_ripper_action.triggered.connect(self._on_course_ripper_action_triggered)
         text_image_builder_action = tools_menu.addAction('Text Image Builder')
         text_image_builder_action.triggered.connect(self._on_text_image_builder_action_triggered)
         ast_converter_action = tools_menu.addAction('AST Converter')
@@ -3939,6 +3941,180 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         bottom_layout = QtWidgets.QHBoxLayout()
         bottom_layout.addStretch()
         bottom_layout.addWidget(generate_button)
+        layout.addLayout(bottom_layout)
+        dialog.exec_()
+
+    def _on_course_ripper_action_triggered(self):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setMinimumWidth(dialog.fontMetrics().averageCharWidth() * 80)
+        dialog.setWindowTitle('Course Ripper')
+        layout = QtWidgets.QVBoxLayout(dialog)
+        description_label = QtWidgets.QLabel()
+        description_label.setWordWrap(True)
+        description_label.setText(
+            markdown_to_html(
+                '',
+                'This is a tool that rips courses from a pre-patched or pre-extended Mario Kart: '
+                'Double Dash!! ISO file.'
+                '\n\n'
+                '**NOTE:** Due to technical limitations, course names cannot be inferred '
+                'automatically and will need to set manually in the `trackinfo.ini` file for each '
+                'course. Directory names will need to be updated too, as they would have been '
+                'provided with a numbered placeholder.',
+            ))
+        layout.addWidget(description_label)
+        layout.addSpacing(dialog.fontMetrics().height())
+        form_layout = QtWidgets.QFormLayout()
+        form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        input_file_edit = PathEdit('Select Input ISO File', QtWidgets.QFileDialog.AcceptOpen,
+                                   QtWidgets.QFileDialog.ExistingFile,
+                                   ('ISO (*.iso)', 'GCM (*.gcm)'))
+        path = self._settings.value('miscellaneous/course_ripper_input_path')
+        if path:
+            input_file_edit.set_path(path)
+        path = self._settings.value('miscellaneous/course_ripper_input_last_dir')
+        if path:
+            input_file_edit.set_last_dir(path)
+
+        def on_input_file_path_changed(dirpath: str):
+            _ = dirpath
+            self._settings.setValue('miscellaneous/course_ripper_input_path',
+                                    input_file_edit.get_path())
+            self._settings.setValue('miscellaneous/course_ripper_input_last_dir',
+                                    input_file_edit.get_last_dir())
+
+        input_file_edit.path_changed.connect(on_input_file_path_changed)
+        form_layout.addRow('Input ISO File', input_file_edit)
+        output_directory_edit = PathEdit('Select Output Directory',
+                                         QtWidgets.QFileDialog.AcceptSave,
+                                         QtWidgets.QFileDialog.Directory)
+        path = self._settings.value('miscellaneous/course_ripper_output_path')
+        if path:
+            output_directory_edit.set_path(path)
+        path = self._settings.value('miscellaneous/course_ripper_output_last_dir')
+        if path:
+            output_directory_edit.set_last_dir(path)
+
+        def on_output_directory_path_changed(dirpath: str):
+            _ = dirpath
+            self._settings.setValue('miscellaneous/course_ripper_output_path',
+                                    output_directory_edit.get_path())
+            self._settings.setValue('miscellaneous/course_ripper_output_last_dir',
+                                    output_directory_edit.get_last_dir())
+
+        output_directory_edit.path_changed.connect(on_output_directory_path_changed)
+        form_layout.addRow('Output Directory', output_directory_edit)
+        humanreadable_formats_checkbox = QtWidgets.QCheckBox(
+            'Also export files as human-readable formats')
+        humanreadable_formats_checkbox.setToolTip(
+            markdown_to_html(
+                '',
+                'If checked, BTI and AST files encountered in the ripped courses will be exported '
+                '_also_ in the more accessible PNG and WAV file formats.</div>'))
+        humanreadable_formats_checkbox.toggled.connect(lambda checked: self._settings.setValue(
+            'miscellaneous/course_ripper_humanreadable_export', checked))
+        humanreadable_formats_checkbox.setChecked(
+            bool(self._settings.value('miscellaneous/course_ripper_humanreadable_export')))
+        form_layout.addRow('', humanreadable_formats_checkbox)
+        layout.addLayout(form_layout)
+        layout.addStretch()
+        layout.addSpacing(dialog.fontMetrics().height())
+
+        def rip_courses():
+            filepath = input_file_edit.get_path()
+            dirpath = output_directory_edit.get_path()
+            humanreadable_formats = humanreadable_formats_checkbox.isChecked()
+
+            if not filepath:
+                raise mkdd_extender.MKDDExtenderError('Input ISO file has not been set.')
+            if not dirpath:
+                raise mkdd_extender.MKDDExtenderError('Output directory has not been set.')
+
+            os.makedirs(dirpath, exist_ok=True)
+
+            if not os.path.isdir(dirpath):
+                raise mkdd_extender.MKDDExtenderError(
+                    'Output path already exists, but it is not a directory.')
+
+            return mkdd_extender.rip_courses_from_iso(filepath, dirpath, humanreadable_formats)
+
+        def on_rip_courses_button_clicked():
+            dirpath = output_directory_edit.get_path()
+
+            if os.path.isdir(dirpath):
+                dirpath_content = os.listdir(dirpath)
+                if dirpath_content:
+                    message_box = QtWidgets.QMessageBox(self)
+                    message_box.setIcon(QtWidgets.QMessageBox.Warning)
+                    message_box.setWindowTitle('Empty output directory?')
+                    message_box.setText(
+                        f'The output directory is not empty: it contains {len(dirpath_content)} '
+                        'files or directories.\n\n'
+                        'Would you like to delete the content of the directory?',
+                    )
+                    cancel_button = message_box.addButton('&Cancel',
+                                                          QtWidgets.QMessageBox.RejectRole)
+                    message_box.setEscapeButton(cancel_button)
+                    delete_button = message_box.addButton('&Yes; delete content and continue',
+                                                          QtWidgets.QMessageBox.DestructiveRole)
+                    message_box.setDefaultButton(cancel_button)
+                    message_box.exec_()
+                    clicked_button = message_box.clickedButton()
+                    if clicked_button != delete_button:
+                        return
+
+                    for name in dirpath_content:
+                        path = os.path.join(dirpath, name)
+                        if os.path.isdir(path):
+                            shutil.rmtree(path)
+                        else:
+                            mkdd_extender.remove_file(path)
+
+            error_message = None
+            exception_info = None
+
+            try:
+                progress_dialog = ProgressDialog('Ripping courses...', rip_courses, self)
+                result = progress_dialog.execute_and_wait()
+                if result is None:
+                    return
+                page_count, course_count = result
+
+            except mkdd_extender.MKDDExtenderError as e:
+                if e.text is None or e.detailed_text is None:
+                    error_message = str(e)
+                else:
+                    error_message = e.text
+                    exception_info = e.detailed_text
+            except AssertionError as e:
+                error_message = str(e) or 'Assertion error.'
+                exception_info = traceback.format_exc()
+            except Exception as e:
+                error_message = str(e)
+                exception_info = traceback.format_exc()
+
+            if error_message is not None:
+                error_message = error_message or 'Unknown error.'
+
+                icon_name = 'error'
+                title = 'Error'
+                text = error_message
+                detailed_text = exception_info
+            else:
+                icon_name = 'success'
+                title = 'Success!!'
+                text = (
+                    f'{course_count} courses in {page_count} page{"s" if page_count > 1 else ""} '
+                    'have been ripped successfully.')
+                detailed_text = ''
+
+            show_message(icon_name, title, text, detailed_text, self)
+
+        rip_courses_button = QtWidgets.QPushButton('Rip Courses')
+        rip_courses_button.clicked.connect(on_rip_courses_button_clicked)
+        bottom_layout = QtWidgets.QHBoxLayout()
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(rip_courses_button)
         layout.addLayout(bottom_layout)
         dialog.exec_()
 
