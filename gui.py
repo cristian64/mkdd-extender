@@ -1135,6 +1135,113 @@ def cancel_futures(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
             work_item.future.cancel()
 
 
+class EditInfoWidget(QtWidgets.QDialog):
+
+    def __init__(self, trackinfo_filepath: str, parent: QtWidgets.QWidget = None) -> None:
+        super().__init__(parent)
+
+        self.deleteLater()
+
+        self.setWindowTitle('Edit Info')
+        self.setMinimumWidth(self.fontMetrics().averageCharWidth() * 70)
+        self.setMinimumHeight(self.fontMetrics().height() * 15)
+
+        self._trackinfo_filepath = trackinfo_filepath
+
+        self._initial_dirname = os.path.basename(os.path.dirname(trackinfo_filepath))
+        with open(trackinfo_filepath, 'r', encoding='utf-8') as f:
+            self._initial_info = f.read()
+
+        layout = QtWidgets.QVBoxLayout(self)
+
+        self._directory_name_edit = QtWidgets.QLineEdit()
+        self._directory_name_edit.setText(self._initial_dirname)
+
+        self._info_edit = QtWidgets.QTextEdit()
+        font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+        font.setPointSizeF(font.pointSizeF() * 0.9)
+        self._info_edit.setFont(font)
+        self._info_edit.setAcceptRichText(False)
+        self._info_edit.setWordWrapMode(QtGui.QTextOption.NoWrap)
+        self._info_edit.setPlainText(self._initial_info)
+
+        self._directory_name_edit.textChanged.connect(self._update_save_button)
+        self._info_edit.textChanged.connect(self._update_save_button)
+
+        form_layout = QtWidgets.QFormLayout()
+        form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
+        form_layout.addRow('Directory Name', self._directory_name_edit)
+        form_layout.addRow('Info', self._info_edit)
+
+        layout.addLayout(form_layout)
+
+        self._save_button = QtWidgets.QPushButton('Save')
+        self._save_button.setEnabled(False)
+        save_button_layout = QtWidgets.QHBoxLayout()
+        save_button_layout.addStretch()
+        save_button_layout.addWidget(self._save_button)
+
+        self._save_button.clicked.connect(self._on_save_button_clicked)
+
+        layout.addLayout(save_button_layout)
+
+    def _update_save_button(self) -> None:
+        new_dirname = self._directory_name_edit.text()
+        new_info = self._info_edit.toPlainText()
+
+        self._save_button.setEnabled(
+            bool(new_dirname)
+            and (new_dirname != self._initial_dirname or new_info != self._initial_info),
+        )
+
+    def _on_save_button_clicked(self) -> None:
+        initial_track_name = ''
+        trackinfo = configparser.ConfigParser()
+        try:
+            trackinfo.read(self._trackinfo_filepath)
+            initial_track_name = trackinfo['Config'].get('trackname') or ''
+        except Exception:
+            pass
+
+        new_info = self._info_edit.toPlainText()
+        if new_info != self._initial_info:
+            with open(self._trackinfo_filepath, 'w', encoding='utf-8') as f:
+                f.write(new_info)
+
+        track_name = ''
+        trackinfo = configparser.ConfigParser()
+        try:
+            trackinfo.read(self._trackinfo_filepath)
+            track_name = trackinfo['Config'].get('trackname') or ''
+        except Exception:
+            pass
+
+        new_dirname = self._directory_name_edit.text()
+        if new_dirname != self._initial_dirname:
+            dirpath = os.path.dirname(self._trackinfo_filepath)
+            try:
+                os.rename(
+                    dirpath,
+                    os.path.join(os.path.dirname(dirpath), new_dirname),
+                )
+            except Exception as e:
+                show_message('error', 'Error', 'Unable to rename directory.', str(e))
+
+        window = MKDDExtenderWindow.find_instance()
+        window._load_custom_tracks_directory()  # pylint: disable=protected-access
+
+        if track_name != initial_track_name:
+            custom_tracks_table = window._custom_tracks_table  # pylint: disable=protected-access
+            for item in custom_tracks_table.selectedItems():
+                item.setSelected(False)
+            if track_name:
+                candidates = custom_tracks_table.findItems(track_name, QtCore.Qt.MatchContains)
+                if len(candidates) == 1:  # Only if not ambiguous.
+                    candidates[0].setSelected(True)
+
+        self.close()
+
+
 class InfoViewWidget(QtWidgets.QScrollArea):
 
     shown = QtCore.Signal()
@@ -1308,6 +1415,12 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             """))  # noqa: E501
         info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         info_box.layout().addWidget(info_widget)
+        edit_info_layout = QtWidgets.QHBoxLayout()
+        edit_info_button = QtWidgets.QPushButton('Edit Info')
+        edit_info_button.clicked.connect(lambda: EditInfoWidget(trackinfo_filepath, self).exec())
+        edit_info_layout.addWidget(edit_info_button)
+        edit_info_layout.addStretch()
+        info_box.layout().addLayout(edit_info_layout)
         layout.addWidget(info_box)
 
         if audio_filepaths:
