@@ -2126,6 +2126,14 @@ class DelayedDirectoryWatcher(QtCore.QObject):
 
 class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
+    @classmethod
+    def find_instance(cls) -> 'MKDDExtenderWindow | None':
+        app = QtWidgets.QApplication.instance()
+        for widget in app.topLevelWidgets():
+            if isinstance(widget, MKDDExtenderWindow):
+                return widget
+        return None
+
     def __init__(self,
                  parent: QtWidgets.QWidget = None,
                  flags: QtCore.Qt.WindowFlags = QtCore.Qt.WindowFlags()):
