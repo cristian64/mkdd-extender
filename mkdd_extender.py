@@ -334,6 +334,12 @@ def remove_file(filepath: str):
         pass
 
 
+def safe_copyfile(src_filepath: str, dst_filepath: str) -> None:
+    if os.path.isfile(src_filepath):
+        os.makedirs(os.path.dirname(dst_filepath), exist_ok=True)
+        shutil.copyfile(src_filepath, dst_filepath)
+
+
 def make_link(src_filepath: str, dst_filepath: str, attempt_copy_on_error: bool = True):
     remove_file(dst_filepath)
     try:
@@ -572,6 +578,363 @@ def course_name_to_course(course_name: str) -> str:
                                                        course_name).ratio())
                       for course, other_course_name in COURSE_TO_NAME.items()]
     return sorted(courses_weight, key=lambda e: e[1])[-1][0]
+
+
+def rip_minimap_coordinates(
+    iso_dirpath: str,
+) -> tuple[list[list[tuple[float, float, float, float, int]]] | None, bool]:
+    dol_path = os.path.join(iso_dirpath, 'sys', 'main.dol')
+
+    initial_minimap_values = []
+    initial_minimap_values_dict = code_patcher.read_minimap_values(get_game_id(iso_dirpath),
+                                                                   dol_path)
+    for course in COURSES:
+        initial_minimap_values.append(initial_minimap_values_dict[course])
+
+    with open(dol_path, 'rb') as f:
+        dol_data = f.read()
+
+    luigi_coordinates = struct.pack('>ffff', *initial_minimap_values_dict['Luigi'][0:4])
+    cookieland_coordinates = struct.pack('>ffff', *initial_minimap_values_dict['Mini7'][0:4])
+    orientations = bytes()
+    for _, _, _, _, orientation in initial_minimap_values:
+        orientations += struct.pack('>B', orientation)
+
+    offset = dol_data.find(luigi_coordinates)
+    offset = dol_data.find(luigi_coordinates, offset + 1)
+
+    is_extended_iso = offset != -1
+    if not is_extended_iso:
+        return [initial_minimap_values], False
+
+    BYTE_COUNT = 16  # Size of '>ffff'.
+    theoretical_cookieland_coordinates = dol_data[offset + RACE_TRACK_COUNT * BYTE_COUNT:offset +
+                                                  RACE_TRACK_COUNT * BYTE_COUNT + BYTE_COUNT]
+    has_battle_stages = cookieland_coordinates == theoretical_cookieland_coordinates
+
+    if has_battle_stages:
+        orientations_offset = dol_data.find(orientations)
+    else:
+        orientations_offset = dol_data.find(orientations[:RACE_TRACK_COUNT])
+
+    assert orientations_offset > offset
+
+    course_per_page = RACE_AND_BATTLE_COURSE_COUNT if has_battle_stages else RACE_TRACK_COUNT
+
+    delta = orientations_offset - offset
+    page_count = round(delta / course_per_page / BYTE_COUNT)
+
+    minimap_values = []
+
+    coordinates_data = dol_data[offset:]
+    orientations_data = dol_data[orientations_offset:]
+
+    for _ in range(page_count):
+        page_minimap_values = []
+
+        for _ in range(course_per_page):
+            page_minimap_values.append(
+                struct.unpack('>ffff', coordinates_data[0:BYTE_COUNT]) +
+                struct.unpack('>B', orientations_data[0:1]))
+
+            coordinates_data = coordinates_data[BYTE_COUNT:]
+            orientations_data = orientations_data[1:]
+
+        if not has_battle_stages:
+            page_minimap_values.extend(initial_minimap_values[-BATTLE_STAGE_COUNT:])
+
+        minimap_values.append(page_minimap_values)
+
+    return minimap_values, has_battle_stages
+
+
+def rip_audio_stream_filepaths(iso_dirpath: str, page_count: int) -> list[tuple[tuple[str, str]]]:
+    dol_path = os.path.join(iso_dirpath, 'sys', 'main.dol')
+    with open(dol_path, 'rb') as f:
+        dol_data = f.read()
+
+    initial_audio_data_list = gather_audio_file_indices(iso_dirpath, {}, {})[0]
+
+    # The data may have been written as `char` or as `short`; try both.
+    initial_audio_data = bytes()
+    for value in initial_audio_data_list:
+        initial_audio_data += struct.pack('>B', value)
+    offset = dol_data.find(initial_audio_data)
+    BYTE_COUNT = 1
+    if offset == -1:
+        initial_audio_data = bytes()
+        for value in initial_audio_data_list:
+            initial_audio_data += struct.pack('>H', value)
+        offset = dol_data.find(initial_audio_data)
+        BYTE_COUNT = 2
+
+    assert page_count == 1 or offset != -1
+
+    TABLE_FILE_INDEX_TO_COURSE_INDEX = {
+        0: 2,  # Baby Park
+        1: 1,  # Peach Beach
+        2: 6,  # Daisy Cruiser
+        3: 0,  # Luigi Circuit
+        4: 5,  # Mario Circuit
+        5: 10,  # Yoshi Circuit
+        6: 4,  # Mushroom Bridge
+        7: 9,  # Mushroom City
+        8: 7,  # Waluigi Stadium
+        9: 12,  # Wario Colosseum
+        10: 13,  # Dino Dino Jungle
+        11: 11,  # DK Mountain
+        12: 14,  # Bowser's Castle
+        13: 15,  # Rainbow Road
+        14: 3,  # Dry Dry Desert
+        15: 8,  # Sherbet Land
+    }
+
+    file_list = build_file_list(iso_dirpath)
+
+    pages_audio_filepath_indexes = []
+    for _ in range(page_count):
+        page_audio_file_indexes = [[] for _ in range(RACE_TRACK_COUNT)]
+        for i in range(32):
+            if offset >= 0:
+                audio_file_index = struct.unpack('>B' if BYTE_COUNT == 1 else '>H',
+                                                 dol_data[offset:offset + BYTE_COUNT])[0]
+                offset += BYTE_COUNT
+            else:
+                audio_file_index = initial_audio_data_list[i]
+            filepath = os.path.join(iso_dirpath, file_list[audio_file_index])
+            page_audio_file_indexes[TABLE_FILE_INDEX_TO_COURSE_INDEX[i if i < 16 else i -
+                                                                     16]].append(filepath)
+        pages_audio_filepath_indexes.append(page_audio_file_indexes)
+
+    return pages_audio_filepath_indexes
+
+
+def rip_courses_from_iso(
+    filepath: str,
+    dirpath: str,
+    humanreadable_formats: bool,
+) -> tuple[int, int]:
+    os.makedirs(dirpath, exist_ok=True)
+
+    if os.listdir(dirpath):
+        raise MKDDExtenderError(f'Destination directory "{dirpath}" is not empty')
+
+    iso_tmp_dir = tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX)
+    iso_tmp_dirpath = iso_tmp_dir.name
+
+    gcm_file = gcm.GCM(filepath)
+    try:
+        gcm_file.read_entire_disc()
+    except Exception as e:
+        raise MKDDExtenderError(f'Unable to read input ISO image: {str(e)}') from e
+    tuple(gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dirpath))  # It's a generator.
+
+    RARC_FILENAMES = ('coursename.arc', 'courseselect.arc', 'mapselect.arc')
+    files_dirpath = os.path.join(iso_tmp_dirpath, 'files')
+    scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
+    scenedata_filenames = os.listdir(scenedata_dirpath)
+    for language in LANGUAGES:
+        if language not in scenedata_filenames:
+            continue
+        for filename in RARC_FILENAMES:
+            filepath = os.path.join(scenedata_dirpath, language, filename)
+            rarc.extract(filepath, os.path.dirname(filepath))
+
+    minimap_values, has_extended_battle_stages = rip_minimap_coordinates(iso_tmp_dirpath)
+    page_count = len(minimap_values) if minimap_values else 1
+
+    audio_stream_filepaths = rip_audio_stream_filepaths(iso_tmp_dirpath, page_count)
+
+    page_definitions = []
+    for name in sorted(os.listdir(files_dirpath)):
+        if name == 'Course':
+            page_definitions.append((
+                None,
+                'Course',
+                'CourseName',
+                'StaffGhosts',
+            ))
+        else:
+            COURSE_PATTERN = re.compile(r'^Cours(.)$')
+            match = COURSE_PATTERN.match(name)
+            if match is not None:
+                index = match.group(1)
+                page_definitions.append((
+                    int(index, 16),
+                    f'Cours{index}',
+                    f'CourseNam{index}',
+                    f'StaffGhost{index}',
+                ))
+
+    for i, (
+            index,
+            course_dirname,
+            coursename_dirname,
+            staffghost_dirname,
+    ) in enumerate(page_definitions):
+        course_dirpath = os.path.join(files_dirpath, course_dirname)
+        coursename_dirpath = os.path.join(files_dirpath, coursename_dirname)
+        staffghosts_dirpath = os.path.join(files_dirpath, staffghost_dirname)
+
+        for j, course_name in enumerate(COURSES):
+            is_battle_stage = 'Mini' in course_name
+
+            # Only for the first page will battle stages be processed if this is not a extended
+            # ISO that has extended the number of battle stages.
+            if index not in (None, 0) and is_battle_stage and not has_extended_battle_stages:
+                continue
+
+            replaces_name = f'{COURSE_TO_NAME[course_name]}'
+            course_type = 'Battle Stage' if is_battle_stage else 'Race Track'
+            custom_course_name = f'Page {i + 1:02} - {course_type} {j + 1:02}'
+            custom_course_dirpath = os.path.join(dirpath, custom_course_name)
+            os.makedirs(custom_course_dirpath)
+
+            # Info file.
+            with open(
+                    os.path.join(custom_course_dirpath, 'trackinfo.ini'),
+                    'w',
+                    encoding='utf-8',
+            ) as f:
+                f.write('[Config]\n'
+                        'author = Unknown\n'
+                        f'trackname = {custom_course_name}\n'
+                        f'replaces = {replaces_name}\n'
+                        f'replaces_music = {replaces_name}\n'
+                        'main_language = English\n')
+
+            # Minimap coordinates.
+            if minimap_values is not None:
+                coordinates = minimap_values[i][j]
+                coordinates_dict = {
+                    "Top Left Corner X": coordinates[0],
+                    "Top Left Corner Z": coordinates[1],
+                    "Bottom Right Corner X": coordinates[2],
+                    "Bottom Right Corner Z": coordinates[3],
+                    "Orientation": coordinates[4]
+                }
+                with open(os.path.join(custom_course_dirpath, 'minimap.json'),
+                          'w',
+                          encoding='utf-8') as f:
+                    f.write(json.dumps(coordinates_dict, indent=4))
+
+            # Copy main RARC course files.
+            if course_name == 'Luigi':
+                safe_copyfile(
+                    os.path.join(course_dirpath, f'{course_name}2.arc'),
+                    os.path.join(custom_course_dirpath, 'track.arc'),
+                )
+                safe_copyfile(
+                    os.path.join(course_dirpath, f'{course_name}2L.arc'),
+                    os.path.join(custom_course_dirpath, 'track_mp.arc'),
+                )
+                safe_copyfile(
+                    os.path.join(course_dirpath, f'{course_name}.arc'),
+                    os.path.join(custom_course_dirpath, 'track_50cc.arc'),
+                )
+                safe_copyfile(
+                    os.path.join(course_dirpath, f'{course_name}L.arc'),
+                    os.path.join(custom_course_dirpath, 'track_mp_50cc.arc'),
+                )
+            else:
+                safe_copyfile(
+                    os.path.join(course_dirpath, f'{course_name}.arc'),
+                    os.path.join(custom_course_dirpath, 'track.arc'),
+                )
+                safe_copyfile(
+                    os.path.join(course_dirpath, f'{course_name}L.arc'),
+                    os.path.join(custom_course_dirpath, 'track_mp.arc'),
+                )
+
+            # Staff ghost.
+            if not is_battle_stage:
+                safe_copyfile(
+                    os.path.join(staffghosts_dirpath, f'{course_name}.ght'),
+                    os.path.join(custom_course_dirpath, 'staffghost.ght'),
+                )
+
+            # Course images.
+            if index is not None and (not is_battle_stage or has_extended_battle_stages):
+                with_page_index_xfix_func = (with_page_index_infix
+                                             if is_battle_stage else with_page_index_suffix)
+            else:
+
+                def with_page_index_xfix_func(page_index: int, path: str) -> str:
+                    del page_index
+                    return path
+
+            for language in LANGUAGES:
+                course_images_dirpath = os.path.join(custom_course_dirpath, 'course_images',
+                                                     language)
+                safe_copyfile(
+                    os.path.join(coursename_dirpath, language, f'{course_name}_name.bti'),
+                    os.path.join(course_images_dirpath, 'track_big_logo.bti'),
+                )
+                if not is_battle_stage:
+                    if index in (None, 0):
+                        # Extender does not modify the small logo (used in **RECORDS** screen),
+                        # so only take it for the first page.
+                        safe_copyfile(
+                            os.path.join(scenedata_dirpath, language, 'coursename', 'timg',
+                                         f'{course_name.lower()}_names.bti'),
+                            os.path.join(course_images_dirpath, 'track_small_logo.bti'),
+                        )
+                    safe_copyfile(
+                        os.path.join(
+                            scenedata_dirpath, language, 'courseselect', 'timg',
+                            with_page_index_xfix_func(
+                                index, f'coname_{COURSE_TO_LABEL_IMAGE_NAME[course_name]}.bti')),
+                        os.path.join(course_images_dirpath, 'track_name.bti'),
+                    )
+                    safe_copyfile(
+                        os.path.join(
+                            scenedata_dirpath, language, 'courseselect', 'timg',
+                            with_page_index_xfix_func(
+                                index, f'cop_{COURSE_TO_PREVIEW_IMAGE_NAME[course_name]}.bti')),
+                        os.path.join(course_images_dirpath, 'track_image.bti'),
+                    )
+                else:
+                    safe_copyfile(
+                        os.path.join(
+                            scenedata_dirpath, language, 'mapselect', 'timg',
+                            with_page_index_xfix_func(
+                                index, f'mozi_map{COURSE_TO_LABEL_IMAGE_NAME[course_name]}.bti')),
+                        os.path.join(course_images_dirpath, 'track_name.bti'),
+                    )
+                    safe_copyfile(
+                        os.path.join(
+                            scenedata_dirpath, language, 'mapselect', 'timg',
+                            with_page_index_xfix_func(
+                                index,
+                                f'battlemapsnap{COURSE_TO_PREVIEW_IMAGE_NAME[course_name]}.bti')),
+                        os.path.join(course_images_dirpath, 'track_image.bti'),
+                    )
+
+            # Audio stream files.
+            if not is_battle_stage and (index or 0) < len(audio_stream_filepaths):
+                (
+                    normal_audio_stream_filepath,
+                    fast_audio_stream_filepath,
+                ) = audio_stream_filepaths[index or 0][j]
+                safe_copyfile(normal_audio_stream_filepath,
+                              os.path.join(custom_course_dirpath, 'lap_music_normal.ast'))
+                safe_copyfile(fast_audio_stream_filepath,
+                              os.path.join(custom_course_dirpath, 'lap_music_fast.ast'))
+
+    # Post processing for proper perusal.
+    if humanreadable_formats:
+        for rootdir, dirnames, filenames in os.walk(dirpath):
+            dirnames.sort()
+            filenames.sort()
+            for filename in filenames:
+                filepath = os.path.join(rootdir, filename)
+                stem, ext = os.path.splitext(filepath)
+                if ext == '.bti':
+                    convert_bti_to_png(filepath, f'{stem}.png')
+                elif ext == '.ast':
+                    ast_converter.convert_to_wav(filepath, f'{stem}.wav')
+
+    return page_count, len(os.listdir(dirpath))
 
 
 def get_tilt_setting_from_bol_file(course_filepath: str) -> int:
