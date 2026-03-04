@@ -1261,6 +1261,28 @@ The address to the one place from where `ItemShuffleMgr::calcSlot()` is called. 
 instruction will be hijacked to add support for type-specific item boxes.
 """
 
+INIT_IDLE_COUNT_INJECTION_ADDRESSES = {
+    'GM4E01': 0x801CD81C,
+    'GM4P01': 0x801CD730,
+    'GM4J01': 0x801CD81C,
+    'GM4E01dbg': 0x801FB8A4,
+}
+"""
+The address to one of the last instructions in `RaceApp::__ct()` that will be hijacked by the Idle
+Autopilot code patch to initialize a few variables before the race starts.
+"""
+
+KARTCHECK_CHECKALLCLEARKEY_CALL_ADDRESSES = {
+    'GM4E01': 0x802B0AD0,
+    'GM4P01': 0x802B0A94,
+    'GM4J01': 0x802B0AF8,
+    'GM4E01dbg': 0x802F1EB8,
+}
+"""
+The address to the one place from where `KartCheck::CheckAllClearKey()` is called. This `bl`
+instruction will be hijacked to add support for the Idle Autopilot code patch.
+"""
+
 RESET_SECTION_COUNT_CALL_ADDRESSES = {
     'GM4E01': 0x80179298,
     'GM4P01': 0x8017813C,
@@ -1521,6 +1543,9 @@ SYMBOLS_MAP = {
         KartStrat__DoSpeedCrl = 0x802a77f4;
         CrsGround__isItemInvalGround = 0x80181524;
         CrsGround__getStaggerCode = 0x80181564;
+        KartCheck__CheckAllClearKey = 0x802C60E0;
+        KartCtrl__getKartEnemy = 0x802B2164;
+        RivalBodyCtrl__comebackRescure = 0x80245578;
         """),
     'GM4P01':
     textwrap.dedent("""\
@@ -1547,6 +1572,9 @@ SYMBOLS_MAP = {
         KartStrat__DoSpeedCrl = 0x802a77d0;
         CrsGround__isItemInvalGround = 0x801803c8;
         CrsGround__getStaggerCode = 0x80180408;
+        KartCheck__CheckAllClearKey = 0x802C60A4;
+        KartCtrl__getKartEnemy = 0x802B2128;
+        RivalBodyCtrl__comebackRescure = 0x80245548;
         """),
     'GM4J01':
     textwrap.dedent("""\
@@ -1573,6 +1601,9 @@ SYMBOLS_MAP = {
         KartStrat__DoSpeedCrl = 0x802a781c;
         CrsGround__isItemInvalGround = 0x80181524;
         CrsGround__getStaggerCode = 0x80181564;
+        KartCheck__CheckAllClearKey = 0x802C6108;
+        KartCtrl__getKartEnemy = 0x802B218C;
+        RivalBodyCtrl__comebackRescure = 0x802455A0;
         """),
     'GM4E01dbg':
     textwrap.dedent("""\
@@ -1601,6 +1632,9 @@ SYMBOLS_MAP = {
         KartStrat__DoSpeedCrl = 0x802ea110;
         CrsGround__isItemInvalGround = 0x801a3204;
         CrsGround__getStaggerCode = 0x801a32c0;
+        KartCheck__CheckAllClearKey = 0x80306630;
+        KartCtrl__getKartEnemy = 0x802F3CA8;
+        RivalBodyCtrl__comebackRescure = 0x80282CF8;
         """),
 }
 """
@@ -1887,8 +1921,10 @@ def patch_dol_file(
             ('__CURRENT_PAGE_ADDRESS__', f'0x{CURRENT_PAGE_ADDRESSES[game_id]:08X}'),
             ('__EXTENDER_CUP__', str(int(extender_cup))),
             ('__GAMEAUDIO_MAIN_ADDRESS__', f'0x{GAMEAUDIO_MAIN_ADDRESSES[game_id]:08X}'),
+            ('__GM4E01__', str(int(game_id == 'GM4E01'))),
+            ('__GM4P01__', str(int(game_id == 'GM4P01'))),
+            ('__GM4J01__', str(int(game_id == 'GM4J01'))),
             ('__GM4E01_DEBUG_BUILD__', str(int(game_id == 'GM4E01dbg'))),
-            ('__GM4P01_PAL__', str(int(game_id == 'GM4P01'))),
             ('__GP_AWARDED_SCORES_ADDRESS__', f'0x{GP_AWARDED_SCORES_ADDRESSES[game_id]:08X}'),
             ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
             ('__GP_CUP_INDEX_ADDRESS__', f'0x{GP_CUP_INDEX_ADDRESSES[game_id]:08X}'),
@@ -1911,6 +1947,7 @@ def patch_dol_file(
              str(initial_page_index) if args.reset_course_page_on_lan_initialization else '-1'),
             ('__RESET_COURSE_PAGE_ON_TITLE_SCREEN__',
              str(initial_page_index) if args.reset_course_page_on_title_screen else '-1'),
+            ('__IDLE_AUTOPILOT__', str(int(bool(args.idle_autopilot)))),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__CUSTOMIZABLE_FALLING_STARS__', str(int(customizable_falling_stars))),
@@ -2085,6 +2122,12 @@ def patch_dol_file(
                                        'itemobjmgr_isavailablerollingslot_ex')
                     project.branchlink(ITEMSHUFFLEMGR_CALCSLOT_CALL_ADDRESSES[game_id],
                                        'itemshufflemgr_calcslot_ex')
+
+                if args.idle_autopilot:
+                    project.branchlink(INIT_IDLE_COUNT_INJECTION_ADDRESSES[game_id],
+                                       'init_idle_count')
+                    project.branchlink(KARTCHECK_CHECKALLCLEARKEY_CALL_ADDRESSES[game_id],
+                                       'kartcheck_checkallclearkey_ex')
 
                 if customizable_falling_stars:
                     project.branchlink(CFS_ITEMOBJMGR_OCCURITEM_CALL_ADDRESSES[game_id],

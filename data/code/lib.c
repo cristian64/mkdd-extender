@@ -22,8 +22,10 @@
 #define RESET_COURSE_PAGE_ON_LAN_INITIALIZATION __RESET_COURSE_PAGE_ON_LAN_INITIALIZATION__
 #define RESET_COURSE_PAGE_ON_TITLE_SCREEN __RESET_COURSE_PAGE_ON_TITLE_SCREEN__
 #define GAMEAUDIO_MAIN_ADDRESS __GAMEAUDIO_MAIN_ADDRESS__
+#define GM4E01 __GM4E01__
+#define GM4P01 __GM4P01__
+#define GM4J01 __GM4J01__
 #define GM4E01_DEBUG_BUILD __GM4E01_DEBUG_BUILD__
-#define GM4P01_PAL __GM4P01_PAL__
 #define GP_AWARDED_SCORES_ADDRESS __GP_AWARDED_SCORES_ADDRESS__
 #define GP_COURSE_INDEX_ADDRESS __GP_COURSE_INDEX_ADDRESS__
 #define GP_CUP_INDEX_ADDRESS __GP_CUP_INDEX_ADDRESS__
@@ -40,6 +42,7 @@
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 #define USE_ALT_BUTTONS __USE_ALT_BUTTONS__
+#define IDLE_AUTOPILOT __IDLE_AUTOPILOT__
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 #define CUSTOMIZABLE_FALLING_STARS __CUSTOMIZABLE_FALLING_STARS__
@@ -172,7 +175,7 @@ void process_course_page_change(const int mode)
         // the arguments to the setNetworkMode() call.
 #if GM4E01_DEBUG_BUILD
         const int offset = 0x5570;
-#elif GM4P01_PAL
+#elif GM4P01
         const int offset = 0x55E8;
 #else
         const int offset = 0x5608;
@@ -879,24 +882,61 @@ int get_stagger_code_hijack(const struct CrsGround* const ground)
 #define BOUNCE_DESCENT_CAP -300.0f
 #define BOUNCE_BOOST_XZ_FLOOR 0x4500
 
-#if !GM4P01_PAL
-
+#if GM4E01
 #define RACE_MANAGER_OFFSET -0x5C38
-
-#else
-
+#define KART_CTRL_OFFSET -0x4E98
+#elif GM4P01
 #define RACE_MANAGER_OFFSET -0x5C18
-
+#define KART_CTRL_OFFSET -0x4E78
+#elif GM4J01
+#define RACE_MANAGER_OFFSET -0x5C38
+#define KART_CTRL_OFFSET -0x4E98
+#elif GM4E01_DEBUG_BUILD
+#define RACE_MANAGER_OFFSET -0x5BD8
+#define KART_CTRL_OFFSET -0x4DE0
 #endif
 
 #define RACE_MANAGER_POINTER_OFFSET 0x38
 #define RACE_MANAGER_IS_MIRROR_OFFSET 0x2C
 
-#if BOUNCY_TERRAIN_TYPE
+struct KartTarget;
+struct KartBody;
+struct KartChecker;
+
+typedef struct RivalKart
+{
+    char unknown[0x20];
+    struct KartBody* kart_body;             // 20
+    void* sus[4];                           // 24
+    int _34;                                // 34
+    int _38;                                // 38
+    struct RivalBodyCtrl* rival_body_ctrl;  // 3c
+    void* item_ctrl;                        // 40
+    void* speed_ctrl;                       // 44
+} RivalKart;
+
+enum ERaceMode
+{
+    INV_MODE = 0,
+    TIME_ATTACK = 0x1,
+    GRAND_PRIX = 0x2,
+    VERSUS_RACE = 0x3,
+    BALLOON_BATTLE = 0x4,
+    ROBBERY_BATTLE = 0x5,
+    BOMB_BATTLE = 0x6,
+    ESCAPE_BATTLE = 0x7,
+    AWARD_DEMO = 0x8,
+    STAFF_ROLL = 0x9,
+};
 
 typedef struct RaceInfo
 {
-    char unknown_buffer[0x2C];
+    bool is_tiny_process;
+    bool is_land_mode;
+    bool is_true_ending;
+    unsigned int random_seed;
+    enum ERaceMode race_mode;
+    char unknown_buffer[0x21];
     bool is_mirror;
 } RaceInfo;
 
@@ -904,12 +944,23 @@ typedef struct RaceMgr
 {
     char unknown_buffer[0x38];
     struct RaceInfo* race_info;
+    void* race_bgm_player;
+    void* console;
+    void* course;
+    struct KartChecker* kart_checkers[8];
 } RaceMgr;
 
 typedef struct RaceMgrContainer
 {
     struct RaceMgr* race_manager;
 } RaceMgrContainer;
+
+typedef struct KartGame
+{
+    struct KartBody* body;
+    unsigned char _4[0x12 - 004];
+    unsigned short count_down_duration;
+} KartGame;
 
 typedef struct KartBody
 {
@@ -954,6 +1005,45 @@ typedef struct KartBody
     char unknown_timer;  // Offset = 0x5B5
 } KartBody;
 
+typedef struct CButton
+{
+    unsigned int button;              // buttons held down
+    unsigned int trigger;             // buttons newly pressed this frame
+    unsigned int release;             // buttons released this frame
+    unsigned char analog_a;           //
+    unsigned char analog_b;           //
+    unsigned char analog_l;           // left trigger percent
+    unsigned char analog_r;           // right trigger percent
+    float analog_lf;                  // left trigger analog percent
+    float analog_rf;                  // right trigger analog percent
+    unsigned int repeat;              // buttons currently marked as "repeated" triggers when held
+    unsigned int repeat_timer;        // frames since current button combo has been held
+    unsigned int repeat_last_button;  // last buttons pressed
+    unsigned int repeat_mask;         // button ask to allow repeating trigger inputs
+    unsigned int repeat_delay;        // delay before beginning repeated input
+    unsigned int repeat_frequency;    // repeat input every X frames
+} CButton;
+
+typedef struct KartGamePad
+{
+    int unknown[6];
+    CButton buttons;
+} KartGamePad;
+
+typedef struct KartChecker
+{
+    unsigned short race_flags;
+    short target_kart_number;
+    int num_sectors;
+    int num_bitfields;
+    int max_lap;
+    int best_lap_idx;
+    void* lap_times;
+    void* lap_splits;
+    int player_kart_color;
+    struct KartGamePad* kart_game_pads[2];
+} KartChecker;
+
 typedef struct KartStrat
 {
     struct KartBody* kart_body;
@@ -979,8 +1069,21 @@ typedef struct KartCtrl
     char unknown_buffer_2[0x20];
     struct KartBody* kart_bodies[8];  // Offset = 0xA0
     char unknown_buffer_3[0xE0];
-    struct KartSound* kart_sounds[8];  // Offset = 0x1A0
+    struct KartSound* kart_sounds[8];    // Offset = 0x1A0
+    struct KartTarget* kart_targets[8];  // Offset = 0x1C0
 } KartCtrl;
+
+typedef struct KartTarget
+{
+    void* center;
+} KartTarget;
+
+typedef struct KartCheck
+{
+    struct KartBody* body;
+} KartCheck;
+
+#if BOUNCY_TERRAIN_TYPE
 
 float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
@@ -1512,3 +1615,126 @@ void do_spd_ctrl_call_hijack()
 }
 
 #endif
+
+#if IDLE_AUTOPILOT
+
+#define RACE_SESSION_INVALID 0
+#define RACE_SESSION_IDLE 1
+#define RACE_SESSION_RUNNING 2
+
+static unsigned char s_race_state = 0xFF;
+static unsigned short s_idle_count[8] = {[0 ... 7] = 0xFFFF};
+// NOTE: Initialized to non-zero values to ensure correct calculation of the new OS Arena.
+
+void init_idle_count(RaceMgr* const race_manager)
+{
+    // The race manager happens to be in r3 in the place from where this function is called, hence
+    // that it can be declared as the first parameter of the function.
+
+    const enum ERaceMode race_mode = race_manager->race_info->race_mode;
+    s_race_state = (race_mode == TIME_ATTACK || race_mode == GRAND_PRIX || race_mode == VERSUS_RACE)
+                       ? RACE_SESSION_IDLE
+                       : RACE_SESSION_INVALID;
+
+    for (int i = 0; i < 8; ++i)
+    {
+        s_idle_count[i] = 0;
+    }
+
+    asm("or %r3, %r31, %r31");  // Hijacked instruction.
+}
+
+int kartcheck_checkallclearkey_ex(const KartCheck* const this)
+{
+    register char* const r13 asm("r13");
+
+    if (KartCheck__CheckAllClearKey(this))
+        return true;
+
+    if (s_race_state == RACE_SESSION_INVALID)
+        return false;
+
+    const KartBody* const kart_body = this->body;
+
+    const KartGame* const kart_game = kart_body->kart_game;
+    if (kart_game->count_down_duration == 180)
+    {
+        s_race_state = RACE_SESSION_RUNNING;
+    }
+    else if (s_race_state != RACE_SESSION_RUNNING)
+        return false;
+
+    const int kart_num = (int)(kart_body->kart_num);
+
+    const RaceMgrContainer* const race_manager_container =
+        (RaceMgrContainer*)(r13 + RACE_MANAGER_OFFSET);
+    const RaceMgr* const race_manager = race_manager_container->race_manager;
+
+    const KartChecker* const kart_checker = race_manager->kart_checkers[kart_num];
+
+    for (int i = 0; i < 2; ++i)
+    {
+        const KartGamePad* const kart_game_pad = kart_checker->kart_game_pads[i];
+        if (kart_game_pad)
+        {
+            if (kart_game_pad->buttons.button)
+            {
+                // Game pad shows human activity; autopilot will be disabled.
+                s_idle_count[kart_num] = 0;
+                return false;
+            }
+        }
+    }
+
+    // Wait for a few seconds before autopilot is ultimately enabled.
+    const unsigned short frame_count = 600;
+    if (s_idle_count[kart_num] < frame_count)
+    {
+        const bool touching_ground = kart_body->num_wheels_grounded > 0;
+        if (touching_ground)
+        {
+            s_idle_count[kart_num] += 1;
+
+            // If just reached, adjust enemy path point so that the CPU kart knows where to go.
+            if (s_idle_count[kart_num] == frame_count)
+            {
+                // Karts keep track of two different enemy path points:
+                //
+                // 1. The enemy path point that the CPU targets to know which direction to take.
+                // 2. The enemy path point that all items (e.g. red shells) would target when
+                //    launched from a kart.
+                //
+                // TIP: MKDD Track Editor can show both when hooked into Dolphin.
+                //
+                // When humans are driving a kart, the CPU enemy path point is _not_ kept up to
+                // date. Humans may or may not reach enemy path points sequentially, as the CPU
+                // would. This results in a problem when autopilot is re-activated after human
+                // interaction: the CPU kart would be left potentially targeting an old enemy path
+                // point that may be behind (or behind an inaccessible wall, etc.).
+                //
+                // The logic here is to use the enemy path point that all karts do track (i.e. 2.),
+                // and assign it as the CPU enemy path point (i.e. 1.).
+
+                // Address for KartCtrl singleton seen in KartCtrl::makeKartCtrl().
+                KartCtrl* const kart_ctrl = (KartCtrl*)*(KartCtrl**)(r13 + KART_CTRL_OFFSET);
+                KartTarget* const kart_target = kart_ctrl->kart_targets[kart_num];
+                RivalKart* const rival_kart =
+                    (RivalKart*)KartCtrl__getKartEnemy(kart_ctrl, kart_num);
+                RivalBodyCtrl__comebackRescure(
+                    rival_kart->rival_body_ctrl, kart_target->center, false);
+
+                return true;
+            }
+        }
+        else
+        {
+            s_idle_count[kart_num] = 0;
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+#endif  // IDLE_AUTOPILOT
