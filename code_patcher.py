@@ -1911,6 +1911,7 @@ def patch_dol_file(
              str(initial_page_index) if args.reset_course_page_on_lan_initialization else '-1'),
             ('__RESET_COURSE_PAGE_ON_TITLE_SCREEN__',
              str(initial_page_index) if args.reset_course_page_on_title_screen else '-1'),
+            ('__IDLE_AUTOPILOT__', str(int(bool(args.idle_autopilot)))),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
             ('__CUSTOMIZABLE_FALLING_STARS__', str(int(customizable_falling_stars))),
@@ -2085,6 +2086,10 @@ def patch_dol_file(
                                        'itemobjmgr_isavailablerollingslot_ex')
                     project.branchlink(ITEMSHUFFLEMGR_CALCSLOT_CALL_ADDRESSES[game_id],
                                        'itemshufflemgr_calcslot_ex')
+
+                if args.idle_autopilot:
+                    project.branchlink(0x801CD81C, 'init_idle_count')
+                    project.branchlink(0x802B0AD0, 'kartcheck_checkallclearkey_ex')
 
                 if customizable_falling_stars:
                     project.branchlink(CFS_ITEMOBJMGR_OCCURITEM_CALL_ADDRESSES[game_id],

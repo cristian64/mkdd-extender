@@ -3633,6 +3633,12 @@ OPTIONAL_ARGUMENTS = {
             'races/battles.\n\n'
             'Code patch version: v1.1.1',
         ),
+        (
+            'Idle Autopilot',
+            bool,
+            'If enabled, the Idle Autopilot code patch will be added to the game, which will turn '
+            'autopilot on for players that appear to be inactive at the start of the race.',
+        ),
         ('---', None, None),
         (
             'Code Patching Mode',

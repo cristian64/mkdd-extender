@@ -40,6 +40,7 @@
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 #define USE_ALT_BUTTONS __USE_ALT_BUTTONS__
+#define IDLE_AUTOPILOT __IDLE_AUTOPILOT__
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
 #define CUSTOMIZABLE_FALLING_STARS __CUSTOMIZABLE_FALLING_STARS__
@@ -892,24 +893,57 @@ int get_stagger_code_hijack(const struct CrsGround* const ground)
 #define RACE_MANAGER_POINTER_OFFSET 0x38
 #define RACE_MANAGER_IS_MIRROR_OFFSET 0x2C
 
-#if BOUNCY_TERRAIN_TYPE
+struct KartBody;
+struct KartChecker;
+
+enum ERaceMode
+{
+    INV_MODE = 0,
+    TIME_ATTACK = 0x1,
+    GRAND_PRIX = 0x2,
+    VERSUS_RACE = 0x3,
+    BALLOON_BATTLE = 0x4,
+    ROBBERY_BATTLE = 0x5,
+    BOMB_BATTLE = 0x6,
+    ESCAPE_BATTLE = 0x7,
+    AWARD_DEMO = 0x8,
+    STAFF_ROLL = 0x9,
+};
 
 typedef struct RaceInfo
 {
-    char unknown_buffer[0x2C];
+    bool is_tiny_process;
+    bool is_land_mode;
+    bool is_true_ending;
+    unsigned int random_seed;
+    enum ERaceMode race_mode;
+    char unknown_buffer[0x21];
     bool is_mirror;
 } RaceInfo;
+
+
 
 typedef struct RaceMgr
 {
     char unknown_buffer[0x38];
     struct RaceInfo* race_info;
+    void* race_bgm_player;
+    void* console;
+    void* course;
+    struct KartChecker* kart_checkers[8];
 } RaceMgr;
 
 typedef struct RaceMgrContainer
 {
     struct RaceMgr* race_manager;
 } RaceMgrContainer;
+
+typedef struct KartGame
+{
+    struct KartBody* body;
+    unsigned char _4[0x12 - 004];
+    unsigned short count_down_duration;
+} KartGame;
 
 typedef struct KartBody
 {
@@ -954,6 +988,60 @@ typedef struct KartBody
     char unknown_timer;  // Offset = 0x5B5
 } KartBody;
 
+typedef struct CButton
+{
+    unsigned int button;              // buttons held down
+    unsigned int trigger;             // buttons newly pressed this frame
+    unsigned int release;             // buttons released this frame
+    unsigned char analog_a;           //
+    unsigned char analog_b;           //
+    unsigned char analog_l;           // left trigger percent
+    unsigned char analog_r;           // right trigger percent
+    float analog_lf;                  // left trigger analog percent
+    float analog_rf;                  // right trigger analog percent
+    unsigned int repeat;              // buttons currently marked as "repeated" triggers when held
+    unsigned int repeat_timer;        // frames since current button combo has been held
+    unsigned int repeat_last_button;  // last buttons pressed
+    unsigned int repeat_mask;         // button ask to allow repeating trigger inputs
+    unsigned int repeat_delay;        // delay before beginning repeated input
+    unsigned int repeat_frequency;    // repeat input every X frames
+} CButton;
+
+typedef struct KartGamePad
+{
+    int unknown[6];
+    CButton buttons;
+} KartGamePad;
+
+typedef struct KartChecker
+{
+    unsigned short race_flags;
+    short target_kart_number;
+    int num_sectors;
+    int num_bitfields;
+    int max_lap;
+    int best_lap_idx;
+    void* lap_times;
+    void* lap_splits;
+    int player_kart_color;
+    struct KartGamePad* kart_game_pads[2];
+    // bool mLapRenewal;
+    // bool mRaceEnd;
+    // unsigned char _0x2a; // only seems to get set in the constructor
+    // int mLap;
+    // float mSectorProgression;
+    // int mWarpState;
+    // int mGeneration;
+    // int mSectorIdx;
+    // void *mSector1; // TODO: figure out difference between these, sector 2 seems to get used all the time
+    // void *mSector2;
+    // float mLapProgression;
+    // float mPrevLapProgression;
+    // float mLapProgression2; // might be max Lap Progression
+    // float mRaceProgression;
+    // unsigned int *mPassedSectors; // array of bitfields that keep track of what checkpoints have been passed 
+} KartChecker;
+
 typedef struct KartStrat
 {
     struct KartBody* kart_body;
@@ -981,6 +1069,13 @@ typedef struct KartCtrl
     char unknown_buffer_3[0xE0];
     struct KartSound* kart_sounds[8];  // Offset = 0x1A0
 } KartCtrl;
+
+typedef struct KartCheck
+{
+    struct KartBody* body;
+} KartCheck;
+
+#if BOUNCY_TERRAIN_TYPE
 
 float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
@@ -1512,3 +1607,104 @@ void do_spd_ctrl_call_hijack()
 }
 
 #endif
+
+#if IDLE_AUTOPILOT
+
+static bool s_race_started = false;
+static RaceMgr* s_race_manager = NULL;
+static unsigned char s_idle_count[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+// With these, things work well
+// static bool* const s_race_started = (bool*)0x80316A62;
+// static RaceMgr** const s_race_manager = (RaceMgr**)0x80316A64;
+// static unsigned char* const s_idle_count = (unsigned char*)0x80316A68;
+
+#define PERMANENTLY_DISABLED_VALUE 255
+
+void init_idle_count(RaceMgr* const race_manager)
+{
+    // The race manager happens to be in r3 in the place from where this function is called, hence
+    // that it can be declared as the first parameter of the function.
+
+    s_race_started = false;
+    s_race_manager = race_manager;
+
+    const enum ERaceMode race_mode = race_manager->race_info->race_mode;
+    const int has_waypoints =
+        race_mode == TIME_ATTACK || race_mode == GRAND_PRIX || race_mode == VERSUS_RACE;
+    const unsigned char initial_value = has_waypoints ? 0 : PERMANENTLY_DISABLED_VALUE;
+
+    for (int i = 0; i < 8; ++i)
+    {
+        s_idle_count[i] = initial_value;
+    }
+
+    asm("or %r3, %r31, %r31");  // Hijacked instruction.
+}
+
+int kartcheck_checkallclearkey_ex(const KartCheck* const this)
+{
+    const KartBody* const kart_body = this->body;
+
+    // This is the sole check in the original KartCheck::CheckAllClearKey().
+    if ((kart_body->kart_state_flags_3_isCPU & 4) && (kart_body->kart_state_flags_3_isCPU & 8))
+        return true;
+
+    const KartGame* const kart_game = kart_body->kart_game;
+    if (kart_game->count_down_duration == 180)
+    {
+        s_race_started = true;
+    }
+    else if (!s_race_started)
+        return false;
+
+    const int kart_num = (int)(kart_body->kart_num);
+
+    if (s_idle_count[kart_num] == PERMANENTLY_DISABLED_VALUE)
+        return false;
+
+    const RaceMgr* const race_manager = s_race_manager;
+    const KartChecker* const kart_checker = race_manager->kart_checkers[kart_num];
+
+    for (int i = 0; i < 2; ++i)
+    {
+        const KartGamePad* const kart_game_pad = kart_checker->kart_game_pads[i];
+        if (kart_game_pad)
+        {
+            // OSReport("%d Buttons pad: %u\n", kart_num, kart_game_pad->buttons.button);
+            if (kart_game_pad->buttons.button)
+            {
+                // Game pad shows human activity; autopilot will be permanently disabled.
+                s_idle_count[kart_num] = PERMANENTLY_DISABLED_VALUE;
+                return false;
+            }
+        }
+    }
+
+    // Wait for a few frames before autopilot is ultimately enabled.
+    if (s_idle_count[kart_num] < 100)
+    {
+        s_idle_count[kart_num] += 1;
+        return false;
+    }
+
+#if 0
+    // Right now, autopilot will be turned off permanently once there is any human interaction with
+    // the pad. The reason being that the target enemy path point would go stale as the human is
+    // driving the kart, preventing the autopilot from working if/when re-enabled.
+    //
+    // The following logic is an idea where the target enemy point that is used for items, and that
+    // is updated even for humans, would be used for setting up the target enemy point that
+    // autopilot requires.
+    KartCtrl* const kart_ctrl = NULL;  // The address  to this object still needs to be found.
+    KartTarget* const kart_target = KartCtrl__getKartTarget(kart_ctrl, kart_num);
+    RivalKart* const rival_kart = KartCtrl__getKartEnemy(kart_num);
+    RivalBodyCtrl__comebackRescure(rival_kart->rival_body_kart, kart_target->center, false);
+    // Question: Will this simulate some rescue? Perhaps it needs to be more granular by running the
+    // functions inside that (but without rescuing part).
+#endif
+
+    return true;
+}
+
+#endif  // IDLE_AUTOPILOT
