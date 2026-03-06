@@ -1085,7 +1085,8 @@ typedef struct KartCheck
 
 #if BOUNCY_TERRAIN_TYPE
 
-float s_last_momenta[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+static float s_last_momenta[] = {[0 ... 7] = -1.0f};
+// NOTE: Initialized to non-zero values to ensure correct calculation of the new OS Arena.
 
 // Reads number of wheels on ground. If > 0, is grounded.
 bool is_touching_ground(const struct KartBody* const kart_body)
