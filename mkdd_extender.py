@@ -317,6 +317,21 @@ class MKDDExtenderCanceled(Exception):
     pass
 
 
+if frozen:
+    # The function that loads resource files in GeckoLoader will be monkey-patched to account for
+    # the extra directory that PyInstaller introduces.
+    def geckoloader_resource_path(relative_path: pathlib.Path) -> pathlib.Path:
+        base_path = pathlib.Path(sys.executable).parent / '_internal'
+        if not base_path.is_dir():
+            raise MKDDExtenderError(f'"{base_path}" not found or not a directory')
+        path = base_path / relative_path
+        if not path.exists():
+            raise MKDDExtenderError(f'"{path}" not found')
+        return path
+
+    GeckoLoader.resource_path = geckoloader_resource_path
+
+
 @contextlib.contextmanager
 def current_directory(dirpath):
     cwd = os.getcwd()
