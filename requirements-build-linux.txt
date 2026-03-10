@@ -1,5 +1,5 @@
-altgraph==0.17.4
-packaging==25.0
-pyinstaller==6.14.2
-pyinstaller-hooks-contrib==2025.5
-setuptools==80.9.0
+altgraph==0.17.5
+packaging==26.0
+pyinstaller==6.19.0
+pyinstaller-hooks-contrib==2026.3
+setuptools==82.0.1
