@@ -332,7 +332,6 @@ def open_and_select_in_directory(path: str):
         explorer_path = os.path.join(os.environ['WINDIR'], 'explorer.exe')
         subprocess.check_call((explorer_path, '/select,', path))
     elif mkdd_extender.macos:
-        open_directory(os.path.dirname(path))
         subprocess.check_call(('open', '--reveal', path))
     else:
         if mkdd_extender.frozen:
