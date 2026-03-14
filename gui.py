@@ -312,8 +312,18 @@ def show_long_message(icon_name: str, title: str, text: str, parent: QtWidgets.Q
 def open_directory(dirpath: str):
     if mkdd_extender.windows:
         os.startfile(dirpath)  # pylint: disable=no-member
+    elif mkdd_extender.macos:
+        subprocess.check_call(('open', dirpath))
     else:
-        subprocess.check_call(('open' if mkdd_extender.macos else 'xdg-open', dirpath))
+        if mkdd_extender.frozen:
+            # PyInstaller bundles copies of libraries that can clash with the system's. The
+            # path in `LD_LIBRARY_PATH` that it sets must be cleared to prevent the dynamic linker
+            # from finding the wrong library.
+            env = os.environ.copy()
+            env.pop('LD_LIBRARY_PATH', None)
+        else:
+            env = os.environ
+        subprocess.check_call(('xdg-open', dirpath), env=env)
 
 
 def open_and_select_in_directory(path: str):
@@ -325,16 +335,27 @@ def open_and_select_in_directory(path: str):
         open_directory(os.path.dirname(path))
         subprocess.check_call(('open', '--reveal', path))
     else:
-        subprocess.check_call((
-            'dbus-send',
-            '--session',
-            '--dest=org.freedesktop.FileManager1',
-            '--type=method_call',
-            '/org/freedesktop/FileManager1',
-            'org.freedesktop.FileManager1.ShowItems',
-            f'array:string:file://{path}',
-            'string:""',
-        ))
+        if mkdd_extender.frozen:
+            # PyInstaller bundles copies of libraries that can clash with the system's. The
+            # path in `LD_LIBRARY_PATH` that it sets must be cleared to prevent the dynamic linker
+            # from finding the wrong library.
+            env = os.environ.copy()
+            env.pop('LD_LIBRARY_PATH', None)
+        else:
+            env = os.environ
+        subprocess.check_call(
+            (
+                'dbus-send',
+                '--session',
+                '--dest=org.freedesktop.FileManager1',
+                '--type=method_call',
+                '/org/freedesktop/FileManager1',
+                'org.freedesktop.FileManager1.ShowItems',
+                f'array:string:file://{path}',
+                'string:""',
+            ),
+            env=env,
+        )
 
 
 class PathEdit(QtWidgets.QWidget):
