@@ -120,7 +120,7 @@ void refresh_lanselectmode()
 
 #if BATTLE_STAGES
 
-int* g_scenemapselect;
+static int* g_scenemapselect = 0xFFFFFFFF;
 
 void refresh_mapselectmode()
 {
@@ -569,7 +569,7 @@ void cfs_kartgame_itemwatchman_ex(void* const p1, const struct ItemObj* const it
 
 #if SECTIONED_COURSES
 
-static unsigned short g_section_count = 0;
+static unsigned short g_section_count = 0xFFFF;
 
 // Due to the nature of the compiler, portions of the code had to be rewritten in ASM
 // so that the compiler would not ignore it, and thus break this code patch.
