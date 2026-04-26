@@ -3197,6 +3197,7 @@ def inject_gecko_cheat_codes(text: str, dol_path: str) -> None:
             'GX',
             '--txtcodes',
             'ALL',
+            '--optimize',
             '--quiet',
         ))
         cli._exec(args, tmp_dir)  # pylint: disable=protected-access
