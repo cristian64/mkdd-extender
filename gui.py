@@ -3005,6 +3005,31 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             self._pending_undo_actions += 1
             self._process_undo_action()
 
+    def _update_shelf_item(self, name: str) -> bool:
+        message_box = QtWidgets.QMessageBox(self)
+        message_box.setIcon(QtWidgets.QMessageBox.Question)
+        message_box.setWindowTitle('Update Shelf Item')
+        message_box.setText(f'Update "{name}" item with the current mapping?')
+        no_button = message_box.addButton('&No', QtWidgets.QMessageBox.RejectRole)
+        message_box.setEscapeButton(no_button)
+        update_button = message_box.addButton('&Update', QtWidgets.QMessageBox.DestructiveRole)
+        message_box.setDefaultButton(update_button)
+        message_box.exec_()
+        clicked_button = message_box.clickedButton()
+        if clicked_button != update_button:
+            return
+
+        shelf_items = []
+        for shelf_item in self._get_shelf_items():
+            if shelf_item[0] == name:
+                shelf_item = (
+                    name,
+                    tuple(item[4] for item in self._get_page_item_values_enabled_only()),
+                )
+            shelf_items.append(shelf_item)
+
+        self._settings.setValue('shelf/items', shelf_items)
+
     def _open_first_run_dialog(self):
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle('Hello!')
@@ -4907,10 +4932,14 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             load_button = QtWidgets.QPushButton('Load')
             load_button.clicked.connect(lambda _checked=False, i=i: self._load_shelf_item(i))
             load_button.clicked.connect(shelf_menu.close)
+            update_button = QtWidgets.QPushButton('Update')
+            update_button.clicked.connect(
+                lambda _checked=False, name=name: self._update_shelf_item(name))
             delete_button = QtWidgets.QPushButton('Delete')
             delete_button.clicked.connect(lambda _checked=False, i=i: self._delete_shelf_item(i))
             buttons_layout = QtWidgets.QHBoxLayout()
             buttons_layout.addWidget(load_button)
+            buttons_layout.addWidget(update_button)
             buttons_layout.addWidget(delete_button)
             buttons_layout.addStretch()
             shelf_item_layout.addLayout(buttons_layout)
