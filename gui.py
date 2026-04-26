@@ -2918,6 +2918,27 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         def on_create_button_clicked():
             name = name_edit.text()
             shelf_items = list(self._get_shelf_items())
+            filtered_shelf_items = [
+                shelf_item for shelf_item in shelf_items if shelf_item[0] != name
+            ]
+
+            name_exists = len(filtered_shelf_items) != len(shelf_items)
+            if name_exists:
+                message_box = QtWidgets.QMessageBox(self)
+                message_box.setIcon(QtWidgets.QMessageBox.Question)
+                message_box.setWindowTitle('Overwrite Shelf Item')
+                message_box.setText(f'An item named "{name}" already exists. Overwrite?')
+                no_button = message_box.addButton('&No', QtWidgets.QMessageBox.RejectRole)
+                message_box.setEscapeButton(no_button)
+                overwrite_button = message_box.addButton('&Overwrite',
+                                                         QtWidgets.QMessageBox.DestructiveRole)
+                message_box.setDefaultButton(no_button)
+                message_box.exec_()
+                clicked_button = message_box.clickedButton()
+                if clicked_button != overwrite_button:
+                    return
+                shelf_items = filtered_shelf_items
+
             course_names = tuple(item[4] for item in self._get_page_item_values_enabled_only())
             shelf_items.append((name, course_names))
             self._settings.setValue('shelf/items', shelf_items)
