@@ -4854,10 +4854,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                             if row % 2 != 0:
                                 continue
                             rowspan = 2
-                            index = 16 + row // 2 * 3 + col - 4
+                            index = 16 + row // 2 + 2 * (col - 4)
                         else:
                             rowspan = 1
-                            index = row * 4 + col
+                            index = row + 4 * col
                         course_name = page_courses_names[index] or '-'
                         html += (f'<td style="padding: 0.3em; font-size: {font_size}px;" '
                                  f'rowspan="{rowspan}">'
