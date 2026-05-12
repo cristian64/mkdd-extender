@@ -4188,7 +4188,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         input_file_edit.path_changed.connect(on_input_file_path_changed)
         form_layout.addRow('Input ISO File', input_file_edit)
         output_directory_edit = PathEdit('Select Output Directory',
-                                         QtWidgets.QFileDialog.AcceptSave,
+                                         QtWidgets.QFileDialog.AcceptOpen,
                                          QtWidgets.QFileDialog.Directory)
         path = self._settings.value('miscellaneous/course_ripper_output_path')
         if path:
