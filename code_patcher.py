@@ -16,6 +16,7 @@ import struct
 import subprocess
 import tempfile
 import textwrap
+from string import printable
 
 import baa
 from tools.gc_c_kit import devkit_tools
@@ -1108,6 +1109,28 @@ The address to the one place from where `LANPlayInfo::init()` is called. The fun
 hijacked to reset the course page when the LAN session is initialized.
 """
 
+RACEMGR_DRAWRACE_CALL_ADDRESSES = {
+    'GM4E01': 0x801CD918,
+    'GM4P01': 0x801CD82C,
+    'GM4J01': 0x801CD918,
+    'GM4E01dbg': 0x801FB9A0,
+}
+"""
+The address to the `bl` instruction in `RaceApp::draw()` from where `RaceMgr::drawRace()` is
+invoked.
+"""
+
+KARTGAME_DOCHAPTERONE_CALL_ADDRESSES = {
+    'GM4E01': 0x802D73C4,
+    'GM4P01': 0x802D7338,
+    'GM4J01': 0x802D73EC,
+    'GM4E01dbg': 0x80314FE4,
+}
+"""
+The address to the `bl` instruction in `KartGame::DoStartGoalCtl()` from where
+`KartGame::DoChapterOne()` is invoked.
+"""
+
 SCENETITLE_INIT_VTABLE_INDEX_ADDRESSES = {
     'GM4E01': 0x8034AB9C,
     'GM4P01': 0x803549DC,
@@ -1521,8 +1544,12 @@ SYMBOLS_MAP = {
     'GM4E01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        strlen_ = 0x80107058;
         OSReport = 0x800E8078;
+        JSystemM__JUTReport = 0x80019C4C;
+        JUTDbPrint__flush = 0x800199CC;
         GameAudio_Main_startSystemSe = 0x80115E74;
+        RaceMgr__drawRace = 0x8018922C;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
@@ -1538,6 +1565,7 @@ SYMBOLS_MAP = {
         ItemObjMgr__occurItem = 0x8020929C;
         GeographyObj__getGeoRnd = 0x801F7E78;
         JPEffectMgr__createEmt = 0x801FD6B8;
+        KartGame__DoChapterOne = 0x802D5AC4;
         KartGame__ItemWatchMan = 0x802AEC2C;
         ObjUtility__getKartZdir = 0x80225864;
         KartStrat__DoSpeedCrl = 0x802a77f4;
@@ -1550,8 +1578,12 @@ SYMBOLS_MAP = {
     'GM4P01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        strlen_ = 0x80107088;
         OSReport = 0x800E803C;
+        JSystemM__JUTReport = 0x80019C4C;
+        JUTDbPrint__flush = 0x800199CC;
         GameAudio_Main_startSystemSe = 0x80115EA4;
+        RaceMgr__drawRace = 0x801880D0;
         SceneCourseSelect__calcAnm = 0x8016A584;
         SceneMapSelect__calcAnm = 0x80173974;
         SceneMapSelect__map_init = 0x801730A0;
@@ -1567,6 +1599,7 @@ SYMBOLS_MAP = {
         ItemObjMgr__occurItem = 0x8020926C;
         GeographyObj__getGeoRnd = 0x801F7E48;
         JPEffectMgr__createEmt = 0x801FD688;
+        KartGame__DoChapterOne = 0x802D5A44;
         KartGame__ItemWatchMan = 0x802AEBF0;
         ObjUtility__getKartZdir = 0x80225848;
         KartStrat__DoSpeedCrl = 0x802a77d0;
@@ -1579,8 +1612,12 @@ SYMBOLS_MAP = {
     'GM4J01':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        strlen_ = 0x80107058;
         OSReport = 0x800E8078;
+        JSystemM__JUTReport = 0x80019C4C;
+        JUTDbPrint__flush = 0x800199CC;
         GameAudio_Main_startSystemSe = 0x80115E74;
+        RaceMgr__drawRace = 0x8018922C;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
@@ -1596,6 +1633,7 @@ SYMBOLS_MAP = {
         ItemObjMgr__occurItem = 0x802092C4;
         GeographyObj__getGeoRnd = 0x801F7EA0;
         JPEffectMgr__createEmt = 0x801FD6E0;
+        KartGame__DoChapterOne = 0x802D5AEC;
         KartGame__ItemWatchMan = 0x802AEC54;
         ObjUtility__getKartZdir = 0x8022588c;
         KartStrat__DoSpeedCrl = 0x802a781c;
@@ -1608,8 +1646,12 @@ SYMBOLS_MAP = {
     'GM4E01dbg':
     textwrap.dedent("""\
         memcpy = 0x80003540;
+        strlen_ = 0x8010DA58;
         OSReport = 0x800EEA6C;
+        JSystemM__JUTReport = 0x8006BBF8;
+        JUTDbPrint__flush = 0x8006B97C;
         GameAudio_Main_startSystemSe = 0x8011E540;
+        RaceMgr__drawRace = 0x801ADD84;
         SceneCourseSelect__calcAnm = 0x80189448;
         SceneMapSelect__calcAnm = 0x801943D0;
         SceneMapSelect__map_init = 0x80193824;
@@ -1627,6 +1669,7 @@ SYMBOLS_MAP = {
         ItemObjMgr__occurItem = 0x8023E5C4;
         GeographyObj__getGeoRnd = 0x8022AC14;
         JPEffectMgr__createEmt = 0x80230544;
+        KartGame__DoChapterOne = 0x803134E8;
         KartGame__ItemWatchMan = 0x802F09C4;
         ObjUtility__getKartZdir = 0x8025e39c;
         KartStrat__DoSpeedCrl = 0x802ea110;
@@ -1728,6 +1771,7 @@ def patch_dol_file(
     use_alternative_buttons: bool,
     replaces_data: dict,
     minimap_data: dict,
+    course_author_names: list[tuple[str, str]],
     tilt_setting_data: dict,
     audio_track_data: 'tuple[tuple[int]]',
     battle_stages_enabled: bool,
@@ -1874,6 +1918,27 @@ def patch_dol_file(
                                  f'(const unsigned {audio_data_type}*)audio_indexes[(int)page];')
     audio_data_code = '\n'.join(audio_data_code_lines)
 
+    # Course and author names.
+    NATIVE_RESOLUTION = 608
+    FONT_CHAR_WIDTH = 12
+    MAX_CHARACTERS_PER_LINE = NATIVE_RESOLUTION // FONT_CHAR_WIDTH
+    course_author_names_lines = []
+    printable_chars = set(printable)
+    for course_name, author_name in course_author_names:
+        course_name = ' '.join(course_name.split()).replace('"', "'")
+        author_name = ' '.join(author_name.split()).replace('"', "'")
+        course_name = ''.join(filter(lambda c: c in printable_chars, course_name))
+        author_name = ''.join(filter(lambda c: c in printable_chars, author_name))
+        author_name = f'by {author_name}'
+        if len(course_name) > MAX_CHARACTERS_PER_LINE:
+            course_name = course_name[:-3] + '...'
+        if len(author_name) > (MAX_CHARACTERS_PER_LINE):
+            author_name = author_name[:-3] + '...'
+        course_author_names_lines.append(f'"{course_name}"')
+        course_author_names_lines.append(f'"{author_name}"')
+    course_author_names_data_code = ('const char* const course_author_names[] = {' +
+                                     ', '.join(course_author_names_lines) + '};')
+
     # Tilting courses data.
     page_tilting_courses = collections.defaultdict(list)
     page_tilting_courses[0].append(COURSES.index('Mini5'))  # Just Tilt-A-Kart in first page.
@@ -1947,6 +2012,8 @@ def patch_dol_file(
              str(initial_page_index) if args.reset_course_page_on_lan_initialization else '-1'),
             ('__RESET_COURSE_PAGE_ON_TITLE_SCREEN__',
              str(initial_page_index) if args.reset_course_page_on_title_screen else '-1'),
+            ('__COURSE_AND_AUTHOR_NAMES__',
+             str(int(not args.skip_course_and_author_names_overlay))),
             ('__IDLE_AUTOPILOT__', str(int(bool(args.idle_autopilot)))),
             ('__TILTING_COURSES__', str(int(tilting_courses))),
             ('__TYPE_SPECIFIC_ITEM_BOXES__', str(int(type_specific_item_boxes))),
@@ -1961,6 +2028,7 @@ def patch_dol_file(
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
             ('// __TILTING_DATA_PLACEHOLDER__', tilting_data_code),
+            ('// __COURSE_AUTHOR_NAMES_DATA_PLACEHOLDER__', course_author_names_data_code),
         )
         with open(os.path.join(code_dir, 'lib.c'), 'r', encoding='ascii') as f:
             code = f.read()
@@ -2056,6 +2124,11 @@ def patch_dol_file(
                 if page_count > 1:
                     project.branchlink(SCENECOURSESELECT_CALCANM_CALL_ADDRESSES[game_id],
                                        'scenecourseselect_calcanm_ex')
+                    if not args.skip_course_and_author_names_overlay:
+                        project.branchlink(RACEMGR_DRAWRACE_CALL_ADDRESSES[game_id],
+                                           'racemgr_drawrace_ex')
+                        project.branchlink(KARTGAME_DOCHAPTERONE_CALL_ADDRESSES[game_id],
+                                           'kartgame_dochapterone_ex')
                     if battle_stages_enabled:
                         project.branchlink(SCENEMAPSELECT_CALCANM_CALL_ADDRESSES[game_id],
                                            'scenemapselect_calcanm_ex')

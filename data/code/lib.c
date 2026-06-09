@@ -42,6 +42,7 @@
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
 #define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 #define USE_ALT_BUTTONS __USE_ALT_BUTTONS__
+#define COURSE_AND_AUTHOR_NAMES __COURSE_AND_AUTHOR_NAMES__
 #define IDLE_AUTOPILOT __IDLE_AUTOPILOT__
 #define TILTING_COURSES __TILTING_COURSES__
 #define TYPE_SPECIFIC_ITEM_BOXES __TYPE_SPECIFIC_ITEM_BOXES__
@@ -50,6 +51,12 @@
 #define BOUNCY_TERRAIN_TYPE __BOUNCY_TERRAIN_TYPE__
 #define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
 #define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
+
+#if BATTLE_STAGES
+#define COURSE_COUNT_PER_PAGE 22
+#else
+#define COURSE_COUNT_PER_PAGE 16
+#endif
 
 #if PAGE_COUNT > 1
 
@@ -240,6 +247,159 @@ void scenecourseselect_calcanm_ex()
     SceneCourseSelect__calcAnm();
     process_course_page_change(RACE_MODE);
 }
+
+#if COURSE_AND_AUTHOR_NAMES
+
+#if GM4E01
+#define COURSE_ID_OFFSET -0x56DC
+#elif GM4P01
+#define COURSE_ID_OFFSET -0x56BC
+#elif GM4J01
+#define COURSE_ID_OFFSET -0x56DC
+#elif GM4E01_DEBUG_BUILD
+#define COURSE_ID_OFFSET -0x5644
+#endif
+
+typedef int ECourseID;
+static const ECourseID COURSE_IDS[] = {36, 34, 33, 50, 40, 37, 35, 42, 51, 41, 38,
+                                       45, 43, 44, 47, 49, 58, 53, 54, 59, 52, 56};
+
+static int get_current_course_index()
+{
+    register char* const r13 asm("r13");
+
+    const ECourseID course_id = *(int*)(r13 + COURSE_ID_OFFSET);
+
+    for (int i = 0; i < (int)(sizeof(COURSE_IDS) / sizeof(ECourseID)); ++i)
+    {
+        if (COURSE_IDS[i] == course_id)
+            return i;
+    }
+
+    return -1;
+}
+
+struct JUTDbPrint
+{
+    void* list;
+    void* font;
+    int color;
+};
+
+#if GM4E01
+#define DEBUG_PRINT_OFFSET -0x6770
+#elif GM4P01
+#define DEBUG_PRINT_OFFSET -0x6758
+#elif GM4J01
+#define DEBUG_PRINT_OFFSET -0x6768
+#elif GM4E01_DEBUG_BUILD
+#define DEBUG_PRINT_OFFSET -0x6798
+#endif
+
+static void draw_text(const int x,
+                      const int y,
+                      const char* const text,
+                      const int text_color,
+                      const int opacity)
+{
+    register char* const r13 asm("r13");
+
+    struct JUTDbPrint* const sDebugPrint = *(struct JUTDbPrint**)(r13 + DEBUG_PRINT_OFFSET);
+
+    const int outline_thickness = 2;
+    for (int i = -outline_thickness; i <= outline_thickness; ++i)
+    {
+        for (int j = -outline_thickness; j <= outline_thickness; ++j)
+        {
+            if (i == 0 && j == 0)
+                continue;
+            JSystemM__JUTReport(x + i, y + j, text);
+        }
+    }
+    const int outline_color = 0x00000000;
+    sDebugPrint->color = outline_color | (opacity >> 1);
+    JUTDbPrint__flush(sDebugPrint);
+
+    JSystemM__JUTReport(x, y, text);
+    sDebugPrint->color = text_color | opacity;
+    JUTDbPrint__flush(sDebugPrint);
+
+    sDebugPrint->color = 0xFFFFFFFF;
+}
+
+#define HIDE_COURSE_AND_AUTHOR_NAME 0xFFFF
+static unsigned short s_course_name_and_author_opacity = HIDE_COURSE_AND_AUTHOR_NAME;
+
+static void draw_course_and_author_name()
+{
+    const int width = 608;
+    const int height = 448;
+    const int char_width = 12;
+    const int char_height = 12;
+
+    const int page_index = (int)(*(char*)CURRENT_PAGE_ADDRESS);
+    if (page_index == 0)
+        return;
+    const int page_effective_index = page_index - 1;
+
+    const int course_index = get_current_course_index();
+    if (course_index < 0)
+        return;
+#if !BATTLE_STAGES
+    if (course_index >= 16)
+        return;
+#endif
+
+    // __COURSE_AUTHOR_NAMES_DATA_PLACEHOLDER__
+
+    const int offset = page_effective_index * (COURSE_COUNT_PER_PAGE * 2) + course_index * 2;
+    const char* const course_name = course_author_names[offset];
+    const char* const author_name = course_author_names[offset + 1];
+
+    unsigned int opacity = s_course_name_and_author_opacity;
+
+    {
+        const int x = width / 2 - (strlen_(course_name) * char_width) / 2;
+        const int y = height / 2 - char_height / 2;
+        draw_text(x, y, course_name, 0xFCE94F00, opacity);
+    }
+
+    {
+        const int x = width / 2 - (strlen_(author_name) * char_width) / 2;
+        const int y = height / 2 + char_height + char_height / 2;
+        draw_text(x, y, author_name, 0xD3D7CF00, opacity);
+    }
+
+    s_course_name_and_author_opacity -= 10;
+    if (s_course_name_and_author_opacity > 0x00FF)  // Overflow; we are done.
+    {
+        s_course_name_and_author_opacity = HIDE_COURSE_AND_AUTHOR_NAME;
+    }
+}
+
+void racemgr_drawrace_ex()
+{
+    RaceMgr__drawRace();
+
+    if (s_course_name_and_author_opacity != HIDE_COURSE_AND_AUTHOR_NAME)
+    {
+        draw_course_and_author_name();
+    }
+}
+
+void kartgame_dochapterone_ex()
+{
+    KartGame__DoChapterOne();
+
+    // The overlay is enabled by virtue of setting the opacity to a valid value. This function is
+    // called repeatedly during chapter one (which is the course intro and the first couple of
+    // seconds before the countdown starts). Because it's called repeatedly, it will nullify the
+    // decrement in the opacity in every draw until chapter one is done. After that, the opacity
+    // will be reduced after is draw call until it reaches 0, in which case the overlay is hidden.
+    s_course_name_and_author_opacity = 0x00FF;
+}
+
+#endif  // COURSE_AND_AUTHOR_NAMES
 
 #if BATTLE_STAGES
 void scenemapselect_calcanm_ex()
