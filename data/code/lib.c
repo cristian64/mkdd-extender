@@ -127,7 +127,7 @@ void refresh_lanselectmode()
 
 #if BATTLE_STAGES
 
-static int* g_scenemapselect = 0xFFFFFFFF;
+static int* g_scenemapselect = (int*)0xFFFFFFFF;
 
 void refresh_mapselectmode()
 {
