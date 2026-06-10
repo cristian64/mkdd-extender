@@ -3568,7 +3568,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         menu = QtWidgets.QMenu()
 
-        action = menu.addAction('Open Containing Directory...')
+        action = menu.addAction('Open Containing Directory')
         path = self._item_text_to_path.get(item.text())
         if path and os.path.exists(path):
             action.triggered[bool].connect(lambda: open_and_select_in_directory(path))
@@ -4372,8 +4372,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         form_layout.addRow('Vertical Scaling', vertical_scaling_slider)
 
         menu = QtWidgets.QMenu()
-        save_as_png_action = menu.addAction('Save as PNG')
-        save_as_bti_action = menu.addAction('Save as BTI')
+        save_as_png_action = menu.addAction('Save as PNG...')
+        save_as_bti_action = menu.addAction('Save as BTI...')
         menu.addSeparator()
         copy_action = menu.addAction('Copy to Clipboard')
 
