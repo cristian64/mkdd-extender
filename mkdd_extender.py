@@ -2046,6 +2046,7 @@ def meld_courses(
     alternative_audio_data = {}
     matching_audio_override_data = {}
     added_course_names = []
+    added_author_names = []
     battle_stages_enabled = False
 
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
@@ -2063,6 +2064,7 @@ def meld_courses(
             alternative_audio_data,
             matching_audio_override_data,
             added_course_names,
+            added_author_names,
             battle_stages_enabled,
         )
 
@@ -2253,6 +2255,7 @@ def meld_courses(
                 trackinfo = configparser.ConfigParser()
                 trackinfo.read(trackinfo_filepath)
                 trackname = trackinfo['Config']['trackname'] or 'Unnamed'
+                author_name = trackinfo['Config']['author'] or 'Unknown'
                 main_language = trackinfo['Config']['main_language']
                 replaces = trackinfo['Config']['replaces']
                 auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track')
@@ -2308,6 +2311,7 @@ def meld_courses(
             raise_if_canceled()
 
             added_course_names.append(trackname)
+            added_author_names.append(author_name)
 
             if not is_battle_stage:
                 if auxiliary_audio_track:
@@ -2788,6 +2792,7 @@ def meld_courses(
         alternative_audio_data,
         matching_audio_override_data,
         added_course_names,
+        added_author_names,
         battle_stages_enabled,
     )
 
@@ -3208,6 +3213,7 @@ def patch_dol_file(
     replaces_data: dict,
     minimap_data: dict,
     cheat_codes_data: dict,
+    course_author_names: list[[tuple[str, str]]],
     tilt_setting_data: dict,
     alternative_audio_data: 'dict[str, str]',
     matching_audio_override_data: 'dict[str, str]',
@@ -3296,6 +3302,7 @@ def patch_dol_file(
         bool(args.use_alternative_buttons),
         replaces_data,
         minimap_data,
+        course_author_names,
         tilt_setting_data,
         audio_track_data,
         battle_stages_enabled,
@@ -3431,8 +3438,13 @@ def patch_dol_file(
             f.write(NEW_FUNCTIONS_INSTRUCTIONS)
 
 
-def write_description_file(args: argparse.Namespace, added_course_names: 'list[str]',
-                           battle_stages_enabled: bool, iso_tmp_dir: str):
+def write_description_file(
+    args: argparse.Namespace,
+    added_course_names: 'list[str]',
+    added_author_names: 'list[str]',
+    battle_stages_enabled: bool,
+    iso_tmp_dir: str,
+):
     lines = []
 
     lines.append('# MKDD Extender - Description File')
@@ -3482,7 +3494,10 @@ def write_description_file(args: argparse.Namespace, added_course_names: 'list[s
                 lines.append('')
                 lines.append('#### Battle Stages')
                 lines.append('')
-            lines.append(f'- {added_course_names[page * page_course_count + i]}')
+            lines.append(
+                f'- {added_course_names[page * page_course_count + i]} '
+                f'(by {added_author_names[page * page_course_count + i]})',
+            )
 
     description_filepath = os.path.join(iso_tmp_dir, 'files', 'DESCRIPTION.md')
     with open(description_filepath, 'w', encoding='utf-8') as f:
@@ -3530,6 +3545,13 @@ OPTIONAL_ARGUMENTS = {
             'If specified, cup names will be left untouched.\n\n'
             'By default, cup names are modified to include a text containing the currently '
             'selected page number, as well as the total page count.',
+        ),
+        (
+            'Skip Course And Author Names Overlay',
+            bool,
+            'If specified, the course and author names overlay will not be shown in the game.\n\n'
+            'By default, the names of the added custom courses and the name of their respective '
+            'author will be shown before the race or battle starts.',
         ),
         (
             'Skip Minimap Transforms Removal',
@@ -4159,8 +4181,11 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
             alternative_audio_data,
             matching_audio_override_data,
             added_course_names,
+            added_author_names,
             battle_stages_enabled,
         ) = meld_courses(args, paths, tracks_is_dir, raise_if_canceled, iso_tmp_dir)
+
+        course_author_names = tuple(zip(added_course_names, added_author_names, strict=True))
 
         raise_if_canceled()
 
@@ -4182,6 +4207,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
             replaces_data,
             minimap_data,
             cheat_codes_data,
+            course_author_names,
             tilt_setting_data,
             alternative_audio_data,
             matching_audio_override_data,
@@ -4272,7 +4298,13 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
 
         # Generate description file.
         if args.add_description_file:
-            write_description_file(args, added_course_names, battle_stages_enabled, iso_tmp_dir)
+            write_description_file(
+                args,
+                added_course_names,
+                added_author_names,
+                battle_stages_enabled,
+                iso_tmp_dir,
+            )
 
         raise_if_canceled()
 
