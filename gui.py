@@ -2327,7 +2327,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         menu = self.menuBar()
         file_menu = menu.addMenu('&File')
-        open_configuration_directory_action = file_menu.addAction('Open Configuration Directory...')
+        open_configuration_directory_action = file_menu.addAction('Open Configuration Directory')
         open_configuration_directory_action.triggered.connect(
             self._on_open_configuration_directory_action_triggered)
         file_menu.addSeparator()
