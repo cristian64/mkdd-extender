@@ -53,6 +53,7 @@ class CodeBlockInfo:
     curasmfile: str
     blockstartname: str
     startoffset: int
+    endoffset: int
     addressestoresolve: tuple[str]
     funcaddressestoresolve: tuple[str]
     tablerowdata: list
@@ -65,23 +66,31 @@ def make_data_file(region: str, temp_dir: tempfile.TemporaryDirectory, asm_dir: 
     codeblocks = (CodeBlockInfo(
         curasmfile="patchlogoapp_part2.s",
         blockstartname="NewCalcCodeBlockStart",
-        startoffset=symbols.symbols[region]["OsakoM____sinit_ResMgr_cpp"],
+        startoffset=symbols.symbols[region]["DriverDataChild__mDriverDataDefault"],
+        endoffset=symbols.symbols[region]["DriverData__vt"],
         addressestoresolve=(
             "NetGateAppAfterCt",
+            "NetGateAppCase1LANSelectModeStart",
+            "NetGateAppCase1LANTitleEnd",
+            "NetGateAppCase1LANEntryEnd",
+            "NetGateAppLANPlayArcStart",
+            "NetGateAppLANPlayArcEnd",
             "NewDrawCodeBlockStart",
             "LANEntrySkipEntryCheck",
             "LANPlayInfoConditionallyResetConsoleKartEntryArray",
+            "LanEntryStart_NullCheck",
+            "NetGateAppDt_DestroyBattleName2D",
         ),
         funcaddressestoresolve=("LANEntryCalcPrintMenu", "ResolveConsoleAndControllerIDs",
                                 "PrepareKartInfo", "CheckIfAllKartsHaveFinished"),
         tablerowdata=[]),
-                  CodeBlockInfo(
-                      curasmfile="lanentrydraw_beforeseconddraw.s",
-                      blockstartname=None,
-                      startoffset=symbols.symbols[region]["DriverDataChild__mDriverDataDefault"],
-                      addressestoresolve=("LANEntryDrawBeforeSecondDraw", ),
-                      funcaddressestoresolve=(),
-                      tablerowdata=[]))
+                  CodeBlockInfo(curasmfile="lanentrydraw_beforeseconddraw.s",
+                                blockstartname=None,
+                                startoffset=symbols.symbols[region]["OsakoM____sinit_ResMgr_cpp"],
+                                endoffset=symbols.symbols[region]["System__reset"],
+                                addressestoresolve=("LANEntryDrawBeforeSecondDraw", ),
+                                funcaddressestoresolve=(),
+                                tablerowdata=[]))
     for cb in codeblocks:
         prepare_symbols_inc_file(symbolsinc_path, symbols.symbols[region], cb.addressestoresolve)
         curasmfilepath = os.path.join(asm_dir, cb.curasmfile)
@@ -196,7 +205,6 @@ def make_data_file(region: str, temp_dir: tempfile.TemporaryDirectory, asm_dir: 
             assert len(
                 machinecode) != 0, f'Error with {cb.curasmfile}, did not compile to anything!'
             finaldata_output += machinecode
-
     return finaldata_output
 
 
@@ -221,12 +229,25 @@ def patch_maindol(region: str, dol_path: str, temp_dir: tempfile.TemporaryDirect
         ("LANEntry__draw_LANEntry_blo_draw", patchcmd_bl, "LANEntryDrawBeforeSecondDrawResolved"),
         ("LANEntry__calcAnm_lwz_JUTFader_vtable", patchcmd_asmfile, "lanentrycalcanm_timerup.s"),
         ("NetGateApp__NetGateApp_blr", patchcmd_b, "NetGateAppAfterCtResolved"),
-        ("NetGateApp_alloc_size", patchcmd_asm, "li r3, 0x34+0x8"
-         ),  # Adjust alloc size to account for pointer to arrow and B button textures
+        ("NetGateApp_alloc_size", patchcmd_asm, "li r3, 0x34+(11*0x4)"),  # 11 new fields
         ("LANEntry__start_blr", patchcmd_b, "LANEntrySkipEntryCheckResolved"),
-        ("NetGameMgr_alloc_size", patchcmd_asm, "li r3, 0x1310"),
+        ("NetGameMgr_alloc_size", patchcmd_asm, "li r3, 0x1311"),
         ("LANPlayInfo__saveInfo_consoleKartCount_stbx", patchcmd_b,
          "LANPlayInfoConditionallyResetConsoleKartEntryArrayResolved"),
+        ("NetGateApp__calc_case1_LANSelectMode_li_r3", patchcmd_bl,
+         "NetGateAppCase1LANSelectModeStartResolved"),
+        ("NetGateApp__calc_case1_LANTitle_end", patchcmd_bl, "NetGateAppCase1LANTitleEndResolved"),
+        ("NetGateApp__calc_case1_LANEntry_end", patchcmd_bl, "NetGateAppCase1LANEntryEndResolved"),
+        ("NetGateApp__loadTask_after_titleline_arc_store", patchcmd_bl,
+         "NetGateAppLANPlayArcStartResolved"),
+        ("NetGateApp__loadTask_blr", patchcmd_b, "NetGateAppLANPlayArcEndResolved"),
+        ("NetGateApp__loadTask_LANPlay_arc_appHeap_lwz_mount", patchcmd_asm, "lwz r5, 0x44(r5)"),
+        ("NetGateApp__calc_LANEntry_start", patchcmd_bl, "LanEntryStart_NullCheckResolved"),
+        # Always skip "Select course" option, even if course order is set to 1 Course Only
+        # To make use of LANSelectMode screen, introduced in v1.2
+        ("LANSelectMode__directView_menuOption_1_bitfield_stw", patchcmd_asm, "nop"),
+        ("NetGateApp_dt_before_GameApp_dt", patchcmd_bl,
+         "NetGateAppDt_DestroyBattleName2DResolved"),
     )
 
     with open(dol_path, 'rb') as dol:
@@ -278,7 +299,7 @@ def patchcmd_asmfile(adr: int, filename: str, region: str, temp_dir: tempfile.Te
 
     run_subprocess(
         (devkit_tools.LDPATH, asmfileobj_path, '-T', symbolsld_path, '-o', asmfileldobj_path))
-    devkit_tools.objcopy(asmfileldobj_path, '-O', 'binary', '-g', '-S')
+    run_subprocess([devkit_tools.OBJCOPYPATH, asmfileldobj_path, '-O', 'binary', '-g', '-S'])
 
     with open(asmfileldobj_path, 'rb') as asmbin:
         return asmbin.read()

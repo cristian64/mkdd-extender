@@ -34,7 +34,7 @@ TextureLoadLoop:
     lwz r3, TextureCopyTable_ArcPath(r28)
     li r4, 0x1
     mr r5, r31 # NetGateApp (this) pointer
-    lwz r5, appHeap(r5)
+    lwz r5, NetGateApp_appHeap(r5)
     lis r6, menuString@h
     ori r6, r6, menuString@l
     bl JKRArchive_mount_for_SceneFactory
@@ -80,6 +80,36 @@ CopyTextureBti:
     b TextureLoadLoop
 
 TextureLoadComplete:
+    lis r3, 0x28
+    lwz r4, NetGateApp_appHeap(r31)
+    li r5, 0x0
+    bl JKRExpHeap__create
+    stw r3, NetGateApp_swappableHeap(r31)
+
+    lis r3, 0x10
+    lwz r4, NetGateApp_appHeap(r31)
+    li r5, 0x0
+    bl JKRExpHeap__create
+    stw r3, NetGateApp_lanEntryHeap(r31)
+
+    #######################################################
+    # Zero the SceneCourseSelect and SceneMapSelect objects
+    # to indicate that they have not been initialised yet
+    #######################################################
+    li r3, 0x0
+    stw r3, NetGateApp_sceneCourseSelect(r31)
+    stw r3, NetGateApp_sceneMapSelect(r31)
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    lbz r4, NetGameMgr_randSeedWordInitialised(r3)
+    cmpwi r4, 0x0
+    bne RandSeedWordInitialised
+
+    lbz r4, NetGameMgr_randSeed(r3)
+    stw r4, NetGameMgr_randSeedWord(r3)
+    li r4, 0x1
+    stb r4, NetGameMgr_randSeedWordInitialised(r3)
+RandSeedWordInitialised:
 
 #####################
 # Return this pointer
@@ -93,9 +123,9 @@ TextureLoadComplete:
     blr
 
 TextureCopyTable:
-.4byte SceneMenuArcPathResolved, ArrowBtiFilenameResolved, 0x420, arrowBtiPtr
-.4byte LanEntryArcPathResolved, BButtonFilenameResolved, 0x220, bButtonBtiPtr
-.4byte -1 # End
+.4byte SceneMenuArcPathResolved, ArrowBtiFilenameResolved, 0x420, NetGateApp_arrowBtiPtr
+.4byte LanEntryArcPathResolved, BButtonFilenameResolved, 0x220, NetGateApp_bButtonBtiPtr
+.4byte TABLE_END
 
 SceneMenuArcPath:
 .if regionID == REGION_JP
@@ -109,6 +139,7 @@ LanEntryArcPath:
 .else
     .asciz "/SceneData/English/lanentry.arc"
 .endif
+
 ArrowBtiFilename:
 .asciz "timg/arrow1.bti"
 BButtonFilename:

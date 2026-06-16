@@ -21,17 +21,17 @@
     lwz r4, NetGateApp_mspNetGateApp(r13)
     lwz r4, NetGateApp_lanEntry(r4)
 
-    stw r3, kartCount(r4)
+    stw r3, LANEntry_kartCount(r4)
     li r3, MENUPROGRESS_INITNOSOUND
-    stw r3, progress(r4)
+    stw r3, LANEntry_progress(r4)
 
     lwz r3, NetGameMgr_mspNetGameMgr(r13)
     lbz r3, NetGameMgr_consoleEnteredBitfield(r3)
-    stb r3, consoleEnteredBitfield(r4)
+    stb r3, LANEntry_consoleEnteredBitfield(r4)
 
     li r3, 0x0
-    stw r3, timer(r4)
-    stb r3, (LANEntry_blo + visible)(r4)
+    stw r3, LANEntry_timer(r4)
+    stb r3, (LANEntry_lanEntry_blo + J2DPane_visible)(r4)
 
 DontSkipEntryScreen:
 # Function epilogue

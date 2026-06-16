@@ -1537,6 +1537,13 @@ by a real kart (i.e. it has a kart owner index), or was synthetically generated 
 star configured with a custom item type).
 """
 
+APPMGR_MSGAMEAPP_ADDRESSES = {
+    'GM4E01': 0x803cbda0,
+    'GM4P01': 0x803d5be0,
+    'GM4J01': 0x803e63c0,
+    'GM4E01dbg': 0x80416998,
+}
+
 for address in OSARENALO_ADDRESSES.values():
     assert address % 32 == 0
 
@@ -2024,11 +2031,13 @@ def patch_dol_file(
              f'0x{KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id]:04X}'),
             ('__KART_BOUNCE_DEFAULT_READ_ADDRESS__',
              f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}'),
+            ('__LAN_CHOOSE_CHARACTER_AND_KART__', str(int(args.lan_choose_character_and_kart))),
             ('// __AUDIO_DATA_PLACEHOLDER__', audio_data_code),
             ('// __MINIMAP_DATA_PLACEHOLDER__', minimap_data_code),
             ('// __STRING_DATA_PLACEHOLDER__', string_data_code),
             ('// __TILTING_DATA_PLACEHOLDER__', tilting_data_code),
             ('// __COURSE_AUTHOR_NAMES_DATA_PLACEHOLDER__', course_author_names_data_code),
+            ('__APPMGR_MSGAMEAPP_ADDRESS__', f'0x{APPMGR_MSGAMEAPP_ADDRESSES[game_id]:08X}'),
         )
         with open(os.path.join(code_dir, 'lib.c'), 'r', encoding='ascii') as f:
             code = f.read()

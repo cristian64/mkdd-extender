@@ -1,6 +1,7 @@
 .include "./symbols.inc"
+.include "./macros.s"
 
-.equ regCount, 5
+.equ regCount, 7
 .equ stackSize, 0x8 + regCount*4
 
 /* --------------------- */
@@ -15,14 +16,14 @@ Start:
     stw r0, (stackSize+4)(r1)
     stmw 32 - regCount, (stackSize-regCount*4)(r1)
 
+    mr r26, r3
     mr r28, r31 /*  r28 now has SceneLanEntry's JKRArchive object pointer  */
-    addi r31, r3, NewCalcCodeBlockStart - Start /*  r31 now points to the new calc code to copy the machine code instructions over */
-    addi r27, r3, NewDrawCodeBlockStart - Start /*  r27 now points to the new draw code to copy the machine code instructions over */
-    /* mr r30, r3 */
+    addi r31, r26, NewCalcCodeBlockStart - Start /*  r31 now points to the new calc code to copy the machine code instructions over */
+    addi r27, r26, NewDrawCodeBlockStart - Start /*  r27 now points to the new draw code to copy the machine code instructions over */
 
 /*  Copy new code */
-    lis r4, __sinit_ResMgr_cpp@h
-    ori r4, r4, __sinit_ResMgr_cpp@l
+    lis r4, DriverDataChild_mDriverDataDefault@h
+    ori r4, r4, DriverDataChild_mDriverDataDefault@l
     mr r5, r31
     li r6, (NewCalcCodeBlockEnd - NewCalcCodeBlockStart)/4 /*  word count */
     mtctr r6
@@ -53,8 +54,8 @@ PutLanguageData:
     addi r4, r4, 0x4
     bdnz PutLanguageData
 
-    lis r4, DriverDataChild_mDriverDataDefault@h
-    ori r4, r4, DriverDataChild_mDriverDataDefault@l
+    lis r4, __sinit_ResMgr_cpp@h
+    ori r4, r4, __sinit_ResMgr_cpp@l
     mr r5, r27
     li r6, NewDrawCodeBlockWordSizeResolved /*  word count */
     mtctr r6
@@ -76,8 +77,8 @@ PutNewDrawCode:
     stw r3, (0x4*3)(r4)
 
 /*  Flush cache for calc code */
-    lis r3, __sinit_ResMgr_cpp@h
-    ori r3, r3, __sinit_ResMgr_cpp@l
+    lis r3, DriverDataChild_mDriverDataDefault@h
+    ori r3, r3, DriverDataChild_mDriverDataDefault@l
     li r4, NewCalcCodeBlockEnd - NewCalcCodeBlockStart /*  byte count */
     add r4, r4, r7 /*  Add the language-specific size too */
     lis r12, Dolphin__flush_cache@h
@@ -86,20 +87,40 @@ PutNewDrawCode:
     bctrl
 
 /*  Flush cache for draw code */
-    lis r3, DriverDataChild_mDriverDataDefault@h
-    ori r3, r3, DriverDataChild_mDriverDataDefault@l
+    lis r3, __sinit_ResMgr_cpp@h
+    ori r3, r3, __sinit_ResMgr_cpp@l
     li r4, NewDrawCodeBlockByteSizeResolved /*  byte count */
     lis r12, Dolphin__flush_cache@h
     ori r12, r12, Dolphin__flush_cache@l
     mtctr r12
     bctrl
 
-###########################################################################################
-# Set random seed for NetGameMgr to avoid using the same random seed after consequent races
-###########################################################################################
-   lwz r3, NetGameMgr_mspNetGameMgr(r13)
-   lbz r4, NetGameMgr_randSeed(r3)
-   stw r4, NetGameMgr_randSeedWord(r3)
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    li r4, 0x0
+    stb r4, NetGameMgr_randSeedWordInitialised(r3)
+
+################################################################################
+# Patch main.dol during runtime
+# mostly for calls that can be made offline, that reference program code in DATA
+################################################################################
+  addi r26, r26, AddressesToPatch - Start /*  r31 now points to the new calc code to copy the machine code instructions over */
+PatchAddressLoop:
+  lwz r3, 0x0(r26)
+  cmpwi r3, -1
+  beq PatchAddressComplete
+
+  lwz r4, 0x4(r26)
+  stw r4, 0x0(r3)
+
+  li r4, 0x4
+  lis r12, Dolphin__flush_cache@h
+  ori r12, r12, Dolphin__flush_cache@l
+  mtctr r12
+  bctrl
+  addi r26, r26, 0x8
+  b PatchAddressLoop
+PatchAddressComplete:
+
 
 /* ------------------------------------------------------------------------------------------------------------- */
 /*  Perform instructions in SceneLanEntry's constructor that have been overwritten by code that loads DATA file. */
@@ -160,10 +181,10 @@ PutNewDrawCode:
 
 /*  New code to patch    */
 PointTo_createMoviePlayer:
-lis r3, __sinit_ResMgr_cpp@h
-ori r4, r3, __sinit_ResMgr_cpp@l
+lis r3, DriverDataChild_mDriverDataDefault@h
+ori r4, r3, DriverDataChild_mDriverDataDefault@l
 
-/*  Code from here now on is written to __sinit_ResMgr_cpp */
+/*  Code from here now on is written to DriverDataChild_mDriverDataDefault */
 NewCalcCodeBlockStart:
 LogoApp_createMoviePlayer: /*  This was copied */
     stwu       r1,-0x10(r1)
@@ -179,38 +200,40 @@ LogoApp_createMoviePlayer: /*  This was copied */
     blr
 
 LANEntryCalcPrintMenu:
-    .include "./lanentrycalc_menu.s"
+.include "./lanentrycalc_menu.s"
 .align 4
+
 NetGateAppAfterCt:
-    .include "./netgateapp_afterct.s"
+.include "./netgateapp_afterct.s"
 .align 4
+
 LANEntrySkipEntryCheck:
-    .include "./lanentrystart_skipentry.s"
-LANPlayInfoConditionallyResetConsoleKartEntryArray:
-# Function prologue
-    stwu r1, -stackSize(r1)
-    mfspr r0, LR
-    stw r0, (stackSize+4)(r1)
+.include "./lanentrystart_skipentry.s"
+.align 4
 
-    bl CoopAndScreenDivisionSameAsPrevSession
-    cmpwi r3, 0x1
-    beq DontResetConsoleKartEntryArray
+.include "./netgateapp_case1.s"
+.align 4
 
-# set all byte values to 1
-    lis r3, 0x0101
-    ori r3, r3, 0x0101 # r3 = 0x01010101
-    lis r4, gLANPlayInfo@h
-    ori r4, r4, gLANPlayInfo@l
-    stw r3, LANPlayInfo_consoleKartEntryArr(r4)
-    stw r3, (LANPlayInfo_consoleKartEntryArr+4)(r4)
+.include "./lanplayinfo_saveinfo_resetconsolekart.s"
+.align 4
 
-DontResetConsoleKartEntryArray:
-# Function epilogue
-    lwz r0, (stackSize+4)(r1)
-    mtspr LR, r0
-    addi r1, r1, stackSize
-    blr
+.include "./scenecourseselect_override.s"
+.align 4
 
+.include "./scenemapselect_override.s"
+.align 4
+
+.include "./lanentrystart_nullcheck.s"
+.align 4
+
+.include "./netgateapp_dt.s"
+.align 4
+
+.include "./lanentrycalc_tasks.s"
+.align 4
+
+.include "./lanselectmode_afterct.s"
+.align 4
 
 /* ----------------------------------------------------------------------------------------------------------------------------------- */
 /*  Table is only read by this method to load the DATA file but is kept here to preserve the correct offset for KartStringOffsetTable,  */
@@ -272,6 +295,35 @@ LANEntryCalcMenuSpanishText:
 .align 4
 LANEntryCalcMenuSpanishTextEnd:
 
-/*  Code from here now on is written to DriverDataChild::mDriverDataDefault */
+.align 4
+AddressesToPatch:
+.4byte gpaGamePad, gKartPad1P # Make sure Host 1's Pad 1 controls SceneCourseSelect and SceneMapSelect. This will also work offline
+make_bl_word_pair SceneCourseSelect__ct_backArc_lwz, SceneCourseSelectCt_MenuBackgroundCheckResolved
+make_bl_word_pair SceneCourseSelect__ct_titleLineArc_lwz, SceneCourseSelectCt_MenuTitleLineCheckResolved
+make_bl_word_pair SceneCourseSelect__calc_MenuBackground__calc, SceneCourseSelectCalc_MenuBackgroundCheckResolved
+make_bl_word_pair SceneCourseSelect__draw_MenuBackground_J2DScreen_draw, SceneCourseSelectDraw_MenuBackgroundCheckResolved
+make_bl_word_pair SceneCourseSelect__calc_SceneCourseSelect__nextScene, SceneCourseSelectNextScene_LANEntryCheckResolved
+make_bl_word_pair SceneCourseSelect__calc_SceneCourseSelect__nextRace, SceneCourseSelectNextRace_LANEntryCheckResolved
+make_bl_word_pair SceneCourseSelect__buttonA_lwz_raceModetype, SceneCourseSelectButtonA_LANEntryCheckResolved
+make_bl_word_pair SceneCourseSelect__reset_SpecialCupCheck, SceneCourseSelectReset_SpecialCupCheckResolved
+make_bl_word_pair SceneCourseSelect__reset_AllCupCheck, SceneCourseSelectReset_AllCupCheckResolved
+make_bl_word_pair SceneCourseSelect__calcAnm_lbz_record, SceneCourseSelectCalcAnm_Cup2DCheckResolved
+make_bl_word_pair SceneCourseSelect__rndRoulette_Dolphin__OSGetTime, SceneCourseSelectRndRoulette_OSGetTimeResolved
+
+make_bl_word_pair SceneMapSelect__ct_backArc_lwz, SceneMapSelectCt_MenuBackgroundCheckResolved
+make_bl_word_pair SceneMapSelect__ct_titleLineArc_lwz, SceneMapSelectCt_MenuTitleLineCheckResolved
+make_bl_word_pair SceneMapSelect__calc_MenuBackground__calc, SceneMapSelectCalc_MenuBackgroundCheckResolved
+make_bl_word_pair SceneMapSelect__draw_MenuBackground_J2DScreen_draw, SceneMapSelectDraw_MenuBackgroundCheckResolved
+make_bl_word_pair SceneMapSelect__calc_SceneMapSelect__nextScene, SceneMapSelectNextScene_LANEntryCheckResolved
+make_bl_word_pair SceneMapSelect__calc_SceneMapSelect__nextBattle, SceneMapSelectNextBattle_LANEntryCheckResolved
+make_b_word_pair SceneMapSelect__buttonA_lwz_battleStageCount, SceneMapSelectButtonA_LANEntryCheckResolved
+make_bl_word_pair SceneMapSelect__rndRoulette_Dolphin__OSGetTime, SceneMapSelectRndRoulette_OSGetTimeResolved
+
+make_bl_word_pair SceneMapSelect__reset_LuigisMansionCheck, SceneMapSelectReset_GameFlagCheckResolved
+make_bl_word_pair SceneMapSelect__reset_TiltAKart, SceneMapSelectReset_GameFlagCheckResolved
+.4byte TABLE_END
+
+
+/*  Code from here now on is written to __sinit_ResMgr_cpp */
 NewDrawCodeBlockStart:
 

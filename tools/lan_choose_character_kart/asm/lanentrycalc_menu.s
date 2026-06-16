@@ -1,45 +1,159 @@
 .include "./symbols.inc"
 .include "./fielddefinitions.inc"
 .include "./charkartdb.inc"
-.equ regCount, 5
+.equ regCount, 6
 .equ consoleRelatedIDs, 0x4 # 2 bytes, but rounded up to 4 to ensure 4 byte alignment
-.equ stackSize, 0x8 + regCount*4 + consoleRelatedIDs
+.equ stringOnStackSize, 0x40 # Same size used in NetGateApp::loadTask
 .equ kartForConsoleIDStart, 0x8
 .equ consoleIDStart, 0x9
-
+.equ sprintfStringStart, 0x8 + regCount*4 + consoleRelatedIDs
+.equ stackSize, 0x8 + regCount*4 + consoleRelatedIDs + stringOnStackSize
 
     /* Function prologue */
-
     stwu r1,-stackSize(r1)
     mfspr r0,LR
     stw r0,(stackSize+4)(r1)
     stmw 32-regCount, (stackSize-regCount*4)(r1)
 
-    lwz r3, progress(r31)
-    cmpwi r3, MENUPROGRESS_INIT
-    beq DoInit
-    cmpwi r3, MENUPROGRESS_INITNOSOUND
-    beq DoInitWithoutSound
+    lwz r26, NetGateApp_mspNetGateApp(r13)
+    lwz r3, LANEntry_progress(r31)
+    subi r12, r3, MENUPROGRESS_INIT
+    slwi r12, r12, 0x2
+    lis r4, MenuProgressTableResolved@h
+    ori r4, r4, MenuProgressTableResolved@l
+    lwzx r12, r4, r12
+    mtctr r12
+    bctr
 
-    cmpwi r3, MENUPROGRESS_WAITFORFADE
-    bne NotWaitingForFadeIn
-
+WaitingForFadeIn:
     lwz r3, System_mspDisplay(r13)
-    lwz r3, fader(r3)
+    lwz r3, JFWDisplay_fader(r3)
     lwz r3, JUTFader_hasFadedIn(r3)
     cmpwi r3, 0x1
     bne StillWaitingForFadeIn
 
     li r3, MENUPROGRESS_CANMAKESELECTIONS
-    stw r3, progress(r31)
+    stw r3, LANEntry_progress(r31)
+
     b StillWaitingForFadeIn
 
-NotWaitingForFadeIn:
-    cmpwi r3, MENUPROGRESS_RACEBATTLEWAIT
-    blt DontWaitForFade
+WaitForCourseLoad:
+    lwz r3, NetGateApp_isSceneOrTitleLoaded(r26)
+    cmpwi r3, 0x0
+    beq SceneCourseSelectNotLoaded
 
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    bl SceneCourseSelect__reset
+
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    bl SceneCourseSelect__calc
+
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+
+    li r4, SCENECOURSESELECTMODE_GRANDPRIX
+    lis r5, gLANPlayInfo@h
+    ori r5, r5, gLANPlayInfo@l
+    lbz r6, LANPlayInfo_courseOrder(r5)
+    cmpwi r6, COURSEORDER_1_COURSE_ONLY
+    bne Not1CourseOrder
+    ##################################################
+    # Preselect cup and course, based on previous race
+    ##################################################
+    lbz r7, LANPlayInfo_courseStageId(r5)
+    srwi r8, r7, 2
+    stw r8, SceneCourseSelect__mCup(r13)
+    andi. r8, r7, 0b11
+    stw r8, SceneCourseSelect__mCourse(r13)
+
+    li r4, SCENECOURSESELECTMODE_VERSUS
+Not1CourseOrder:
+    stw r4, SceneCourseSelect_raceModeType(r3)
+
+    cmpwi r6, COURSEORDER_FLOWER_CUP
+    blt CourseOrderNotFlowerOrHigher
+    subi r3, r6, COURSEORDER_MUSHROOM_CUP
+    stw r3, SceneCourseSelect__mCup(r13)
+CourseOrderNotFlowerOrHigher:
+
+    lbz r6, LANPlayInfo_nextCourseInCup(r5)
+    andi. r6, r6, 0b11 # handles scenario when value is 4, this gets reset to 0 in LANPlayInfo_nextCourseInCup
+    beq SessionNotInMiddleOfCup
+
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    bl SceneCourseSelect__buttonA
+SessionNotInMiddleOfCup:
+
+    ###############################################
+    # Ensure course preview texture is set properly
+    ###############################################
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    bl SceneCourseSelect__setTexture
+
+    li r3, MENUPROGRESS_WAITFOROTHERCONSOLES_COURSE
+    stw r3, LANEntry_progress(r31)
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    bl NetGameMgr__awake
+
+    b CourseSelectCalcEnd
+
+SceneCourseSelectNotLoaded:
+    b SceneLoadCheckEnd
+
+WaitForMapLoad:
+    lwz r3, NetGateApp_isSceneOrTitleLoaded(r26)
+    cmpwi r3, 0x0
+    beq SceneMapSelectNotLoaded
+
+    lis r3, gSequenceInfo@h
+    ori r3, r3, gSequenceInfo@l
+
+    lis r5, gLANPlayInfo@h
+    ori r5, r5, gLANPlayInfo@l
+    lbz r4, LANPlayInfo_gameMode(r5)
+    subi r4, r4, LAN_GAMEMODE_BALLOON_BATTLE
+    stw r4, SequenceInfo_battleName(r3)
+
+    ###########################################
+    # Preselect stage, based on previous battle
+    ###########################################
+    lbz r3, LANPlayInfo_courseStageId(r5)
+    lis r4, LANPlayInfo_To_SceneMapSelectTableResolved@h
+    ori r4, r4, LANPlayInfo_To_SceneMapSelectTableResolved@l
+    lbzx r4, r4, r3
+
+    lwz r3, NetGateApp_sceneMapSelect(r26)
+    stw r4, SceneMapSelect_currentSelection(r3)
+
+    bl SceneMapSelect__reset
+
+    lwz r3, NetGateApp_sceneMapSelect(r26)
+    bl SceneMapSelect__calc
+
+    li r3, MENUPROGRESS_WAITFOROTHERCONSOLES_MAP
+    stw r3, LANEntry_progress(r31)
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    bl NetGameMgr__awake
+
+SceneMapSelectNotLoaded:
+    b SceneLoadCheckEnd
+
+CourseSelectionCalc:
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    bl SceneCourseSelect__calc
+
+    b CourseSelectCalcEnd
+
+MapSelectionCalc:
+    lwz r3, NetGateApp_sceneMapSelect(r26)
+    bl SceneMapSelect__calc
+
+    b MapSelectCalcEnd
+
+RaceBattleTitleWaitForFade:
     lwz r4, System_mspDisplay(r13)
-    lwz r4, fader(r4)
+    lwz r4, JFWDisplay_fader(r4)
     lwz r4, JUTFader_hasFadedIn(r4)
     cmpwi r4, 0x0
     bne WaitingForFadeOut
@@ -60,7 +174,7 @@ NotWaitingForFadeIn:
 # So this loop converts the Order IDs into DB pointers
 #####################################################################################
 CheckDBStoreLoop:
-    lwz r3, kartCount(r31)
+    lwz r3, LANEntry_kartCount(r31)
     cmpw r29, r3
     bge DBStoreFinished
     mr r3, r29
@@ -69,21 +183,21 @@ CheckDBStoreLoop:
     lis r27, CharOrderTableResolved@h
     ori r27, r27, CharOrderTableResolved@l
 
-    lwz r3, char1DB(r28)
+    lwz r3, KartInfo_char1DB(r28)
     lbzx r3, r27, r3
     bl KartInfo_getCharDB
-    stw r3, char1DB(r28)
+    stw r3, KartInfo_char1DB(r28)
 
-    lwz r3, char2DB(r28)
+    lwz r3, KartInfo_char2DB(r28)
     lbzx r3, r27, r3
     bl KartInfo_getCharDB
-    stw r3, char2DB(r28)
+    stw r3, KartInfo_char2DB(r28)
 
-    lwz r3, kartDB(r28)
+    lwz r3, KartInfo_kartDB(r28)
     addi r27, r27, KartOrderTable - CharOrderTable
     lbzx r3, r27, r3
     bl KartInfo_getKartDB
-    stw r3, kartDB(r28)
+    stw r3, KartInfo_kartDB(r28)
 
     addi r29, r29, 0x1
     b CheckDBStoreLoop
@@ -94,10 +208,10 @@ DBStoreFinished:
 # as this has been overwritten by lanentrycalc_setraceinfo.s
 ############################################################
     li r3, 0x0
-    lwz r4, displayNum(r31)
+    lwz r4, LANEntry_displayNum(r31)
     cmpwi r4, 4
     bne DontSetFPSCap
-    lwz r4, kartCount(r31)
+    lwz r4, LANEntry_kartCount(r31)
     cmpwi r4, 6
     blt DontSetFPSCap
     li r3, 0x1
@@ -106,17 +220,17 @@ DontSetFPSCap:
     stb r3, NetGameMgr_capFps(r4)
 
     li r3, MENUPROGRESS_STARTRACEBATTLE
-    stw r3, progress(r31)
+    stw r3, LANEntry_progress(r31)
 
 #################################################################################################
 # Remember consoleEnteredBitfield so that it can be retrieved to skip Race Entry screen next time
 # and remember coop and screen division settings to also potentially skip Race Entry screen
 #################################################################################################
-    lbz r3, consoleEnteredBitfield(r31)
+    lbz r3, LANEntry_consoleEnteredBitfield(r31)
     lwz r4, NetGameMgr_mspNetGameMgr(r13)
     stb r3, NetGameMgr_consoleEnteredBitfield(r4)
 
-    lbz r3, isCoopMode(r31)
+    lbz r3, LANEntry_isCoopMode(r31)
     stb r3, NetGameMgr_prevSessionCoopMode(r4)
 
     lis r3, gLANPlayInfo@h
@@ -131,12 +245,83 @@ NotGoingToRaceBattle:
     ori r5, r5, KaneshigeM_gRaceInfo@l
     li r4, 0x0
     sth r4, gRaceInfo_kartNumber(r5) # Set the Kart number to 0 to prevent the Reuse Selection code from being executed on non-pointer values
-    stb r4, selectionsHaveBeenUsed(r31)
-    stb r4, consoleEnteredBitfield(r31)
+    stb r4, LANEntry_selectionsHaveBeenUsed(r31)
+    stb r4, LANEntry_consoleEnteredBitfield(r31)
     li r4, 0x1
-    stb r4, (LANEntry_blo + visible)(r31)
+    stb r4, (LANEntry_lanEntry_blo + J2DPane_visible)(r31)
+
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    cmpwi r3, 0x0
+    bne LanEntryCalc_SceneCourseSelectInitialised
+
+    lwz r3, NetGateApp_sceneMapSelect(r26)
+    cmpwi r3, 0x0
+    beq DontReinitLANTitleAndLANSelectMode
+LanEntryCalc_SceneCourseSelectInitialised:
+    li r3, MENUPROGRESS_RELOADTITLE
+    stw r3, LANEntry_progress(r31)
+
+    li r4, 0x0
+    stw r4, NetGateApp_isSceneOrTitleLoaded(r26)
+
+    lwz r3, System__mspLoTask(r13)
+    lis r4, LoadTask_LANPlayArcResolved@h
+    ori r4, r4, LoadTask_LANPlayArcResolved@l
+    li r5, 0x0
+    li r6, 0x0
+    bl JKRTask__request
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    bl NetGameMgr__sleep
+
+    b WaitToReloadTitle
+
+DontReinitLANTitleAndLANSelectMode:
+    li r3, 0x2
     b FadeComplete
 
+WaitForTitleLoad:
+    lwz r3, NetGateApp_isSceneOrTitleLoaded(r26)
+    cmpwi r3, 0x0
+    beq WaitForTitleLoadEnd
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    lwz r4, 0x96c(r3)
+    cmpwi r4, 0xf
+    bne WaitForTitleLoadEnd
+
+    li r4, MENUPROGRESS_WAITFOROTHERCONSOLES_TITLE
+    stw r4, LANEntry_progress(r31)
+
+    bl NetGameMgr__awake
+
+    b WaitForTitleLoadEnd
+
+WaitForOtherConsoles:
+    #############################################################################
+    # Check if the other consoles have loaded SceneCourseSelect or SceneMapSelect
+    # They will have called NetGameMgr::awake
+    #############################################################################
+    lwz r4, NetGameMgr_mspNetGameMgr(r13)
+    lwz r4, 0x96c(r4)
+    cmpwi r4, 0xd
+    bne StillWaitingForOtherConsoles
+
+    li r4,  MENUPROGRESS_COURSESELECTION
+    cmpwi r3, MENUPROGRESS_WAITFOROTHERCONSOLES_TITLE
+    beq OtherConsoleTitleLoadComplete
+
+    cmpwi r3, MENUPROGRESS_WAITFOROTHERCONSOLES_MAP
+    bne NotWaitingForOtherConsolesMap
+
+    li r4,  MENUPROGRESS_MAPSELECTION
+NotWaitingForOtherConsolesMap:
+    stw r4, LANEntry_progress(r31)
+    b WaitForOtherConsolesEnd
+
+OtherConsoleTitleLoadComplete:
+    li r3, 0x2
+    b FadeComplete
 
 DoInit:
 ###############################################################
@@ -152,18 +337,18 @@ DoInitWithoutSound:
 # Store character and kart selections from previous race/battle if kart count is the same
 #########################################################################################
     li r3, 0x0
-    stb r3, selectionsHaveBeenUsed(r31)
+    stb r3, LANEntry_selectionsHaveBeenUsed(r31)
     sth r3, LANEntry_bTimer(r31)
 
-    lwz r3, progress(r31)
+    lwz r3, LANEntry_progress(r31)
     cmpwi r3, MENUPROGRESS_INITNOSOUND
     bne DontStoreSelectionsToReuse
     li r3, 0x1
-    stb r3, selectionsHaveBeenUsed(r31)
+    stb r3, LANEntry_selectionsHaveBeenUsed(r31)
 
     li r29, 0x0
 CheckReuseSelectionLoop:
-    lwz r3, kartCount(r31)
+    lwz r3, LANEntry_kartCount(r31)
     cmpw r29, r3
     bge ReuseSelectionDone
 
@@ -173,25 +358,25 @@ CheckReuseSelectionLoop:
     lis r7, CharDBToOrderTableResolved@h
     ori r7, r7, CharDBToOrderTableResolved@l
 
-    lwz r4, char1DB(r3)
+    lwz r4, KartInfo_char1DB(r3)
     lhz r4, charDBID(r4)
     lbzx r4, r7, r4
 
-    lwz r5, char2DB(r3)
+    lwz r5, KartInfo_char2DB(r3)
     lhz r5, charDBID(r5)
     lbzx r5, r7, r5
 
     addi r7, r7, KartDBToOrderTable - CharDBToOrderTable
-    lwz r6, kartDB(r3)
+    lwz r6, KartInfo_kartDB(r3)
     lwz r6, kartDBID(r6)
     lbzx r6, r7, r6
 
     mulli r7, r29, 0x3
     add r7, r7, r31
 
-    stb r4, (rememberedSelections)(r7)
-    stb r5, (rememberedSelections+1)(r7)
-    stb r6, (rememberedSelections+2)(r7)
+    stb r4, (LANEntry_rememberedSelections)(r7)
+    stb r5, (LANEntry_rememberedSelections+1)(r7)
+    stb r6, (LANEntry_rememberedSelections+2)(r7)
 
     addi r29, r29, 0x1
     b CheckReuseSelectionLoop
@@ -201,12 +386,12 @@ DontStoreSelectionsToReuse:
     bl LANEntry_setRaceInfo
 
     li r3, MENUPROGRESS_WAITFORFADE
-    stw r3, progress(r31)
+    stw r3, LANEntry_progress(r31)
     li r3, 0x0
-    stw r3, kartProgressArr(r31)
-    stw r3, (kartProgressArr+4)(r31)
-    stw r3, timer(r31) # timer from now on will be treated as a floating point value
-    stw r3, timerState(r31) # Force timer to stop
+    stw r3, LANEntry_kartProgressArr(r31)
+    stw r3, (LANEntry_kartProgressArr+4)(r31)
+    stw r3, LANEntry_timer(r31) # timer from now on will be treated as a floating point value
+    stw r3, LANEntry_timerState(r31) # Force timer to stop
 
 ##########################################
 # Check if unrestriction mode has been set
@@ -215,18 +400,18 @@ DontStoreSelectionsToReuse:
     lis r3, OsakoM_gpaKartPad@h
     ori r3, r3, OsakoM_gpaKartPad@l
     lwz r3, 0x0(r3) #  Read from host's pad
-    lwz r3, buttonHold(r3)
+    lwz r3, KartPad_buttonHold(r3)
     andi. r3, r3, lButton | rButton
     cmpwi r3, lButton | rButton # cmpwi instruction necessary to check if L AND R are held
     bne UnrestrictionModeNotSet
     li r4, 0x1
 UnrestrictionModeNotSet:
-    stb r4, UnrestrictedModeSet(r31)
+    stb r4, LANEntry_UnrestrictedModeSet(r31)
 
 ####################################################################
 # Reuse character and kart selections if the kart number is the same
 ####################################################################
-    lbz r3, selectionsHaveBeenUsed(r31)
+    lbz r3, LANEntry_selectionsHaveBeenUsed(r31)
     cmpwi r3, 0x1
     beq LoadRememberedSelections
 
@@ -235,13 +420,13 @@ UnrestrictionModeNotSet:
 #########################################################
     li r29, 0 /*  kart ID counter */
 CheckCharKartInitLoop:
-    lwz r3, kartCount(r31)
+    lwz r3, LANEntry_kartCount(r31)
     cmpw r29, r3
     bge KartInitDone
     mr r3, r29
     bl PrepareKartInfo
     slwi r4, r29, 1
-    stw r4, char1DB(r3)
+    stw r4, KartInfo_char1DB(r3)
 
     addi r29, r29, 0x1
     b CheckCharKartInitLoop
@@ -250,7 +435,7 @@ LoadRememberedSelections:
     li r29, 0x0
 
 LoadRememberedSelectionLoop:
-    lwz r3, kartCount(r31)
+    lwz r3, LANEntry_kartCount(r31)
     cmpw r29, r3
     bge KartInitDone
     mr r3, r29
@@ -259,33 +444,32 @@ LoadRememberedSelectionLoop:
     mulli r7, r29, 0x3
     add r7, r7, r31
 
-    lbz r4, (rememberedSelections)(r7)
-    lbz r5, (rememberedSelections+1)(r7)
-    lbz r6, (rememberedSelections+2)(r7)
+    lbz r4, (LANEntry_rememberedSelections)(r7)
+    lbz r5, (LANEntry_rememberedSelections+1)(r7)
+    lbz r6, (LANEntry_rememberedSelections+2)(r7)
 
-    stw r4, char1DB(r3)
-    stw r5, char2DB(r3)
-    stw r6, kartDB(r3)
+    stw r4, KartInfo_char1DB(r3)
+    stw r5, KartInfo_char2DB(r3)
+    stw r6, KartInfo_kartDB(r3)
 
 
     li r3, 3
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     stbx r3, r31, r4 # Make all karts skip to last progression
 
     addi r29, r29, 0x1
     b LoadRememberedSelectionLoop
 KartInitDone:
 
-    lbz r3, curConsoleID(r31)
+    lbz r3, LANEntry_curConsoleID(r31)
     li r4, 0x1
     slw r4, r4, r3 #  1 << curConsoleID
 
-    lbz r3, consoleEnteredBitfield(r31)
+    lbz r3, LANEntry_consoleEnteredBitfield(r31)
     and. r3, r3, r4
     bne DontInitWindowForThisConsole # This Console has at least one kart entry
 
-    lwz r3, NetGateApp_mspNetGateApp(r13)
-    lwz r3, printMemoryCard(r3)
+    lwz r3, NetGateApp_printMemoryCard(r26)
     li r4, 0x1
     # Don't play sound effect
     stb r4, 0xc(r3)
@@ -297,6 +481,7 @@ DontInitWindowForThisConsole:
 DontWaitForFade:
 WindowInitDone:
 
+MakeCharKartSelections:
 ##############################################
 # Check if first pad has pressed B to go back
 # Only valid if all karts are at progress 0
@@ -307,16 +492,16 @@ WindowInitDone:
     cmpwi r3, B_BUTTON_WAIT_LENGTH
     bge BButtonHeldForForceBack
 
-    lwz r3, kartProgressArr(r31)
-    lwz r4, (kartProgressArr+4)(r31)
+    lwz r3, LANEntry_kartProgressArr(r31)
+    lwz r4, (LANEntry_kartProgressArr+4)(r31)
     add r3, r3, r4
     cmpwi r3, 0x0
     bne AllKartsNotAtProgress0
 
-    lis r3, (KaneshigeM_gRaceInfo+kartInfos)@h
-    ori r3, r3, (KaneshigeM_gRaceInfo+kartInfos)@l # points to first kart's pad
-    lwz r3, pad1(r3)
-    lwz r3, buttonRepeat(r3)
+    lis r3, (KaneshigeM_gRaceInfo+RaceInfo_kartInfos)@h
+    ori r3, r3, (KaneshigeM_gRaceInfo+RaceInfo_kartInfos)@l # points to first kart's pad
+    lwz r3, KartInfo_pad1(r3)
+    lwz r3, KartPad_buttonRepeat(r3)
     andi. r3, r3, bButton
     beq BButtonNotPressedToGoBack
 
@@ -328,9 +513,9 @@ BButtonHeldForForceBack:
     bl GameAudio_Main_startSystemSe
 
     lwz r3, System_mspDisplay(r13)
-    lwz r3, fader(r3)
-    lwz r12, vt(r3)
-    lwz r12, startFadeOut(r12)
+    lwz r3, JFWDisplay_fader(r3)
+    lwz r12, JFWDisplay_vt(r3)
+    lwz r12, JFWDisplayVT_startFadeOut(r12)
     li r4, 0xf
     mtctr r12
     bctrl
@@ -346,25 +531,27 @@ BButtonHeldForForceBack:
     bl NetGameMgr_initPadConv # Reset the Kart Pads
 
     li r3, MENUPROGRESS_BACKTOTITLEWAIT
-    stw r3, progress(r31)
+    stw r3, LANEntry_progress(r31)
     li r3, 0x0
-    stw r3, animProgress(r31)
+    stw r3, LANEntry_animProgress(r31)
+
     b WaitingForFadeOut
 BButtonNotPressedToGoBack:
 AllKartsNotAtProgress0:
 
-####################################################################################
-# Begin race when all karts have made their selections and A is pressed on first pad
-####################################################################################
+######################################################################################
+# Begin race or go to course/stage selection when all karts have made their selections
+# and A is pressed on first pad
+######################################################################################
     mr r3, r31
     bl CheckIfAllKartsHaveFinished
     cmpwi r3, 0x1
     bne WontStartRaceOrBattle
 
-    lis r3, (KaneshigeM_gRaceInfo+kartInfos)@h
-    ori r3, r3, (KaneshigeM_gRaceInfo+kartInfos)@l # points to first kart's pad
-    lwz r3, pad1(r3)
-    lwz r3, buttonRepeat(r3)
+    lis r3, (KaneshigeM_gRaceInfo+RaceInfo_kartInfos)@h
+    ori r3, r3, (KaneshigeM_gRaceInfo+RaceInfo_kartInfos)@l # points to first kart's pad
+    lwz r3, KartInfo_pad1(r3)
+    lwz r3, KartPad_buttonRepeat(r3)
     andi. r0, r3, startButton
     beq WontStartRaceOrBattle
 
@@ -373,10 +560,89 @@ AllKartsNotAtProgress0:
     ori r4, r4, SE_SELECTION@l
     bl GameAudio_Main_startSystemSe
 
+    mr r3, r31
+    bl CloseWindowForConsolesWithNoEntries
+
+    lis r6, gLANPlayInfo@h
+    ori r6, r6, gLANPlayInfo@l
+    lbz r5, LANPlayInfo_gameMode(r6)
+    cmpwi r5, LAN_GAMEMODE_VERSUS
+    bne CheckForSceneMapSelect
+
+    lbz r5, LANPlayInfo_courseOrder(r6)
+    cmpwi r5, COURSEORDER_RANDOM
+    beq DontUseSceneCourseSelect
+    cmpwi r5, COURSEORDER_ALL_COURSES
+    beq DontUseSceneCourseSelect
+
+    li r3, MENUPROGRESS_WAITFORCOURSELOAD
+    stw r3, LANEntry_progress(r31)
+
+    lwz r3, NetGateApp_sceneCourseSelect(r26)
+    cmpwi r3, 0x0
+    bne SceneCourseSelectAlreadyConstructed
+
+    li r4, 0x0
+    stw r4, NetGateApp_isSceneOrTitleLoaded(r26)
+
+    lwz r3, System__mspLoTask(r13)
+    lis r4, LoadTask_SceneCourseSelectResolved@h
+    ori r4, r4, LoadTask_SceneCourseSelectResolved@l
+    li r5, 0x0
+    li r6, 0x0
+    bl JKRTask__request
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    bl NetGameMgr__sleep
+
+    b CourseSelectCalcEnd
+
+SceneCourseSelectAlreadyConstructed:
+    li r4, 0x1 # Skip wait for the task as SceneCourseSelect already loaded
+    stw r4, NetGateApp_isSceneOrTitleLoaded(r26)
+    b CourseSelectCalcEnd
+
+CheckForSceneMapSelect:
+    lbz r5, LANPlayInfo_courseOrder(r6)
+    cmpwi r5, STAGEORDER_1_STAGE_ONLY
+    bne DontUseSceneMapSelect
+
+    li r3, MENUPROGRESS_WAITFORMAPLOAD
+    stw r3, LANEntry_progress(r31)
+
+    lwz r3, NetGateApp_sceneMapSelect(r26)
+    cmpwi r3, 0x0
+    bne SceneMapSelectAlreadyConstructed
+
+    li r4, 0x0
+    stw r4, NetGateApp_isSceneOrTitleLoaded(r26)
+
+    lwz r3, System__mspLoTask(r13)
+    lis r4, LoadTask_SceneMapSelectResolved@h
+    ori r4, r4, LoadTask_SceneMapSelectResolved@l
+    li r5, 0x0
+    li r6, 0x0
+    bl JKRTask__request
+
+    lwz r3, NetGameMgr_mspNetGameMgr(r13)
+    bl NetGameMgr__sleep
+
+    b CourseSelectCalcEnd
+
+SceneMapSelectAlreadyConstructed:
+    li r4, 0x1 # Skip wait for the task as SceneMapSelect already loaded
+    stw r4, NetGateApp_isSceneOrTitleLoaded(r26)
+    b MapSelectCalcEnd
+
+DontUseSceneMapSelect:
+DontUseSceneCourseSelect:
+    li r3, MENUPROGRESS_RACEBATTLEWAIT
+    stw r3, LANEntry_progress(r31)
+
     lwz r3, System_mspDisplay(r13)
-    lwz r3, fader(r3)
-    lwz r12, vt(r3)
-    lwz r12, startFadeOut(r12)
+    lwz r3, JFWDisplay_fader(r3)
+    lwz r12, JFWDisplay_vt(r3)
+    lwz r12, JFWDisplayVT_startFadeOut(r12)
     li r4, 0xf
     mtctr r12
     bctrl
@@ -384,12 +650,6 @@ AllKartsNotAtProgress0:
     lwz r3, GameAudio_Main_msBasic(r13)
     li r4, 0xf
     bl GameAudio_Main_fadeOutAll
-
-    mr r3, r31
-    bl CloseWindowForConsolesWithNoEntries
-
-    li r3, MENUPROGRESS_RACEBATTLEWAIT
-    stw r3, progress(r31)
     b WaitingForFadeOut
 
 
@@ -411,7 +671,7 @@ PlayerInputLoop:
 #################################################
 # Check if kart has moved the stick left or right
 #################################################
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r4
 
     addi r4, r4, 0x1
@@ -435,7 +695,7 @@ LeftOrRightStickInput:
     lbz r3, consoleIDStart(r1)
     lis r4, SE_MENU_STICK@h
     ori r4, r4, SE_MENU_STICK@l
-    lbz r5, curConsoleID(r31)
+    lbz r5, LANEntry_curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
 
 DontChangeCharKart:
@@ -444,7 +704,7 @@ DontChangeCharKart:
 # also play voice clip for character
 # and selection sound for kart
 ######################################
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r4
 
     mr r3, r28
@@ -459,7 +719,7 @@ NotAtFinalStageButtonCheck:
     andi. r0, r3, aButton
     beq AButtonNotPressed
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r3
     cmpwi r4, 0x3
     bge KartCannotProgress
@@ -470,7 +730,7 @@ NotAtFinalStageButtonCheck:
     cmpwi r4, KARTPROGRESS_CHAR2
     bne KartNotProgressedToChar2
 
-    lwz r3, char1DB(r28)
+    lwz r3, KartInfo_char1DB(r28)
     lis r5, CharOrderTableResolved@h
     ori r5, r5, CharOrderTableResolved@l
     lbzx r3, r5, r3
@@ -480,7 +740,7 @@ NotAtFinalStageButtonCheck:
     lis r5, CharDBToOrderTableResolved@h
     ori r5, r5, CharDBToOrderTableResolved@l
     lbzx r3, r5, r3
-    stw r3, char2DB(r28)
+    stw r3, KartInfo_char2DB(r28)
     b ProgressionToChar2Done
 
 KartNotProgressedToChar2:
@@ -497,20 +757,20 @@ KartNotProgressedToChar2:
 
     lis r4, CharOrderTableResolved@h
     ori r4, r4, CharOrderTableResolved@l
-    lwz r3, char1DB(r28)
+    lwz r3, KartInfo_char1DB(r28)
     lbzx r3, r4, r3
     bl KartInfo_getCharDB
 
     lhz r3, charDBWeight(r3)
-    li r4, char1DB
+    li r4, KartInfo_char1DB
     cmpw r3, r27
     beq Char1MatchesKartWeight
 
-    lbz r5, UnrestrictedModeSet(r31)
+    lbz r5, LANEntry_UnrestrictedModeSet(r31)
     cmpwi r5, 0x1
     beq UnrestrictedModeSetForKartWeight
 
-    li r4, char2DB
+    li r4, KartInfo_char2DB
 Char1MatchesKartWeight:
 UnrestrictedModeSetForKartWeight:
     lwzx r3, r28, r4
@@ -523,16 +783,16 @@ UnrestrictedModeSetForKartWeight:
     lis r4, KartDBToOrderTableResolved@h
     ori r4, r4, KartDBToOrderTableResolved@l
     lbzx r3, r4, r3
-    stw r3, kartDB(r28)
+    stw r3, KartInfo_kartDB(r28)
 
 ####################################################################
 # Play voice clip when Character 1 or Character 2 have been selected
 ####################################################################
 
-    li r3, char2DB
+    li r3, KartInfo_char2DB
     b DontPlayerChar1VoiceClip
 ProgressionToChar2Done:
-    li r3, char1DB
+    li r3, KartInfo_char1DB
 DontPlayerChar1VoiceClip:
 
     lwzx r3, r28, r3
@@ -541,7 +801,7 @@ DontPlayerChar1VoiceClip:
     ori r4, r4, SceneMenu_mCharVoice@l
     lwzx r4, r4, r3
     lbz r3, consoleIDStart(r1)
-    lbz r5, curConsoleID(r31)
+    lbz r5, LANEntry_curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
     b AButtonPressDone
 
@@ -549,7 +809,7 @@ KartNotProgressedToKart: # "Complete" progression
     lbz r3, consoleIDStart(r1)
     lis r4, SE_SOFT_SELECTION@h
     ori r4, r4, SE_SOFT_SELECTION@l
-    lbz r5, curConsoleID(r31)
+    lbz r5, LANEntry_curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
     b AButtonPressDone
 
@@ -561,7 +821,7 @@ AButtonNotPressed:
     andi. r0, r3, bButton
     beq BButtonNotPressed
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r3
     cmpwi r4, 0x0
     beq KartCannotGoBackAnyFurther
@@ -572,7 +832,7 @@ AButtonNotPressed:
     lbz r3, consoleIDStart(r1)
     lis r4, SE_SOFT_GO_BACK@h
     ori r4, r4, SE_SOFT_GO_BACK@l
-    lbz r5, curConsoleID(r31)
+    lbz r5, LANEntry_curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
 
 KartCannotGoBackAnyFurther:
@@ -583,7 +843,7 @@ AButtonPressDone:
 # Check if kart has done Z press
 # This would swap Char 1 and 2
 ################################
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r4
 
     mr r3, r28
@@ -594,20 +854,20 @@ AButtonPressDone:
     andi. r0, r3, zButton
     beq ZButtonNotPressed
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r3, r31, r3
     cmpwi r3, KARTPROGRESS_CHAR1 # Don't need to check for KARTPROGRESS_COMPLETE
     beq WontSwapChararacters # because GetKartPadField would have returned 0 anyway when r4=3+1
 
-    lwz r3, char1DB(r28)
-    lwz r4, char2DB(r28)
-    stw r4, char1DB(r28)
-    stw r3, char2DB(r28)
+    lwz r3, KartInfo_char1DB(r28)
+    lwz r4, KartInfo_char2DB(r28)
+    stw r4, KartInfo_char1DB(r28)
+    stw r3, KartInfo_char2DB(r28)
 
     lbz r3, consoleIDStart(r1)
     lis r4, SE_MENU_STICK@h
     ori r4, r4, SE_MENU_STICK@l
-    lbz r5, curConsoleID(r31)
+    lbz r5, LANEntry_curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
 WontSwapChararacters:
 ZButtonNotPressed:
@@ -615,7 +875,7 @@ ZButtonNotPressed:
 # Check if kart has done X press
 # This would randomise character/kart
 #####################################
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r4
 
     mr r3, r28
@@ -626,9 +886,9 @@ ZButtonNotPressed:
     andi. r0, r3, xButton
     beq XButtonNotPressed
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r3
-    lbz r5, UnrestrictedModeSet(r31)
+    lbz r5, LANEntry_UnrestrictedModeSet(r31)
 
     cmpwi r4, KARTPROGRESS_KART
     beq RandomiseKart
@@ -652,7 +912,7 @@ RandomiseUnrestrictedModeOffForChar:
 ###############################################
 # r3 now has index to read from EntryCountTable
 ###############################################
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r31, r4
 
     lis r7, ProgressToFieldTableResolved@h
@@ -699,7 +959,7 @@ DontSetParadeKartForRandomise:
 DontHandleParadeKartForRandomise:
     cmpwi r3, RANDOMISE_CHAR2
     bne DontHandleChar2DuplicateForRandomise
-    lwz r4, char1DB(r28)
+    lwz r4, KartInfo_char1DB(r28)
     cmpw r9, r4
     blt RandomiseNotBeforeChar1ForChar2
     addi r9, r9, 0x1 # Prevent randomised character from being identical to the First Character
@@ -710,14 +970,14 @@ DontHandleChar2DuplicateForRandomise:
     lbz r3, consoleIDStart(r1)
     lis r4, SE_RANDOMISE@h
     ori r4, r4, SE_RANDOMISE@l
-    lbz r5, curConsoleID(r31)
+    lbz r5, LANEntry_curConsoleID(r31)
     bl PlaySoundEffectOnlyForCurConsole
 XButtonNotPressed:
     addi r29, r29, 0x1
     lbz r3, kartForConsoleIDStart(r1)
     addi r3, r3, 0x1
     stb r3, kartForConsoleIDStart(r1)
-    lwz r3, kartCount(r31)
+    lwz r3, LANEntry_kartCount(r31)
     cmpw r29, r3
     blt PlayerInputLoop
 
@@ -731,7 +991,7 @@ XButtonNotPressed:
     lis r3, OsakoM_gpaKartPad@h
     ori r3, r3, OsakoM_gpaKartPad@l
     lwz r3, 0x0(r3) #  Read from host's pad
-    lwz r3, buttonHold(r3)
+    lwz r3, KartPad_buttonHold(r3)
     andi. r3, r3, bButton
     bne DontResetBButtonTimer
     li r3, 0x0
@@ -741,8 +1001,15 @@ DontResetBButtonTimer:
     /*  Function epilogue  */
 WaitingForFadeOut:
 StillWaitingForFadeIn:
+CourseSelectCalcEnd:
+MapSelectCalcEnd:
+SceneLoadCheckEnd:
+WaitToReloadTitle:
+StillWaitingForOtherConsoles:
+WaitForOtherConsolesEnd:
     li r3, 0
 FadeComplete:
+WaitForTitleLoadEnd:
     lmw 32-regCount, (stackSize-regCount*4)(r1)
     mr r30, r3
     /*  Function epilogue */
@@ -761,9 +1028,9 @@ CharacterBackgroundByteSetup:
 .byte 0x08, 0x24, 0x8F, 0xC1, 0x08, 0x2A, 0x70, 0xC2, 0x08, 0xFA, 0x0F, 0xC3, 0x08, 0xF4, 0x70, 0x00
 CharacterBackgroundByteSetupEnd:
 ProgressToFieldTable:
-.byte char1DB
-.byte char2DB
-.byte kartDB
+.byte KartInfo_char1DB
+.byte KartInfo_char2DB
+.byte KartInfo_kartDB
 .align 4
 
 
@@ -860,9 +1127,33 @@ KartOrderTable:
 .byte BooPipesDB
 .byte ParadeKartDB
 
+# Nintendo GameCube and Block City have their positions swapped
+LANPlayInfo_To_SceneMapSelectTable:
+.byte SCENEMAPSELECT_COOKIELAND
+.byte SCENEMAPSELECT_BLOCKCITY
+.byte SCENEMAPSELECT_NINTENDOGAMECUBE
+.byte SCENEMAPSELECT_PIPEPLAZA
+.byte SCENEMAPSELECT_LUIGISMANSION
+.byte SCENEMAPSELECT_TILTAKART
 
+MenuProgressTable:
+.4byte DoInitResolved # MENUPROGRESS_INIT
+.4byte DoInitWithoutSoundResolved # MENUPROGRESS_INITNOSOUND
+.4byte WaitingForFadeInResolved # MENUPROGRESS_WAITFORFADE
+.4byte MakeCharKartSelectionsResolved # MENUPROGRESS_CANMAKESELECTIONS
+.4byte RaceBattleTitleWaitForFadeResolved # MENUPROGRESS_RACEBATTLEWAIT
+.4byte RaceBattleTitleWaitForFadeResolved # MENUPROGRESS_BACKTOTITLEWAIT
+.4byte -1 # MENUPROGRESS_STARTRACEBATTLE - not used by calc, only draw
+.4byte WaitForTitleLoadResolved # MENUPROGRESS_RELOADTITLE
+.4byte WaitForCourseLoadResolved # MENUPROGRESS_WAITFORCOURSELOAD
+.4byte WaitForMapLoadResolved # MENUPROGRESS_WAITFORMAPLOAD
+.4byte WaitForOtherConsolesResolved # MENUPROGRESS_WAITFOROTHERCONSOLES_COURSE
+.4byte WaitForOtherConsolesResolved # MENUPROGRESS_WAITFOROTHERCONSOLES_MAP
+.4byte WaitForOtherConsolesResolved # MENUPROGRESS_WAITFOROTHERCONSOLES_TITLE
+.4byte CourseSelectionCalcResolved # MENUPROGRESS_COURSESELECTION
+.4byte MapSelectionCalcResolved # MENUPROGRESS_MAPSELECTION
 
-
+.align 4
 /* --------------------------------------------------------------- */
 /*  Language specific data comes after (defined in external files) */
 /* --------------------------------------------------------------- */

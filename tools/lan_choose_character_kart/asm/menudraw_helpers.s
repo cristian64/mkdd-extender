@@ -34,8 +34,8 @@ PrintColouredText:
     mr r4, r30
 
     lis r5, FLOAT_20@h
-    stw r5, fontSizeWidth(r3)
-    stw r5, fontSizeHeight(r3)
+    stw r5, J2DPrint_fontSizeWidth(r3)
+    stw r5, J2DPrint_fontSizeHeight(r3)
     lfs f1, textMaxWidth(r1)
     lis r5, TextHeightResolved@h
     ori r5, r5, TextHeightResolved@l
@@ -95,24 +95,24 @@ DrawMenuImage:
     stfs f1, 0x8(r1)
     stfs f2, 0xc(r1)
 
-    stfs f3, scaleX(r3)
-    stfs f4, scaleY(r3)
-    stw r5, sizeX(r3)
-    stw r5, sizeY(r3)
+    stfs f3, J2DPane_scaleX(r3)
+    stfs f4, J2DPane_scaleY(r3)
+    stw r5, J2DPane_sizeX(r3)
+    stw r5, J2DPane_sizeY(r3)
 
-    lwz r9, vt(r3)
+    lwz r9, J2DPane_vt(r3)
     cmpw r8, r9
     beq SetTevBlockColours
 
-    stw r6, cornerColourTopLeft(r3)
-    stw r7, cornerColourTopRight(r3)
-    stw r6, cornerColourBottomLeft(r3)
-    stw r7, cornerColourBottomRight(r3)
+    stw r6, J2DPane_cornerColourTopLeft(r3)
+    stw r7, J2DPane_cornerColourTopRight(r3)
+    stw r6, J2DPane_cornerColourBottomLeft(r3)
+    stw r7, J2DPane_cornerColourBottomRight(r3)
     b CornerColorComplete
 
 SetTevBlockColours:
-    lwz r8, j2DMaterial(r3)
-    lwz r8, j2dTevBlock(r8)
+    lwz r8, J2DPictureEx_j2DMaterial(r3)
+    lwz r8, J2DMaterial_j2dTevBlock(r8)
 
 ###############################################################################
 # Store the words onto stack so that they can be iterated through, byte by byte
@@ -168,7 +168,7 @@ GetCharacterPortaitTextureFromOrder:
     ori r4, r4, CharOrderTableResolved@l
     lbzx r4, r4, r3 # Read using order as an index
     slwi r4, r4, 2 # Word (4-byte) alignment
-    addi r4, r4, characterPortraits_Bti
+    addi r4, r4, Kart2DCommon_characterPortraits_Bti
     lwz r5, Kart2DCommon_mspKart2DCommon(r13) # Kart2DCommon Object that contains the portrait textures
     lwzx r3, r5, r4
     blr
@@ -187,7 +187,7 @@ GetKartPortaitTextureFromOrder:
     ori r4, r4, KartOrderTableResolved@l
     lbzx r4, r4, r3 # Read using order as an index
     slwi r4, r4, 2 # Word (4-byte) alignment
-    addi r4, r4, kartPortraits_Bti
+    addi r4, r4, Kart2DCommon_kartPortraits_Bti
     lwz r5, Kart2DCommon_mspKart2DCommon(r13) # Kart2DCommon Object that contains the portrait textures
     lwzx r3, r5, r4
     blr
