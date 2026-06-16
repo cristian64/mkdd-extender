@@ -10,8 +10,8 @@
 #  r3 = Pointed to correct KartInfo object
 # ----------------------------------------------
 PrepareKartInfo:
-    lis r4, (KaneshigeM_gRaceInfo+kartInfos)@h
-    ori r4, r4, (KaneshigeM_gRaceInfo+kartInfos)@l
+    lis r4, (KaneshigeM_gRaceInfo+RaceInfo_kartInfos)@h
+    ori r4, r4, (KaneshigeM_gRaceInfo+RaceInfo_kartInfos)@l
     mulli r3, r3, kartInfoTotalSize
     add r3, r4, r3
     blr
@@ -27,7 +27,7 @@ PrepareKartInfo:
 #############################################################################
 ResolveConsoleAndControllerIDs:
 
-    lbz r5, consoleEnteredBitfield(r3)
+    lbz r5, LANEntry_consoleEnteredBitfield(r3)
     lbz r6, 0x0(r4)
     lbz r7, 0x1(r4)
 CheckNextConsole:
@@ -35,7 +35,7 @@ CheckNextConsole:
     andi. r8, r8, 0x1
     beq TryNextConsole
 
-    li r8, entriesForConsole
+    li r8, LANEntry_entriesForConsole
     add r8, r8, r7
     lbzx r8, r3, r8 #  load byte for console's entry count
     cmpw r6, r8 # Check if current kart-of-console ID exceed the kart entries for that console
@@ -68,26 +68,26 @@ GetKartPadField:
     li r6, 0x0
     rlwinm. r0,r4,0x0, 0x20 - 1, 0x20 - 1
     beq DontReadFromPad1
-    lwz r7, pad1(r3)
+    lwz r7, KartInfo_pad1(r3)
     cmpwi r5, 0x1
-    lwz r8, buttonRepeat(r7)
+    lwz r8, KartPad_buttonRepeat(r7)
     bne NotTriggerPad1
-    lbz r8, trigger(r7)
+    lbz r8, KartPad_trigger(r7)
 NotTriggerPad1:
     or r6, r6, r8
 
 DontReadFromPad1:
     rlwinm. r0,r4,0x0, 0x20 - 2, 0x20 - 2
     beq DontReadFromPad2
-    lwz r7, pad2(r3)
+    lwz r7, KartInfo_pad2(r3)
     cmpwi r7, 0x0
     bne IsCoopPlay
-    lwz r7, pad1(r3)
+    lwz r7, KartInfo_pad1(r3)
 IsCoopPlay:
     cmpwi r5, 0x1
-    lwz r8, buttonRepeat(r7)
+    lwz r8, KartPad_buttonRepeat(r7)
     bne NotTriggerPad2
-    lbz r8, trigger(r7)
+    lbz r8, KartPad_trigger(r7)
 NotTriggerPad2:
     or r6, r6, r8
 
@@ -133,12 +133,12 @@ GetKartInfoWeight:
     lis r30, CharOrderTableResolved@h
     ori r30, r30, CharOrderTableResolved@l
 
-    lwz r3, char1DB(r31)
+    lwz r3, KartInfo_char1DB(r31)
     lbzx r3, r30, r3
     bl KartInfo_getCharDB
     mr r29, r3
 
-    lwz r3, char2DB(r31)
+    lwz r3, KartInfo_char2DB(r31)
     lbzx r3, r30, r3
     bl KartInfo_getCharDB
 
@@ -176,7 +176,7 @@ ChangeCharKartOrderIDFromStickInput:
     mr r30, r5
     mr r29, r6
 
-    addi r3, r4, kartProgressArr
+    addi r3, r4, LANEntry_kartProgressArr
     lbzx r3, r31, r3
     mr r28, r3
 IncDecCharAgain:
@@ -184,7 +184,7 @@ IncDecCharAgain:
     cmpwi r28, KARTPROGRESS_KART
     bne NotIncDecKart
 
-    lbz r3, UnrestrictedModeSet(r31)
+    lbz r3, LANEntry_UnrestrictedModeSet(r31)
     cmpwi r3, 0x1
     li r3, HANDLESTICK_UNRESTRICTEDKART
     beq WrapAroundUnrestrictedModeSet
@@ -240,11 +240,11 @@ DontWrapAroundCharKart:
     cmpwi r28, KARTPROGRESS_CHAR2
     bne NotAtChar2ToHandleDuplicateCase
 
-    lbz r3, UnrestrictedModeSet(r31)
+    lbz r3, LANEntry_UnrestrictedModeSet(r31)
     cmpwi r3, 0x1
     beq UnrestrictedModeForChar # Char 1 and 2 are allowed to be duplicates of each other
 
-    lwz r3, char1DB(r30)
+    lwz r3, KartInfo_char1DB(r30)
     cmpw r7, r3
     beq IncDecCharAgain # Repeat procedure as Char 1 and Char 2 are duplicates
 NotAtChar2ToHandleDuplicateCase:
@@ -264,11 +264,11 @@ UnrestrictedModeForChar:
 #  r3 = All Karts have finished (= 1), or not (= 0)
 ##########################################################################
 CheckIfAllKartsHaveFinished:
-    lwz r4, kartCount(r3)
+    lwz r4, LANEntry_kartCount(r3)
     mtctr r4
     li r4, 0x0
 CheckProgressionLoop:
-    addi r5, r4, kartProgressArr
+    addi r5, r4, LANEntry_kartProgressArr
     lbzx r5, r3, r5
     cmpwi r5, 0x3
     bne NotAllKartsHaveFinished
@@ -287,16 +287,16 @@ NotAllKartsHaveFinished:
 #############################################################
 CloseWindowForConsolesWithNoEntries:
 
-    lbz r4, curConsoleID(r3)
+    lbz r4, LANEntry_curConsoleID(r3)
     li r5, 0x1
     slw r4, r5, r4 #  1 << curConsoleID
 
-    lbz r3, consoleEnteredBitfield(r3)
+    lbz r3, LANEntry_consoleEnteredBitfield(r3)
     and. r3, r3, r4
     bne DontCloseWindowForThisConsole
 
     lwz r3, NetGateApp_mspNetGateApp(r13)
-    lwz r3, printMemoryCard(r3)
+    lwz r3, NetGateApp_printMemoryCard(r3)
     b PrintMemoryCard_closeWindowNoSe
 
 DontCloseWindowForThisConsole:
@@ -354,8 +354,6 @@ ValuesSameAsPrevSession:
     mtspr LR, r0
     addi r1, r1, stackSize
     blr
-
-
 
 # Index order for the below three tables
 # Light weight, Medium weight, Heavy weight, unrestricted kart selection, Character selection, Character selection 2

@@ -11,7 +11,7 @@ SelectionGroupLoop:
 
     lwz r3, System_mspJ2DOrtho(r13)
     bl J2DOrthoGraph_setPort
-    lwz r3, j2dPrintForFont(r30)
+    lwz r3, LANEntry_j2dPrintForFont(r30)
     bl J2DPrint_initiate
 
 
@@ -58,7 +58,7 @@ DontGetKartName:
     lis r3, ProgressXStartIndexTableResolved@h
     ori r3, r3, ProgressXStartIndexTableResolved@l
 
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r30, r4
 
     lbzx r3, r3, r4
@@ -68,7 +68,7 @@ DontGetKartName:
     lis r4, TextLengthTableResolved@h
     ori r4, r4, TextLengthTableResolved@l
     lfsx f3, r4, r3
-    lwz r3, j2dPrintForFont(r30)
+    lwz r3, LANEntry_j2dPrintForFont(r30)
     addi r4, r1, sprintfStringStart
     bl PrintColouredText
 
@@ -78,7 +78,7 @@ DontGetKartName:
     lis r3, ProgressXStartIndexTableResolved@h
     ori r3, r3, ProgressXStartIndexTableResolved@l
 
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r30, r4
 
     lbzx r3, r3, r4
@@ -95,9 +95,9 @@ DontGetKartName:
     lfs f3, 0x0(r4)
     lfs f4, 0x0(r4)
 
-    lwz r3, charBackgroundPictureEx(r30)
+    lwz r3, LANEntry_charBackgroundPictureEx(r30)
     lwz r4, Kart2DCommon_mspKart2DCommon(r13)
-    lwz r4, chara_window_1_bti(r4)
+    lwz r4, Kart2DCommon_chara_window_1_bti(r4)
     lis r5, FLOAT_64@h
     lis r6, DARKBLUE_RGBA@h
     ori r6, r6, DARKBLUE_RGBA@l
@@ -110,7 +110,7 @@ DontGetKartName:
     ori r7, r7, ColourToPlayerTableResolved@l
 
     lbz r8, kartForConsoleIDStart(r1)
-    lbz r9, isCoopMode(r30)
+    lbz r9, LANEntry_isCoopMode(r30)
     cmpwi r9, 0x1
     bne DontSetCoopPortaitColour
     slwi r8, r8, 1
@@ -143,7 +143,7 @@ KartPortraitTextureObtained:
     lis r5, ProgressXStartIndexTableResolved@h
     ori r5, r5, ProgressXStartIndexTableResolved@l
 
-    addi r4, r29, kartProgressArr
+    addi r4, r29, LANEntry_kartProgressArr
     lbzx r4, r30, r4
 
     lbzx r5, r5, r4
@@ -171,13 +171,13 @@ DontOffsetXAgainForKart:
     lfs f4, 0x0(r4)
 
     mr r4, r3
-    lwz r3, j2dPicture(r30)
+    lwz r3, LANEntry_j2dPicture(r30)
     lis r5, FLOAT_64@h
     li r6, -1 # i.e. FFFFFFFF
     li r7, -1
     bl DrawMenuImage
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r3, r30, r3
 
     cmpw r26, r3
@@ -186,10 +186,10 @@ DontOffsetXAgainForKart:
 # Draw left arrow
 #################
 
-    lfs f1, timer(r30)
+    lfs f1, LANEntry_timer(r30)
     bl GetArrowXPosOffset
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r3, r30, r3
 
     lis r4, ProgressXStartIndexTableResolved@h
@@ -215,12 +215,12 @@ DontOffsetXAgainForKart:
     lfs f3, 0x0(r3)
     lfs f4, 0x4(r3)
 
-    lwz r3, j2dPicture(r30)
+    lwz r3, LANEntry_j2dPicture(r30)
     lwz r4, NetGateApp_mspNetGateApp(r13)
-    lwz r4, arrowBtiPtr(r4)
+    lwz r4, NetGateApp_arrowBtiPtr(r4)
     lis r5, FLOAT_32@h
 
-    lbz r6, UnrestrictedModeSet(r30)
+    lbz r6, LANEntry_UnrestrictedModeSet(r30)
     lis r7, ArrowColourTableResolved@h
     ori r7, r7, ArrowColourTableResolved@l
     slwi r6, r6, 1 # 2 byte alignment
@@ -233,10 +233,10 @@ DontOffsetXAgainForKart:
 ##################
 # Draw right arrow
 ##################
-    lfs f1, timer(r30)
+    lfs f1, LANEntry_timer(r30)
     bl GetArrowXPosOffset
 
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r3, r30, r3
 
     lis r4, ProgressXStartIndexTableResolved@h
@@ -262,12 +262,12 @@ DontOffsetXAgainForKart:
     lfs f3, 0x4(r3)
     lfs f4, 0x4(r3)
 
-    lwz r3, j2dPicture(r30)
+    lwz r3, LANEntry_j2dPicture(r30)
     lwz r4, NetGateApp_mspNetGateApp(r13)
-    lwz r4, arrowBtiPtr(r4)
+    lwz r4, NetGateApp_arrowBtiPtr(r4)
     lis r5, FLOAT_32@h
 
-    lbz r6, UnrestrictedModeSet(r30)
+    lbz r6, LANEntry_UnrestrictedModeSet(r30)
     lis r7, ArrowColourTableResolved@h
     ori r7, r7, ArrowColourTableResolved@l
     slwi r6, r6, 1 # 2 byte alignment
@@ -286,7 +286,7 @@ DontDrawArrows:
 
 
     addi r26, r26, 0x1
-    addi r3, r29, kartProgressArr
+    addi r3, r29, LANEntry_kartProgressArr
     lbzx r3, r30, r3
     cmpwi r3, 0x3
     bne SelectionGroupLoopNotProgress3

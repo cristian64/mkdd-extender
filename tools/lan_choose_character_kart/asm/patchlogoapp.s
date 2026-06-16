@@ -1,6 +1,6 @@
 .include "./symbols.inc"
+.include "./fielddefinitions.inc"
 
-.equ appHeap, 0x4
 .equ stackSize, 0x138 + 0x20
 
 
@@ -31,7 +31,7 @@
     li r5, 0x1
     li r6, 0x0
     lwz r7, SequenceApp_mspSequenceApp(r13)
-    lwz r7, appHeap(r7)
+    lwz r7, SequenceApp_appHeap(r7)
     li r8, 0x1
     li r9, 0x0
     li r10, 0x0

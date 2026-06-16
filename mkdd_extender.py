@@ -3668,8 +3668,8 @@ OPTIONAL_ARGUMENTS = {
             'Since version v1.1, there is a counter that shows the number of ready karts out of '
             'all participating karts. The host can force the Character Selection screen to be '
             'exited by holding `B`. Finally, the LAN entry screen is skipped for subsequent '
-            'races/battles.\n\n'
-            'Code patch version: v1.1.1',
+            'races/battles. v1.2 adds course and stage selection menus.\n\n'
+            'Code patch version: v1.2',
         ),
         (
             'Idle Autopilot',

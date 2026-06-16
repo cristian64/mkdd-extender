@@ -51,6 +51,10 @@
 #define BOUNCY_TERRAIN_TYPE __BOUNCY_TERRAIN_TYPE__
 #define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
 #define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
+#define LAN_CHOOSE_CHARACTER_AND_KART __LAN_CHOOSE_CHARACTER_AND_KART__
+#define APPMGR_MSGAMEAPP_ADDRESS __APPMGR_MSGAMEAPP_ADDRESS__
+
+#define KARTAPPENUM_NETGATEAPP 0xb
 
 #if BATTLE_STAGES
 #define COURSE_COUNT_PER_PAGE 22
@@ -176,7 +180,14 @@ void process_course_page_change(const int mode)
 
 #if USE_ALT_BUTTONS
     char buttons = *(const char*)(BUTTONS_STATE_ADDRESS);
+
+#if LAN_CHOOSE_CHARACTER_AND_KART
+    // SceneCourseSelect and SceneMapSelect can be accessed in "LAN Choose Character and Kart"
+    // starting from v1.2.
+    if (mode == LAN_MODE || *(int*)APPMGR_MSGAMEAPP_ADDRESS == KARTAPPENUM_NETGATEAPP)
+#else
     if (mode == LAN_MODE)
+#endif
     {
         // The offset (from r13) to the NetGameMgr instance can be seen in RaceApp::RaceApp(), in
         // the arguments to the setNetworkMode() call.
