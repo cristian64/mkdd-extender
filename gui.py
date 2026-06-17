@@ -91,6 +91,7 @@ def set_dark_theme(app: QtWidgets.QApplication):
     padding = QtGui.QFontMetrics(QtGui.QFont()).height() // 2
     app.setStyleSheet(f"""
         QToolTip, HelpDialog > QLabel {{
+            color: rgb(200, 200, 200);
             padding: {padding}px;
             border: 1px solid #202020;
             background: #282828;
