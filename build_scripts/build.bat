@@ -11,7 +11,7 @@ git clone https://github.com/cristian64/mkdd-extender.git --depth=1 --recurse-su
 cd mkdd-extender
 
 @REM Install dependencies.
-python3.12 -m venv venv
+python3.14 -m venv venv
 call venv/Scripts/activate.bat
 set PYTHONNOUSERSITE=1
 python -m pip install -r requirements.txt
