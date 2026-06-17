@@ -1,3 +1,4 @@
+audioop-lts==0.2.2; python_version>='3.13'
 chardet==5.2.0
 numpy==2.4.6
 pillow==12.2.0
