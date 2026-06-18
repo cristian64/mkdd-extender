@@ -2,6 +2,7 @@
 """
 Unit tests for the `baa` module.
 """
+
 import os
 import sys
 import tempfile
@@ -16,8 +17,10 @@ def test_stock_data_set():
     Exercises the module by unpacking, and repacking a set of BAA files.
     """
     if not os.getenv('BAA_TEST_DATA_SET_DIR'):
-        pytest.fail('BAA_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
-                    'containing stock BAA files (e.g. `GCKart.baa`) must be provided.')
+        pytest.fail(
+            'BAA_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
+            'containing stock BAA files (e.g. `GCKart.baa`) must be provided.'
+        )
 
     data_set_dir = os.environ['BAA_TEST_DATA_SET_DIR']
     if not os.path.isdir(data_set_dir):
@@ -35,7 +38,6 @@ def test_stock_data_set():
         pytest.fail(f'"{data_set_dir}" does not contain BAA files.')
 
     for filepath in filepaths:
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             baa.unpack_baa(filepath, tmp_dir)
 

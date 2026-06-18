@@ -20,8 +20,10 @@ def _test_stock_data_set(use_naive_to_wav: bool, use_naive_to_ast: bool):
     which are then converted back to AST.
     """
     if not os.getenv('AST_TEST_DATA_SET_DIR'):
-        pytest.fail('AST_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
-                    'containing stock AST files must be provided.')
+        pytest.fail(
+            'AST_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
+            'containing stock AST files must be provided.'
+        )
 
     data_set_dir = os.environ['AST_TEST_DATA_SET_DIR']
     if not os.path.isdir(data_set_dir):
@@ -56,14 +58,16 @@ def _test_stock_data_set(use_naive_to_wav: bool, use_naive_to_ast: bool):
             ast_info = ast_converter.get_ast_info(filepath)
 
             ast_converter._NUMPY_AVAILABLE = use_naive_to_ast
-            ast_converter.convert_to_ast(tmp_wav_filepath,
-                                         tmp_ast_filepath,
-                                         looped=ast_info['looped'],
-                                         sample_count=ast_info['sample_count'],
-                                         loop_start=ast_info['loop_start'],
-                                         loop_end=ast_info['loop_end'],
-                                         volume=ast_info['volume'],
-                                         last_block_size=ast_info['last_block_size'])
+            ast_converter.convert_to_ast(
+                tmp_wav_filepath,
+                tmp_ast_filepath,
+                looped=ast_info['looped'],
+                sample_count=ast_info['sample_count'],
+                loop_start=ast_info['loop_start'],
+                loop_end=ast_info['loop_end'],
+                volume=ast_info['volume'],
+                last_block_size=ast_info['last_block_size'],
+            )
 
             assert filecmp.cmp(filepath, tmp_ast_filepath)
 

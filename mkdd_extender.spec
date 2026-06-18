@@ -55,8 +55,12 @@ if linux:
     wimgt_filenames = ['wimgt']
 elif windows:
     wimgt_filenames = [
-        'cygcrypto-1.1.dll', 'cygncursesw-10.dll', 'cygpng16-16.dll', 'cygwin1.dll', 'cygz.dll',
-        'wimgt.exe'
+        'cygcrypto-1.1.dll',
+        'cygncursesw-10.dll',
+        'cygpng16-16.dll',
+        'cygwin1.dll',
+        'cygz.dll',
+        'wimgt.exe',
     ]
 elif macos:
     wimgt_filenames = ['wimgt-mac']
@@ -64,8 +68,10 @@ for wimgt_filename in wimgt_filenames:
     datas.append((f'tools/wimgt/{wimgt_filename}', 'tools/wimgt/'))
 datas.append(('tools/wimgt/gpl-2.0.txt', 'tools/wimgt/'))
 datas.append(('tools/wimgt/README.txt', 'tools/wimgt/'))
-datas.append((f'tools/devkitPPC/{platform.system().lower()}',
-              f'tools/devkitPPC/{platform.system().lower()}'))
+datas.append((
+    f'tools/devkitPPC/{platform.system().lower()}',
+    f'tools/devkitPPC/{platform.system().lower()}',
+))
 datas.append(('tools/devkitPPC/buildscripts-devkitPPC_r41.tar.gz', 'tools/devkitPPC/'))
 datas.append(('tools/devkitPPC/README.txt', 'tools/devkitPPC/'))
 datas.append(('tools/lan_choose_character_kart/asm', 'tools/lan_choose_character_kart/asm'))

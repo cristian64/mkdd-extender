@@ -9,6 +9,7 @@ Details of the AST format:
 When executed as a command-line tool, two paths need to be provided. Conversion will be based on the
 extensions of the paths.
 """
+
 import argparse
 import logging
 import os
@@ -19,6 +20,7 @@ log = logging.getLogger('ast')
 
 try:
     import numpy
+
     _NUMPY_AVAILABLE = True
 except ImportError:
     _NUMPY_AVAILABLE = False
@@ -144,8 +146,12 @@ def _swap_bytes_naive(data: bytearray, bit_depth: int):
 
     elif bit_depth == 32:
         for offset in range(0, len(data), 4):
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3] = \
-                data[offset + 3], data[offset + 2], data[offset + 1], data[offset]
+            data[offset], data[offset + 1], data[offset + 2], data[offset + 3] = (
+                data[offset + 3],
+                data[offset + 2],
+                data[offset + 1],
+                data[offset],
+            )
 
     else:
         raise ValueError(f'Unsupported bit depth: {bit_depth}')
@@ -175,11 +181,11 @@ def _interleave_channels_naive(data: memoryview, channel_count: int, bit_depth: 
 
     channel_chunks = []
     for channel in range(channel_count):
-        channel_chunks.append(data[channel * bytes_per_channel:(channel + 1) * bytes_per_channel])
+        channel_chunks.append(data[channel * bytes_per_channel : (channel + 1) * bytes_per_channel])
 
     for sample_offset in range(0, bytes_per_channel, bytes_per_sample):
         for channel_chunk in channel_chunks:
-            result_data.extend(channel_chunk[sample_offset:sample_offset + bytes_per_sample])
+            result_data.extend(channel_chunk[sample_offset : sample_offset + bytes_per_sample])
 
     return result_data
 
@@ -198,8 +204,9 @@ def _interleave_channels_numpy(data: memoryview, channel_count: int, bit_depth: 
 
     arrays = []
     for i in range(channel_count):
-        array = numpy.frombuffer(data[i * bytes_per_channel:(i + 1) * bytes_per_channel],
-                                 dtype=dtype)
+        array = numpy.frombuffer(
+            data[i * bytes_per_channel : (i + 1) * bytes_per_channel], dtype=dtype
+        )
         arrays.append(array)
 
     placeholder = numpy.empty(sum(a.size for a in arrays), dtype=dtype)
@@ -209,22 +216,24 @@ def _interleave_channels_numpy(data: memoryview, channel_count: int, bit_depth: 
     return bytearray(placeholder.tobytes())
 
 
-def _deinterleave_channels_naive(data: memoryview, channel_count: int,
-                                 bit_depth: int) -> 'tuple[memoryview]':
+def _deinterleave_channels_naive(
+    data: memoryview, channel_count: int, bit_depth: int
+) -> 'tuple[memoryview]':
     result_data = tuple(bytearray() for _ in range(channel_count))
 
     bytes_per_sample = bit_depth // 8
 
     channel_idx = 0
     for sample_offset in range(0, len(data), bytes_per_sample):
-        result_data[channel_idx].extend(data[sample_offset:sample_offset + bytes_per_sample])
+        result_data[channel_idx].extend(data[sample_offset : sample_offset + bytes_per_sample])
         channel_idx = (channel_idx + 1) % channel_count
 
     return tuple(map(memoryview, result_data))
 
 
-def _deinterleave_channels_numpy(data: memoryview, channel_count: int,
-                                 bit_depth: int) -> 'tuple[memoryview]':
+def _deinterleave_channels_numpy(
+    data: memoryview, channel_count: int, bit_depth: int
+) -> 'tuple[memoryview]':
     if bit_depth == 8:
         dtype = numpy.uint8
     elif bit_depth == 16:
@@ -242,7 +251,8 @@ def _deinterleave_channels_numpy(data: memoryview, channel_count: int,
     # that it performs poorly.
     return tuple(
         memoryview(array[i::channel_count].copy().view(dtype=numpy.uint8))
-        for i in range(channel_count))
+        for i in range(channel_count)
+    )
 
 
 if _NUMPY_AVAILABLE:
@@ -317,14 +327,19 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
                 padding0,
                 padding1,
                 padding2,
-            ) = struct.unpack('>LLQQQ', block_data[block_offset:block_offset + _BLOCK_HEADER_SIZE])
+            ) = struct.unpack(
+                '>LLQQQ', block_data[block_offset : block_offset + _BLOCK_HEADER_SIZE]
+            )
 
             assert block_magic_bytes == _BLOCK_MAGIC
             assert not (padding0 or padding1 or padding2)
 
             expected_payload_size = block_size * channel_count
-            payload_data = block_data[block_offset + _BLOCK_HEADER_SIZE:block_offset +
-                                      _BLOCK_HEADER_SIZE + expected_payload_size]
+            payload_data = block_data[
+                block_offset + _BLOCK_HEADER_SIZE : block_offset
+                + _BLOCK_HEADER_SIZE
+                + expected_payload_size
+            ]
             payload_size = len(payload_data)
 
             assert payload_size % channel_count == 0
@@ -342,9 +357,11 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
                 payload_delta = payload_size - expected_payload_size
                 payload_delta_sign = '+' if payload_delta > 0 else ''
 
-                log.warning(f'Inconsistent last block size. Expected {expected_payload_size} '
-                            f'bytes, but read {payload_size} bytes '
-                            f'({payload_delta_sign}{payload_delta}).')
+                log.warning(
+                    f'Inconsistent last block size. Expected {expected_payload_size} '
+                    f'bytes, but read {payload_size} bytes '
+                    f'({payload_delta_sign}{payload_delta}).'
+                )
 
             bytes_written += payload_size
             block_count += 1
@@ -356,14 +373,16 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
         assert block_offset == block_data_size
 
 
-def convert_to_ast(src_filepath: str,
-                   dst_filepath: str,
-                   looped: int = None,
-                   sample_count: int = None,
-                   loop_start: int = None,
-                   loop_end: int = None,
-                   volume: int = None,
-                   last_block_size: int = None):
+def convert_to_ast(
+    src_filepath: str,
+    dst_filepath: str,
+    looped: int = None,
+    sample_count: int = None,
+    loop_start: int = None,
+    loop_end: int = None,
+    volume: int = None,
+    last_block_size: int = None,
+):
 
     if looped is None:
         looped = 0xFFFF
@@ -420,7 +439,7 @@ def convert_to_ast(src_filepath: str,
             padding = 0
 
         for i in range(channel_count):
-            block_chunks.append(channel_data[i][offset:offset + block_size])
+            block_chunks.append(channel_data[i][offset : offset + block_size])
             if padding:
                 block_chunks.append(b'\x00' * padding)
 
@@ -460,15 +479,17 @@ def convert_to_ast(src_filepath: str,
 
 
 def main():
-    logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
-                        level=logging.INFO,
-                        datefmt='%Y-%m-%d %H:%M:%S')
+    logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=logging.INFO,
+        datefmt='%Y-%m-%d %H:%M:%S',
+    )
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the AST/WAV file to converted.')
-    parser.add_argument('output',
-                        type=str,
-                        help='Path to the WAV/AST file that is going to be written.')
+    parser.add_argument(
+        'output', type=str, help='Path to the WAV/AST file that is going to be written.'
+    )
 
     def int_hex(x):
         return int(x, 0)
@@ -480,43 +501,49 @@ def main():
         type=int_hex,
         help='If set to 0x0000 (0), disables the loop functionality. If set to 0xFFFF (65535), or '
         'any other value that is not 0x0000 (0), the audio will loop after reaching the loop-end '
-        'sample. Default is 0xFFFF (65535).')
+        'sample. Default is 0xFFFF (65535).',
+    )
     ast_to_wav_group.add_argument(
         '--sample-count',
         '-c',
         type=int,
         help='If provided, the sample count field in the AST header (offset: 0x14) will be '
         'overridden by this value. If not provided, the sample count in the WAV file is used. This '
-        'argument is offered as it\'s been noticed that some of the stock AST files seen in Mario '
+        "argument is offered as it's been noticed that some of the stock AST files seen in Mario "
         'Kart: Double Dash!!, Super Mario Galaxy, and Super Mario Galaxy 2 contain more samples '
-        'than the count specified in the AST header.')
+        'than the count specified in the AST header.',
+    )
     ast_to_wav_group.add_argument(
         '--loop-start',
         '-s',
         type=int,
         help='The sample number where the audio track continues playing after reaching the end of '
-        'the loop. If not provided, 0 is used.')
+        'the loop. If not provided, 0 is used.',
+    )
     ast_to_wav_group.add_argument(
         '--loop-end',
         '-e',
         type=int,
         help='The number of the last sample that will be played before jumping to the start '
-        'of the loop. If not provided, the sample count is used.')
+        'of the loop. If not provided, the sample count is used.',
+    )
     ast_to_wav_group.add_argument(
         '--volume',
         '-v',
         type=int,
-        help='Commonly 127 is used. In rare cases, 100 is used. If not specified, 127 is used.')
+        help='Commonly 127 is used. In rare cases, 100 is used. If not specified, 127 is used.',
+    )
     ast_to_wav_group.add_argument(
         '--last-block-size',
         '-b',
         type=int,
         help='If provided, the block size field (offset: 0x04) in the block header of the last '
-        'block will be overridden. This argument is offered as it\'s been noticed that a number of '
+        "block will be overridden. This argument is offered as it's been noticed that a number of "
         'the stock AST files seen in Mario Kart: Double Dash!! and Super Mario Galaxy have an '
         'inconsistent number of bytes in the last block: fewer bytes than what the header states. '
         'This argument lets the user replicate stock courses with their inconsistent last block '
-        'size.')
+        'size.',
+    )
 
     args = parser.parse_args()
 
@@ -525,12 +552,21 @@ def main():
         _print_mapping(get_ast_info(args.input))
         convert_to_wav(args.input, args.output)
     elif extension == '.wav':
-        convert_to_ast(args.input, args.output, args.looped, args.sample_count, args.loop_start,
-                       args.loop_end, args.volume, args.last_block_size)
+        convert_to_ast(
+            args.input,
+            args.output,
+            args.looped,
+            args.sample_count,
+            args.loop_start,
+            args.loop_end,
+            args.volume,
+            args.last_block_size,
+        )
     else:
         raise ValueError(
             f'Input path ("{args.input}") does not have a recognizable file extension. '
-            'Expect either `.ast` or `.wav`.')
+            'Expect either `.ast` or `.wav`.'
+        )
 
 
 if __name__ == '__main__':

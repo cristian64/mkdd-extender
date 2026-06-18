@@ -4,6 +4,7 @@ GameCube games such as Mario Kart: Double Dash!!. Also support for BSFT and BAAC
 
 BAA format specification was extracted from Jampacked by Xayr (https://github.com/XAYRGA/jampacked).
 """
+
 import json
 import os
 import struct
@@ -12,11 +13,11 @@ from enum import IntEnum
 
 
 def _read_uint32(f):
-    return struct.unpack(">I", f.read(4))[0]
+    return struct.unpack('>I', f.read(4))[0]
 
 
 def _write_uint32(f, value):
-    f.write(struct.pack(">I", value))
+    f.write(struct.pack('>I', value))
 
 
 def _prepare_destination_directory(dirpath: str):
@@ -24,7 +25,8 @@ def _prepare_destination_directory(dirpath: str):
         os.makedirs(dirpath)
     elif not os.path.isdir(dirpath):
         raise RuntimeError(
-            f'Destination directory "{dirpath}" is not a valid directory and cannot be created')
+            f'Destination directory "{dirpath}" is not a valid directory and cannot be created'
+        )
     else:
         with os.scandir(dirpath) as it:
             if any(it):
@@ -185,8 +187,10 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
         # If it's a file, it shoudl be pointing to the BAA info file.
         src_filepath = src_dirpath
         if not src_filepath.endswith(_INFO_FILE_EXTENSION):
-            raise ValueError(f'Input filepath "{src_filepath}" should use the '
-                             f'"{_INFO_FILE_EXTENSION}" extension.')
+            raise ValueError(
+                f'Input filepath "{src_filepath}" should use the '
+                f'"{_INFO_FILE_EXTENSION}" extension.'
+            )
         src_dirpath = os.path.dirname(src_filepath)
     else:
         # If it's a directory, it should contain a single BAA file file in the root directory.
@@ -196,8 +200,9 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
         if not src_filenames:
             raise ValueError(f'No BAA info file was found in "{src_dirpath}".')
         if len(src_filenames) > 1:
-            raise ValueError(f'Only one BAA info file was expected in "{src_dirpath}"; found: '
-                             f'{src_filenames}')
+            raise ValueError(
+                f'Only one BAA info file was expected in "{src_dirpath}"; found: {src_filenames}'
+            )
         src_filepath = os.path.join(src_dirpath, src_filenames[0])
 
     if not dst_filepath.endswith('.baa'):
@@ -249,11 +254,11 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
         file_data_blobs.sort()  # Sort by the original start offsets.
 
         for (
-                _original_start_offset,
-                data,
-                start_offset_offset,
-                end_offset_offset,
-                section_type,
+            _original_start_offset,
+            data,
+            start_offset_offset,
+            end_offset_offset,
+            section_type,
         ) in file_data_blobs:
             start_offset = output_file.tell()
             output_file.write(data)

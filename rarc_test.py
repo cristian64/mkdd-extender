@@ -2,6 +2,7 @@
 """
 Unit tests for the `rarc` module.
 """
+
 import filecmp
 import os
 import sys
@@ -29,9 +30,9 @@ def test_synthetic_data_set():
     """
     data_sets = (
         (),
-        (('a', None), ),
-        (('a.ext', 0), ),
-        (('a.ext', 1), ),
+        (('a', None),),
+        (('a.ext', 0),),
+        (('a.ext', 1),),
         (
             ('a/b.ext', 100),
             ('a/c.ext', 0),
@@ -87,8 +88,10 @@ def test_stock_data_set():
     by third-party tools.
     """
     if not os.getenv('RARC_TEST_DATA_SET_DIR'):
-        pytest.fail('RARC_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
-                    'containing stock ARC files must be provided.')
+        pytest.fail(
+            'RARC_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
+            'containing stock ARC files must be provided.'
+        )
 
     data_set_dir = os.environ['RARC_TEST_DATA_SET_DIR']
     if not os.path.isdir(data_set_dir):
@@ -109,7 +112,6 @@ def test_stock_data_set():
         pytest.fail(f'"{data_set_dir}" does not contain ARC files.')
 
     for filepath in filepaths:
-
         # Extract stock ARC file.
         with tempfile.TemporaryDirectory() as tmp_dir:
             rarc.extract(filepath, tmp_dir)
@@ -144,5 +146,5 @@ def test_stock_data_set():
                     assert __cmpdir(extracted_dirpath, reextracted_dirpath)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(pytest.main(sys.argv))

@@ -1,6 +1,7 @@
 """
 Graphical user interface for the MKDD Extender.
 """
+
 import argparse
 import atexit
 import collections
@@ -46,15 +47,16 @@ data_dir = os.path.join(script_dir, 'data')
 gui_dir = os.path.join(data_dir, 'gui')
 placeholder_race_track_dir = os.path.join(data_dir, 'courses', 'dstestcircle')
 placeholder_battle_stage_dir = os.path.join(data_dir, 'courses', 'dstestcircle_battlestage')
-executable_path = (os.getenv('APPIMAGE')
-                   or (sys.executable if mkdd_extender.frozen else mkdd_extender.script_path))
+executable_path = os.getenv('APPIMAGE') or (
+    sys.executable if mkdd_extender.frozen else mkdd_extender.script_path
+)
 executable_dir = os.path.dirname(executable_path)
 portable_path = os.path.join(executable_dir, 'portable.txt')
 is_portable = os.path.isfile(portable_path)
 
 
 def set_dark_theme(app: QtWidgets.QApplication):
-    app.setStyle("Fusion")
+    app.setStyle('Fusion')
 
     role_colors = []
     role_colors.append((QtGui.QPalette.Window, QtGui.QColor(60, 60, 60)))
@@ -172,13 +174,14 @@ def markdown_to_html(title: str, text: str) -> str:
     while text.count('```\n') >= 2:
         start_offset = text.index('```\n')
         end_offset = text.index('```\n', start_offset + 4) + 3
-        code_block = text[start_offset + 4:end_offset - 4]
+        code_block = text[start_offset + 4 : end_offset - 4]
         text = text[:start_offset] + f'CODE_BLOCK_{len(code_blocks):04}' + text[end_offset:]
         code_blocks.append(code_block)
 
     default_font_size = QtGui.QFont().pointSize()
-    inline_code_padding = (f'<span style="font-size: {int(default_font_size / 2.5)}px;">'
-                           '&nbsp;</span>')
+    inline_code_padding = (
+        f'<span style="font-size: {int(default_font_size / 2.5)}px;">&nbsp;</span>'
+    )
 
     html = f'<h3 style="white-space: nowrap;">{title}</h3>\n'
     for paragraph in text.split('\n\n'):
@@ -194,16 +197,22 @@ def markdown_to_html(title: str, text: str) -> str:
             paragraph = paragraph.replace('\n', ' ')
         paragraph = re.sub(r'^---(.*)', r'<hr/>\1', paragraph)
         paragraph = re.sub(r'\b_(.+)_\b', r'<em>\1</em>', paragraph)
-        paragraph = re.sub(r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>',
-                           paragraph)
         paragraph = re.sub(
-            r'`([^`]+)`', '<code style="background: #1B1B1B; white-space: nowrap;">'
-            f'{inline_code_padding}\\1{inline_code_padding}</code>', paragraph)
+            r'\*\*([^\*]+)\*\*', r'<b style="white-space: nowrap;">\1</b>', paragraph
+        )
+        paragraph = re.sub(
+            r'`([^`]+)`',
+            '<code style="background: #1B1B1B; white-space: nowrap;">'
+            f'{inline_code_padding}\\1{inline_code_padding}</code>',
+            paragraph,
+        )
         html += f'<p>{paragraph}</p>\n'
 
     code_block_padding = int(default_font_size / 2.0)
-    open_tag = (f'<table cellpadding="{code_block_padding}" bgcolor="#1B1B1B" width="100%"><tr><td>'
-                f'<pre style="font-size: {int(default_font_size * 0.9)}pt;">')
+    open_tag = (
+        f'<table cellpadding="{code_block_padding}" bgcolor="#1B1B1B" width="100%"><tr><td>'
+        f'<pre style="font-size: {int(default_font_size * 0.9)}pt;">'
+    )
     end_tag = '</pre></td></tr></table>'
     for i, code_block in enumerate(code_blocks):
         html = html.replace(f'CODE_BLOCK_{i:04}', f'{open_tag}\n{code_block}\n{end_tag}')
@@ -211,15 +220,18 @@ def markdown_to_html(title: str, text: str) -> str:
     return html
 
 
-def show_message(icon_name: str,
-                 title: str,
-                 text: str,
-                 detailed_text: str = None,
-                 parent: QtWidgets.QWidget = None):
+def show_message(
+    icon_name: str,
+    title: str,
+    text: str,
+    detailed_text: str = None,
+    parent: QtWidgets.QWidget = None,
+):
     text = style_message(text)
 
-    message_box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.NoIcon, title, text,
-                                        QtWidgets.QMessageBox.NoButton, parent)
+    message_box = QtWidgets.QMessageBox(
+        QtWidgets.QMessageBox.NoIcon, title, text, QtWidgets.QMessageBox.NoButton, parent
+    )
 
     icon_path = os.path.join(gui_dir, f'{icon_name}.svg')
     icon = QtGui.QIcon(icon_path)
@@ -235,7 +247,8 @@ def show_message(icon_name: str,
         font_size = round(message_box.font().pointSize() * 0.75)
         for text_edit in message_box.findChildren(QtWidgets.QTextEdit):
             text_edit.setStyleSheet(
-                f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
+                f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}'
+            )
 
             # If a detailed message is present, make sure the size is sufficient to show a few
             # words per line, and several lines (e.g. stack traces).
@@ -261,8 +274,9 @@ def show_message(icon_name: str,
             # back.
             show_details_button.setFixedSize(0, 0)
 
-    message_box.addButton(QtWidgets.QPushButton('Close', message_box),
-                          QtWidgets.QMessageBox.AcceptRole)
+    message_box.addButton(
+        QtWidgets.QPushButton('Close', message_box), QtWidgets.QMessageBox.AcceptRole
+    )
 
     message_box.exec()
 
@@ -359,16 +373,17 @@ def open_and_select_in_directory(path: str):
 
 
 class PathEdit(QtWidgets.QWidget):
-
     path_changed = QtCore.Signal(str)
 
-    def __init__(self,
-                 caption: str,
-                 accept_mode: QtWidgets.QFileDialog.AcceptMode,
-                 file_mode: QtWidgets.QFileDialog.FileMode,
-                 name_filters: 'tuple[str]' = tuple(),
-                 use_small_button: bool = False,
-                 parent: QtWidgets.QWidget = None):
+    def __init__(
+        self,
+        caption: str,
+        accept_mode: QtWidgets.QFileDialog.AcceptMode,
+        file_mode: QtWidgets.QFileDialog.FileMode,
+        name_filters: 'tuple[str]' = tuple(),
+        use_small_button: bool = False,
+        parent: QtWidgets.QWidget = None,
+    ):
         super().__init__(parent=parent)
 
         self._caption = caption
@@ -446,7 +461,6 @@ class PathEdit(QtWidgets.QWidget):
 
 
 class VerticalLabel(QtWidgets.QWidget):
-
     def __init__(self, text: str = '', parent: QtWidgets.QWidget = None):
         super().__init__(parent=parent)
         self._text = text
@@ -469,18 +483,19 @@ class VerticalLabel(QtWidgets.QWidget):
         _ = event
         painter = QtGui.QPainter(self)
         rect = self.rect()
-        painter.fillRect(rect.marginsRemoved(QtCore.QMargins(0, 0, 0, 1)),
-                         self.palette().base().color().darker())
+        painter.fillRect(
+            rect.marginsRemoved(QtCore.QMargins(0, 0, 0, 1)), self.palette().base().color().darker()
+        )
         painter.translate(rect.center())
         painter.rotate(90)
         painter.translate(-rect.center())
-        rect = QtCore.QRect(round((rect.width() - rect.height()) / 2), 0, rect.height(),
-                            rect.height())
+        rect = QtCore.QRect(
+            round((rect.width() - rect.height()) / 2), 0, rect.height(), rect.height()
+        )
         painter.drawText(rect, QtCore.Qt.AlignCenter | QtCore.Qt.AlignHCenter, self._text)
 
 
 class CollapsibleGroupBox(QtWidgets.QWidget):
-
     toggled = QtCore.Signal(bool)
 
     _arrow_tip_down_icon_path = os.path.join(gui_dir, 'arrow_tip_down.svg').replace('\\', '/')
@@ -509,7 +524,8 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
             QCheckBox::indicator:unchecked:pressed {{
                 background-color: {self.palette().base().color().name()};
             }}
-        """))
+        """)
+        )
 
         self._widget = QtWidgets.QFrame()
         self._widget.setFrameShape(QtWidgets.QFrame.Box)
@@ -535,7 +551,6 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
 
 
 class HelpDialog(QtWidgets.QDialog):
-
     def __init__(self, text: str, parent: QtWidgets.QWidget | None = None):
         super().__init__(parent, QtCore.Qt.Popup | QtCore.Qt.FramelessWindowHint)
 
@@ -567,8 +582,9 @@ class HelpDialog(QtWidgets.QDialog):
             min(label_size.height(), int(available_geometry.height() * 0.9)),
         )
 
-        needs_scroll_area = (fixed_size.width() < label_size.width()
-                             or fixed_size.height() < label_size.height())
+        needs_scroll_area = (
+            fixed_size.width() < label_size.width() or fixed_size.height() < label_size.height()
+        )
         if needs_scroll_area:
             layout.removeWidget(label)
 
@@ -582,7 +598,6 @@ class HelpDialog(QtWidgets.QDialog):
 
 
 class HelpButton(QtWidgets.QPushButton):
-
     _normal_icon = None
     _hover_icon = None
     _pressed_icon = None
@@ -674,7 +689,6 @@ class HelpButton(QtWidgets.QPushButton):
 
 
 class CopyableImageWidget(QtWidgets.QLabel):
-
     def __init__(self, pixmap: QtGui.QPixmap, parent: QtWidgets.QWidget = None):
         super().__init__(parent=parent)
 
@@ -693,7 +707,6 @@ class CopyableImageWidget(QtWidgets.QLabel):
 
 
 class SpinnableSlider(QtWidgets.QWidget):
-
     value_changed = QtCore.Signal(int)
 
     def __init__(self, parent=None):
@@ -740,7 +753,6 @@ class SpinnableSlider(QtWidgets.QWidget):
 
 
 class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
-
     def initStyleOption(self, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex):
         super().initStyleOption(option, index)
 
@@ -748,12 +760,12 @@ class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
         if selected:
             option.backgroundBrush = option.palette.highlight().color().darker()
             option.showDecorationSelected = True
-            option.state = (option.state & ~QtWidgets.QStyle.State_Selected
-                            & ~QtWidgets.QStyle.State_HasFocus)
+            option.state = (
+                option.state & ~QtWidgets.QStyle.State_Selected & ~QtWidgets.QStyle.State_HasFocus
+            )
 
 
 class DropWidget(QtWidgets.QWidget):
-
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
@@ -804,13 +816,11 @@ class DropWidget(QtWidgets.QWidget):
 
 
 class DragTableWidget(QtWidgets.QTableWidget):
-
     def supportedDropActions(self):
         return super().supportedDropActions() & ~QtCore.Qt.MoveAction
 
 
 class DragDropTableHeaderWidget(QtWidgets.QWidget):
-
     _MARGIN = 0.25
 
     def __init__(self, parent: QtWidgets.QWidget = None):
@@ -845,7 +855,8 @@ class DragDropTableHeaderWidget(QtWidgets.QWidget):
                 border-right: 1px solid {color};
                 border-left: {1 if first else 0}px solid {color};
             }}
-        """))
+        """)
+        )
 
         self._columns.append((emoji, label, widget))
         self.layout().addWidget(widget)
@@ -869,7 +880,6 @@ class DragDropTableHeaderWidget(QtWidgets.QWidget):
 
 
 class DragDropTableWidget(QtWidgets.QTableWidget):
-
     def __init__(self, rows: int, columns: int, parent: QtWidgets.QWidget = None):
         super().__init__(rows, columns, parent=parent)
 
@@ -917,13 +927,18 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
         if not event.isAccepted():
             target_model_index = self.indexAt(event.pos())
             if target_model_index.isValid():
-
                 rect = self.visualRect(target_model_index)
-                centered_pos = QtCore.QPointF(rect.x() + rect.width() / 2,
-                                              rect.y() + rect.height() / 2)
-                synthetic_event = QtGui.QDropEvent(centered_pos, event.dropAction(),
-                                                   event.mimeData(), event.mouseButtons(),
-                                                   event.keyboardModifiers(), event.type())
+                centered_pos = QtCore.QPointF(
+                    rect.x() + rect.width() / 2, rect.y() + rect.height() / 2
+                )
+                synthetic_event = QtGui.QDropEvent(
+                    centered_pos,
+                    event.dropAction(),
+                    event.mimeData(),
+                    event.mouseButtons(),
+                    event.keyboardModifiers(),
+                    event.type(),
+                )
 
                 # Find in the companion tables (and ourselves) the list of selected indexes, so that
                 # the selection in this table can be replicated after dropping the items.
@@ -952,8 +967,9 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
                     if target_indexes:
                         self.setCurrentCell(*target_indexes[0])
-                    self.selectionModel().select(item_selection,
-                                                 QtCore.QItemSelectionModel.ClearAndSelect)
+                    self.selectionModel().select(
+                        item_selection, QtCore.QItemSelectionModel.ClearAndSelect
+                    )
 
                 QtCore.QTimer.singleShot(0, select_later)
 
@@ -997,7 +1013,6 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
 
 class ASTPlayer(QtWidgets.QWidget):
-
     _play_icon = None
     _pause_icon = None
     _audio_tmp_dir = None
@@ -1044,8 +1059,9 @@ class ASTPlayer(QtWidgets.QWidget):
             exception_info = None
 
             try:
-                progress_dialog = ProgressDialog('Converting AST audio file...',
-                                                 self._convert_audio_file, self)
+                progress_dialog = ProgressDialog(
+                    'Converting AST audio file...', self._convert_audio_file, self
+                )
                 progress_dialog.execute_and_wait()
 
             except mkdd_extender.MKDDExtenderError as e:
@@ -1157,7 +1173,6 @@ def cancel_futures(thread_pool_executor: concurrent.futures.ThreadPoolExecutor):
 
 
 class EditInfoWidget(QtWidgets.QDialog):
-
     def __init__(self, trackinfo_filepath: str, parent: QtWidgets.QWidget = None) -> None:
         super().__init__(parent)
 
@@ -1264,7 +1279,6 @@ class EditInfoWidget(QtWidgets.QDialog):
 
 
 class InfoViewWidget(QtWidgets.QScrollArea):
-
     shown = QtCore.Signal()
 
     _minimap_loaded = QtCore.Signal(str)
@@ -1368,7 +1382,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             auxiliary_audio_track = trackinfo['Config'].get('auxiliary_audio_track') or ''
             if auxiliary_audio_track:
                 auxiliary_audio_track = mkdd_extender.COURSE_TO_NAME[
-                    mkdd_extender.course_name_to_course(auxiliary_audio_track)]
+                    mkdd_extender.course_name_to_course(auxiliary_audio_track)
+                ]
         except Exception:
             self.show_not_valid_message()
             return
@@ -1382,8 +1397,12 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         staffghost_filepath = os.path.join(dirpath, 'staffghost.ght')
         staffghost_present = os.path.isfile(staffghost_filepath)
 
-        IMAGE_FILENAMES = ('track_image.bti', 'track_name.bti', 'track_big_logo.bti',
-                           'track_small_logo.bti')
+        IMAGE_FILENAMES = (
+            'track_image.bti',
+            'track_name.bti',
+            'track_big_logo.bti',
+            'track_small_logo.bti',
+        )
 
         image_filepaths_by_language = {}
         for language in mkdd_extender.LANGUAGES:
@@ -1391,13 +1410,16 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             image_filepaths_by_language[language] = image_filepaths
             for image_filename in IMAGE_FILENAMES:
                 image_filepaths.append(
-                    os.path.join(dirpath, 'course_images', language, image_filename))
+                    os.path.join(dirpath, 'course_images', language, image_filename)
+                )
 
         AUDIO_FILENAMES = ('lap_music_normal.ast', 'lap_music_fast.ast')
         audio_filepaths = tuple(
-            os.path.join(dirpath, audio_filename) for audio_filename in AUDIO_FILENAMES)
-        audio_filepaths = tuple(audio_filepath for audio_filepath in audio_filepaths
-                                if os.path.isfile(audio_filepath))
+            os.path.join(dirpath, audio_filename) for audio_filename in AUDIO_FILENAMES
+        )
+        audio_filepaths = tuple(
+            audio_filepath for audio_filepath in audio_filepaths if os.path.isfile(audio_filepath)
+        )
 
         widget = QtWidgets.QWidget()
         widget.setPalette(self.palette())  # To inherit background color from parent.
@@ -1419,7 +1441,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 <tr><td><b>Intended Slot: </b> </td><td>{replaces}</td></tr>
                 <tr><td><b>Code Patches: </b> </td><td>{code_patches}</td></tr>
                 </table>
-            """))  # noqa: E501
+            """)
+            )  # noqa: E501
         else:
             info_widget.setText(
                 textwrap.dedent(f"""\
@@ -1433,7 +1456,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 <tr><td><b>Code Patches: </b> </td><td>{code_patches}</td></tr>
                 <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
                 </table>
-            """))  # noqa: E501
+            """)
+            )  # noqa: E501
         info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         info_box.layout().addWidget(info_widget)
         edit_info_layout = QtWidgets.QHBoxLayout()
@@ -1448,7 +1472,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             audio_box = CollapsibleGroupBox('Audio Tracks')
             audio_box.set_expanded(self._expansion_states.get('audio_tracks', True))
             audio_box.toggled.connect(
-                lambda expanded: self._expansion_states.update({'audio_tracks': expanded}))
+                lambda expanded: self._expansion_states.update({'audio_tracks': expanded})
+            )
             audio_box.setLayout(QtWidgets.QFormLayout())
             for audio_filepath in audio_filepaths:
                 text = 'Normal' if 'normal' in audio_filepath else 'Fast'
@@ -1463,7 +1488,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         minimap_box = CollapsibleGroupBox('Minimap', self)
         minimap_box.set_expanded(self._expansion_states.get('minimap', True))
         minimap_box.toggled.connect(
-            lambda expanded: self._expansion_states.update({'minimap': expanded}))
+            lambda expanded: self._expansion_states.update({'minimap': expanded})
+        )
         minimap_box.setObjectName('minimap_box')
         minimap_box.setLayout(QtWidgets.QHBoxLayout())
         minimap_info_widget = QtWidgets.QLabel()
@@ -1501,7 +1527,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Bottom Right Corner Z: </b> </td><td><code>{bottom_right_corner_z}</code></td></tr>
             <tr><td><b>Orientation: </b> </td><td>{orientation}</td></tr>
             </table>
-        """))  # noqa: E501
+        """)
+        )  # noqa: E501
         minimap_info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         minimap_box.layout().addWidget(minimap_info_widget)
         self._show_minimap_image(rarc_filepath)  # May load image asynchronously.
@@ -1529,27 +1556,33 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             cheat_codes_box = CollapsibleGroupBox(cheat_codes_box_label, self)
             cheat_codes_box.set_expanded(self._expansion_states.get('cheat_codes', False))
             cheat_codes_box.toggled.connect(
-                lambda expanded: self._expansion_states.update({'cheat_codes': expanded}))
+                lambda expanded: self._expansion_states.update({'cheat_codes': expanded})
+            )
             cheat_codes_box.setLayout(QtWidgets.QVBoxLayout())
             cheat_codes_box.layout().setContentsMargins(0, 0, 0, 0)
             cheat_codes_box.layout().setSpacing(0)
             label_padding = cheat_codes_box.fontMetrics().height() // 3
-            label_style_sheet = (f'QLabel {{ font-weight: bold; padding: {label_padding}px 0px; '
-                                 'background-color: #080808; }')
+            label_style_sheet = (
+                f'QLabel {{ font-weight: bold; padding: {label_padding}px 0px; '
+                'background-color: #080808; }'
+            )
             for region, cheat_codes in cheat_codes_by_region.items():
                 cheat_codes_label = QtWidgets.QLabel(region)
                 cheat_codes_label.setAlignment(QtCore.Qt.AlignCenter)
-                cheat_codes_label.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                                QtWidgets.QSizePolicy.Expanding)
+                cheat_codes_label.setSizePolicy(
+                    QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+                )
                 cheat_codes_label.setStyleSheet(label_style_sheet)
                 cheat_codes_edit = QtWidgets.QTextEdit()
                 cheat_codes_edit.setReadOnly(True)
                 cheat_codes_edit.setFrameShape(QtWidgets.QFrame.NoFrame)
                 font_size = round(cheat_codes_edit.font().pointSize() * 0.80)
                 cheat_codes_edit.setStyleSheet(
-                    f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
-                cheat_codes_edit.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                               QtWidgets.QSizePolicy.Fixed)
+                    f'QTextEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}'
+                )
+                cheat_codes_edit.setSizePolicy(
+                    QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+                )
                 cheat_codes_edit.setText(cheat_codes)
                 cheat_codes_box.layout().addWidget(cheat_codes_label)
                 cheat_codes_box.layout().addWidget(cheat_codes_edit)
@@ -1650,8 +1683,11 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
             language_box = CollapsibleGroupBox(f'{"/".join(languages)} Images')
             language_box.set_expanded(self._expansion_states.get(languages[0].lower(), True))
-            language_box.toggled.connect(lambda expanded, language=languages[0].lower(): self.
-                                         _expansion_states.update({language: expanded}))
+            language_box.toggled.connect(
+                lambda expanded, language=languages[0].lower(): self._expansion_states.update({
+                    language: expanded
+                })
+            )
             language_box.setLayout(QtWidgets.QHBoxLayout())
 
             assert len(labels) == 4
@@ -1685,7 +1721,8 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
             for image_filepath in image_filepaths:
                 futures.append(
-                    self._child_thread_pool_executor.submit(self._load_image, image_filepath))
+                    self._child_thread_pool_executor.submit(self._load_image, image_filepath)
+                )
 
             while not self._about_to_quit:
                 done, _undone = concurrent.futures.wait(futures, timeout=0.250)
@@ -1717,7 +1754,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 if image is not None:
                     if image.mode != 'RGBA':
                         image = image.convert('RGBA')
-                    data = image.tobytes("raw", "RGBA")
+                    data = image.tobytes('raw', 'RGBA')
                     image = QtGui.QImage(data, *image.size, QtGui.QImage.Format_RGBA8888)
                     pixmap = QtGui.QPixmap.fromImage(image)
             except Exception:
@@ -1790,7 +1827,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                     if image is not None:
                         if image.mode != 'RGBA':
                             image = image.convert('RGBA')
-                        data = image.tobytes("raw", "RGBA")
+                        data = image.tobytes('raw', 'RGBA')
                         image = QtGui.QImage(data, *image.size, QtGui.QImage.Format_RGBA8888)
                         pixmap = QtGui.QPixmap.fromImage(image)
             except Exception:
@@ -1817,7 +1854,6 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
 
 class CheatCodeSyntaxHighlighter(QtGui.QSyntaxHighlighter):
-
     def __init__(self, document: QtGui.QTextDocument, cheat_code_color: QtGui.QColor):
         super().__init__(document)
 
@@ -1834,7 +1870,8 @@ class CheatCodeSyntaxHighlighter(QtGui.QSyntaxHighlighter):
         )
 
         self.__rules = tuple(
-            (re.compile(pattern), group_index, style) for pattern, group_index, style in rules)
+            (re.compile(pattern), group_index, style) for pattern, group_index, style in rules
+        )
 
     def highlightBlock(self, text):
         self.setFormat(0, len(text), self.__base_color)
@@ -1849,7 +1886,6 @@ class CheatCodeSyntaxHighlighter(QtGui.QSyntaxHighlighter):
 
 
 class CheatCodesDialog(QtWidgets.QDialog):
-
     def __init__(
         self,
         label: str,
@@ -1871,8 +1907,9 @@ class CheatCodesDialog(QtWidgets.QDialog):
         self.__text_edit.setWordWrapMode(QtGui.QTextOption.NoWrap)
         self.__text_edit.setPlainText(text)
         self.__text_edit.textChanged.connect(lambda: callback(self.__text_edit.toPlainText()))
-        CheatCodeSyntaxHighlighter(self.__text_edit.document(),
-                                   self.__text_edit.palette().text().color())
+        CheatCodeSyntaxHighlighter(
+            self.__text_edit.document(), self.__text_edit.palette().text().color()
+        )
 
         close_button = QtWidgets.QPushButton('Close')
         close_button.clicked.connect(self.close)
@@ -1902,8 +1939,13 @@ class CheatCodesDialog(QtWidgets.QDialog):
             self.__text_edit.textCursor().position(),
         )
 
-    def restore_state(self, identifier: int, horizontal_scroll_value: int,
-                      vertical_scroll_value: int, cursor_position: int):
+    def restore_state(
+        self,
+        identifier: int,
+        horizontal_scroll_value: int,
+        vertical_scroll_value: int,
+        cursor_position: int,
+    ):
         if self._build_identifier() != identifier:
             return
         self.__text_edit.horizontalScrollBar().setValue(horizontal_scroll_value)
@@ -1912,9 +1954,7 @@ class CheatCodesDialog(QtWidgets.QDialog):
 
 
 class ProgressDialog:
-
     class _ProgressDialog(QtWidgets.QProgressDialog):
-
         def __init__(self, text: str, parent: QtWidgets.QWidget = None):
             super().__init__(parent)
 
@@ -1926,8 +1966,9 @@ class ProgressDialog:
             self.setLabelText('Please wait...')
             self.setMinimumWidth(int(self.fontMetrics().horizontalAdvance(text) * 1.25))
 
-            self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.WindowTitleHint
-                                | QtCore.Qt.CustomizeWindowHint)
+            self.setWindowFlags(
+                QtCore.Qt.Window | QtCore.Qt.WindowTitleHint | QtCore.Qt.CustomizeWindowHint
+            )
 
             self.finished = False
 
@@ -2016,7 +2057,6 @@ class ProgressDialog:
 
 
 class SplitterChildHolder(QtWidgets.QWidget):
-
     def __init__(self, widget: QtWidgets.QWidget, parent: QtWidgets.QWidget = None):
         super().__init__(parent)
 
@@ -2045,7 +2085,6 @@ class SplitterChildHolder(QtWidgets.QWidget):
 
 
 class LogTable(QtWidgets.QTableWidget):
-
     log_message_received = QtCore.Signal(tuple)
 
     def __init__(self, parent: QtWidgets.QWidget = None):
@@ -2055,7 +2094,8 @@ class LogTable(QtWidgets.QTableWidget):
 
         font_size = round(self.font().pointSize() * 0.80)
         self.setStyleSheet(
-            f'QTableWidget {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
+            f'QTableWidget {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}'
+        )
 
         self.setItemDelegate(SelectionStyledItemDelegate(self))
         self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
@@ -2088,17 +2128,22 @@ class LogTable(QtWidgets.QTableWidget):
         self.addAction(self._clear_log_before_each_run_action)
         self.addAction(clear_log_action)
 
-        self.log_message_received.connect(self._on_log_handler_log_message_received,
-                                          QtCore.Qt.QueuedConnection)
+        self.log_message_received.connect(
+            self._on_log_handler_log_message_received, QtCore.Qt.QueuedConnection
+        )
 
         log_table = self
 
         class LogHandler(logging.Handler):
-
             def emit(self, record: logging.LogRecord):
                 timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
-                log_message = (timestamp, record.levelno, record.levelname.title(), record.name,
-                               record.msg)
+                log_message = (
+                    timestamp,
+                    record.levelno,
+                    record.levelname.title(),
+                    record.name,
+                    record.msg,
+                )
                 log_table.log_message_received.emit(log_message)
 
         self._log_handler = LogHandler()
@@ -2132,8 +2177,12 @@ class LogTable(QtWidgets.QTableWidget):
         elif log_message[1] == logging.CRITICAL:
             color = QtGui.QColor(166, 58, 199)
 
-        for column, column_value in enumerate(
-            (log_message[0], log_message[2], log_message[3], log_message[4])):
+        for column, column_value in enumerate((
+            log_message[0],
+            log_message[2],
+            log_message[3],
+            log_message[4],
+        )):
             item = QtWidgets.QTableWidgetItem(column_value)
             item.setForeground(color)
             self.setItem(row, column, item)
@@ -2144,13 +2193,15 @@ class LogTable(QtWidgets.QTableWidget):
     def _on_save_log_triggered(self, checked: bool):
         _ = checked
 
-        file_dialog = QtWidgets.QFileDialog(self, 'Select Output Log File',
-                                            os.path.dirname(self._last_log_filepath))
+        file_dialog = QtWidgets.QFileDialog(
+            self, 'Select Output Log File', os.path.dirname(self._last_log_filepath)
+        )
         file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
         file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
-        file_dialog.setNameFilters(('Log (*.log)', ))
+        file_dialog.setNameFilters(('Log (*.log)',))
         file_dialog.selectFile(
-            os.path.basename(self._last_log_filepath) or 'mkdd_extender_build.log')
+            os.path.basename(self._last_log_filepath) or 'mkdd_extender_build.log'
+        )
         dialog_code = file_dialog.exec_()
         if dialog_code != QtWidgets.QDialog.Accepted or not file_dialog.selectedFiles():
             return
@@ -2175,7 +2226,6 @@ class LogTable(QtWidgets.QTableWidget):
 
 
 class DelayedDirectoryWatcher(QtCore.QObject):
-
     changed = QtCore.Signal()
 
     def __init__(self):
@@ -2226,7 +2276,8 @@ class DelayedDirectoryWatcher(QtCore.QObject):
             paths = [os.path.join(dirpath, name) for name in os.listdir(dirpath)]
             dirpaths = [path for path in paths if os.path.isdir(path)]
             dirpaths = [
-                dirpath for dirpath in dirpaths
+                dirpath
+                for dirpath in dirpaths
                 if not os.path.isfile(os.path.join(dirpath, 'track.arc'))
             ]
             pending.extend(dirpaths)
@@ -2259,7 +2310,6 @@ class DelayedDirectoryWatcher(QtCore.QObject):
 
 
 class MKDDExtenderWindow(QtWidgets.QMainWindow):
-
     @classmethod
     def find_instance(cls) -> 'MKDDExtenderWindow | None':
         app = QtWidgets.QApplication.instance()
@@ -2268,9 +2318,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 return widget
         return None
 
-    def __init__(self,
-                 parent: QtWidgets.QWidget = None,
-                 flags: QtCore.Qt.WindowFlags = QtCore.Qt.WindowFlags()):
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget = None,
+        flags: QtCore.Qt.WindowFlags = QtCore.Qt.WindowFlags(),
+    ):
         super().__init__(parent=parent, flags=flags)
 
         self._red_color = QtGui.QColor(215, 40, 40)
@@ -2330,7 +2382,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         file_menu = menu.addMenu('&File')
         open_configuration_directory_action = file_menu.addAction('Open Configuration Directory')
         open_configuration_directory_action.triggered.connect(
-            self._on_open_configuration_directory_action_triggered)
+            self._on_open_configuration_directory_action_triggered
+        )
         file_menu.addSeparator()
         quit_action = file_menu.addAction('Quit')
         quit_action.triggered.connect(self.close)
@@ -2339,9 +2392,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._undo_action.setShortcut(QtGui.QKeySequence('Ctrl+Z'))
         self._undo_action.triggered.connect(self._undo)
         self._redo_action = edit_menu.addAction('Redo')
-        self._redo_action.setShortcuts(
-            [QtGui.QKeySequence('Ctrl+Shift+Z'),
-             QtGui.QKeySequence('Ctrl+Y')])
+        self._redo_action.setShortcuts([
+            QtGui.QKeySequence('Ctrl+Shift+Z'),
+            QtGui.QKeySequence('Ctrl+Y'),
+        ])
         self._redo_action.triggered.connect(self._redo)
         edit_menu.addSeparator()
         options_action = edit_menu.addAction('Options')
@@ -2363,7 +2417,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._fullscreen.triggered.connect(self._on_fullscreen_action_triggered)
         purge_preview_caches_action = view_menu.addAction('Purge Preview Caches')
         purge_preview_caches_action.triggered.connect(
-            self._on_purge_preview_caches_action_triggered)
+            self._on_purge_preview_caches_action_triggered
+        )
         shelf_menu = menu.addMenu('&Shelf')
         shelf_menu.aboutToShow.connect(self._on_shelf_menu_about_to_show)
         help_menu = menu.addMenu('&Help')
@@ -2372,17 +2427,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         about_action = help_menu.addAction('About')
         about_action.triggered.connect(self._open_about_dialog)
 
-        self._input_iso_file_edit = PathEdit('Select Input ISO File',
-                                             QtWidgets.QFileDialog.AcceptOpen,
-                                             QtWidgets.QFileDialog.ExistingFile,
-                                             ('ISO (*.iso)', 'GCM (*.gcm)'))
-        self._output_iso_file_edit = PathEdit('Select Output ISO File',
-                                              QtWidgets.QFileDialog.AcceptSave,
-                                              QtWidgets.QFileDialog.AnyFile,
-                                              ('ISO (*.iso)', 'GCM (*.gcm)'))
-        self._custom_tracks_directory_edit = PathEdit('Select Custom Courses Directory',
-                                                      QtWidgets.QFileDialog.AcceptOpen,
-                                                      QtWidgets.QFileDialog.Directory)
+        self._input_iso_file_edit = PathEdit(
+            'Select Input ISO File',
+            QtWidgets.QFileDialog.AcceptOpen,
+            QtWidgets.QFileDialog.ExistingFile,
+            ('ISO (*.iso)', 'GCM (*.gcm)'),
+        )
+        self._output_iso_file_edit = PathEdit(
+            'Select Output ISO File',
+            QtWidgets.QFileDialog.AcceptSave,
+            QtWidgets.QFileDialog.AnyFile,
+            ('ISO (*.iso)', 'GCM (*.gcm)'),
+        )
+        self._custom_tracks_directory_edit = PathEdit(
+            'Select Custom Courses Directory',
+            QtWidgets.QFileDialog.AcceptOpen,
+            QtWidgets.QFileDialog.Directory,
+        )
         input_form_layout = QtWidgets.QFormLayout()
         input_form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
         input_form_layout.addRow('Input ISO File', self._input_iso_file_edit)
@@ -2395,26 +2456,31 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         clear_icon_path = os.path.join(gui_dir, 'clear.svg')
         clear_icon = QtGui.QIcon(clear_icon_path)
         self._clear_filter_action = self._custom_tracks_filter_edit.addAction(
-            clear_icon, QtWidgets.QLineEdit.TrailingPosition)
+            clear_icon, QtWidgets.QLineEdit.TrailingPosition
+        )
         self._clear_filter_action.triggered.connect(self._custom_tracks_filter_edit.clear)
         self._clear_filter_action.setVisible(False)
         self._custom_tracks_table = DragTableWidget()
         self._custom_tracks_table.setItemDelegate(
-            SelectionStyledItemDelegate(self._custom_tracks_table))
+            SelectionStyledItemDelegate(self._custom_tracks_table)
+        )
         self._custom_tracks_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._custom_tracks_table.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self._custom_tracks_table.setColumnCount(1)
         self._custom_tracks_table.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.Stretch)
+            QtWidgets.QHeaderView.Stretch
+        )
         self._custom_tracks_table.horizontalHeader().setSectionsMovable(False)
         self._custom_tracks_table.horizontalHeader().setHighlightSections(False)
         self._custom_tracks_table.setSortingEnabled(True)
         self._custom_tracks_table.horizontalHeader().setSortIndicatorClearable(True)
         self._custom_tracks_table.horizontalHeader().sortIndicatorChanged.connect(
-            self._on_custom_tracks_table_sortIndicatorChanged)
+            self._on_custom_tracks_table_sortIndicatorChanged
+        )
         self._custom_tracks_table.verticalHeader().hide()
         self._custom_tracks_table.verticalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeToContents)
+            QtWidgets.QHeaderView.ResizeToContents
+        )
         self._custom_tracks_table.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self._custom_tracks_table.setWordWrap(False)
         self._custom_tracks_table_label = 'Custom Courses'
@@ -2464,7 +2530,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             page_battle_stages_table_container = QtWidgets.QWidget()
             page_battle_stages_table_container_layout = QtWidgets.QVBoxLayout(
-                page_battle_stages_table_container)
+                page_battle_stages_table_container
+            )
             page_battle_stages_table_container_layout.setContentsMargins(0, 0, 0, 0)
             page_battle_stages_table_container_layout.setSpacing(0)
             page_battle_stages_table = DragDropTableWidget(BATTLE_ROWS, BATTLE_COLUMNS)
@@ -2475,7 +2542,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 page_table_container_layout.addWidget(page_table_header)
                 for i, (header_emoji, header_label) in enumerate(HEADER_LABELS.items()):
                     page_table_header.add_column(
-                        header_emoji, header_label,
+                        header_emoji,
+                        header_label,
                         textwrap.dedent(f"""\
                         <h3>{header_emoji} {header_label}</h3>
                         <p>Race tracks in the stock game:</p>
@@ -2485,14 +2553,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 2]]}</li>
                         <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[i * 4 + 3]]}</li>
                         </ul></p>
-                    """))
+                    """),
+                    )
 
                 page_battle_stages_table_header = DragDropTableHeaderWidget()
                 page_battle_stages_table.header_buddy = page_battle_stages_table_header
                 page_battle_stages_table_container_layout.addWidget(page_battle_stages_table_header)
                 for i, (header_emoji, header_label) in enumerate(BATTLE_HEADER_LABELS.items()):
                     page_battle_stages_table_header.add_column(
-                        header_emoji, header_label,
+                        header_emoji,
+                        header_label,
                         textwrap.dedent(f"""\
                         <h3>{header_emoji} {header_label}</h3>
                         <p>Battle stages in the stock game:</p>
@@ -2510,7 +2580,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         <li>{mkdd_extender.COURSE_TO_NAME[mkdd_extender.COURSES[16 + 5]]}</li>
                         </ul></td>
                         </tr></table></p>
-                    """))
+                    """),
+                    )
 
             page_table_container_layout.addWidget(page_table)
             page_battle_stages_table_container_layout.addWidget(page_battle_stages_table)
@@ -2518,9 +2589,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_battle_stages_table.clear_selection_action.triggered.connect(self._clear_selection)
             page_table.clear_page_action.triggered[bool].connect(
-                lambda _checked, page_index=page_index: self._clear_page(page_index))
+                lambda _checked, page_index=page_index: self._clear_page(page_index)
+            )
             page_battle_stages_table.clear_page_action.triggered[bool].connect(
-                lambda _checked, page_index=page_index: self._clear_page(page_index))
+                lambda _checked, page_index=page_index: self._clear_page(page_index)
+            )
             page_table.clear_all_pages_action.triggered.connect(self._clear_all_pages)
             page_battle_stages_table.clear_all_pages_action.triggered.connect(self._clear_all_pages)
 
@@ -2529,7 +2602,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_widget = QtWidgets.QWidget()
             page_widget.setContentsMargins(0, 0, 0, 0)
             page_widget.setFixedHeight(
-                round(font_height * 1.75) * (ROWS + (1 if page_index == 0 else 0)))
+                round(font_height * 1.75) * (ROWS + (1 if page_index == 0 else 0))
+            )
             page_widget_layout = QtWidgets.QHBoxLayout(page_widget)
             page_widget_layout.setContentsMargins(0, 0, 0, 0)
             page_widget_layout.setSpacing(0)
@@ -2555,13 +2629,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         for i in range(1 + mkdd_extender.MAX_EXTRA_PAGES):
             self._extra_pages_count_combobox.addItem(str(i + 1))
         self._extra_pages_count_combobox.currentIndexChanged.connect(
-            self._on_extra_pages_count_combobox_currentIndexChanged)
+            self._on_extra_pages_count_combobox_currentIndexChanged
+        )
 
         self._enable_custom_battle_stages = QtWidgets.QCheckBox('Enable Custom Battle Stages')
         self._enable_custom_battle_stages.setLayoutDirection(QtCore.Qt.RightToLeft)
         self._update_page_battle_stages_visibility(False)
         self._enable_custom_battle_stages.toggled.connect(
-            self._on_enable_custom_battle_stages_toggled)
+            self._on_enable_custom_battle_stages_toggled
+        )
 
         extra_pages_layout = QtWidgets.QHBoxLayout()
         extra_pages_layout.addStretch()
@@ -2607,8 +2683,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._splitter.setStretchFactor(0, 1)
         self._splitter.setStretchFactor(1, 4)
         self._splitter.setStretchFactor(2, 2)
-        self._splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                     QtWidgets.QSizePolicy.Expanding)
+        self._splitter.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
 
         options_button = QtWidgets.QPushButton('Options')
         options_button.clicked.connect(self._on_options_action_triggered)
@@ -2619,7 +2696,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._options_edit.setReadOnly(True)
         font_size = round(self._options_edit.font().pointSize() * 0.75)
         self._options_edit.setStyleSheet(
-            f'QLineEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}')
+            f'QLineEdit {{ font-family: {FONT_FAMILIES}; font-size: {font_size}pt; }}'
+        )
 
         options_layout = QtWidgets.QHBoxLayout()
         options_layout.setContentsMargins(0, 0, 0, 0)
@@ -2653,8 +2731,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._log_splitter.addWidget(SplitterChildHolder(main_widget))
         self._log_splitter.addWidget(SplitterChildHolder(self._log_table))
         self._log_splitter.setCollapsible(0, False)
-        self._log_splitter.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                         QtWidgets.QSizePolicy.Expanding)
+        self._log_splitter.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
 
         self.setCentralWidget(self._log_splitter)
 
@@ -2674,7 +2753,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_table.itemSelectionChanged.connect(self._on_tables_itemSelectionChanged)
             page_table.itemChanged.connect(self._on_page_table_itemChanged)
         self._custom_tracks_table.customContextMenuRequested.connect(
-            self._on_custom_tracks_table_customContextMenuRequested)
+            self._on_custom_tracks_table_customContextMenuRequested
+        )
         self._custom_tracks_table.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         self._update_options_string()
@@ -2687,8 +2767,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         QtCore.QTimer.singleShot(0, self._process_undo_action)
 
         if first_run:
-            QtCore.QTimer.singleShot(500,
-                                     lambda: self._save_settings() or self._open_first_run_dialog())
+            QtCore.QTimer.singleShot(
+                500, lambda: self._save_settings() or self._open_first_run_dialog()
+            )
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         self._save_settings()
@@ -2711,38 +2792,50 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('window/log_splitter', self._log_splitter.saveState())
 
         self._settings.setValue('miscellaneous/input_path', self._input_iso_file_edit.get_path())
-        self._settings.setValue('miscellaneous/input_last_dir',
-                                self._input_iso_file_edit.get_last_dir())
+        self._settings.setValue(
+            'miscellaneous/input_last_dir', self._input_iso_file_edit.get_last_dir()
+        )
         self._settings.setValue('miscellaneous/output_path', self._output_iso_file_edit.get_path())
-        self._settings.setValue('miscellaneous/output_last_dir',
-                                self._output_iso_file_edit.get_last_dir())
-        self._settings.setValue('miscellaneous/tracks_path',
-                                self._custom_tracks_directory_edit.get_path())
-        self._settings.setValue('miscellaneous/tracks_last_dir',
-                                self._custom_tracks_directory_edit.get_last_dir())
-        self._settings.setValue('miscellaneous/tracks_filter',
-                                self._custom_tracks_filter_edit.text())
+        self._settings.setValue(
+            'miscellaneous/output_last_dir', self._output_iso_file_edit.get_last_dir()
+        )
+        self._settings.setValue(
+            'miscellaneous/tracks_path', self._custom_tracks_directory_edit.get_path()
+        )
+        self._settings.setValue(
+            'miscellaneous/tracks_last_dir', self._custom_tracks_directory_edit.get_last_dir()
+        )
+        self._settings.setValue(
+            'miscellaneous/tracks_filter', self._custom_tracks_filter_edit.text()
+        )
 
         custom_tracks_table_header = self._custom_tracks_table.horizontalHeader()
-        sort_indicator_order = (0 if custom_tracks_table_header.sortIndicatorOrder()
-                                == QtCore.Qt.AscendingOrder else 1)
-        self._settings.setValue('miscellaneous/tracks_order',
-                                (f'{custom_tracks_table_header.sortIndicatorSection()} '
-                                 f'{sort_indicator_order}'))
+        sort_indicator_order = (
+            0 if custom_tracks_table_header.sortIndicatorOrder() == QtCore.Qt.AscendingOrder else 1
+        )
+        self._settings.setValue(
+            'miscellaneous/tracks_order',
+            (f'{custom_tracks_table_header.sortIndicatorSection()} {sort_indicator_order}'),
+        )
 
-        self._settings.setValue('miscellaneous/info_view_expansion_states',
-                                self._info_view.get_expansion_states())
+        self._settings.setValue(
+            'miscellaneous/info_view_expansion_states', self._info_view.get_expansion_states()
+        )
 
         page_item_values = self._get_page_item_values_enabled_only()
-        self._settings.setValue('miscellaneous/page_item_combined_values',
-                                json.dumps(page_item_values))
+        self._settings.setValue(
+            'miscellaneous/page_item_combined_values', json.dumps(page_item_values)
+        )
         # For forward compatibility, values are stored also in the legacy format, at least for a
         # few versions.
-        page_item_legacy_values = [(i, column, row, value, selected)
-                                   for (i, j, column, row, value, selected) in page_item_values
-                                   if j == 0]
-        self._settings.setValue('miscellaneous/page_item_values',
-                                json.dumps(page_item_legacy_values))
+        page_item_legacy_values = [
+            (i, column, row, value, selected)
+            for (i, j, column, row, value, selected) in page_item_values
+            if j == 0
+        ]
+        self._settings.setValue(
+            'miscellaneous/page_item_values', json.dumps(page_item_legacy_values)
+        )
 
         options = []
         for _group_name, group_options in mkdd_extender.OPTIONAL_ARGUMENTS.items():
@@ -2772,8 +2865,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._settings.setValue('miscellaneous/options', json.dumps(options))
 
         self._settings.setValue('miscellaneous/last_log_path', self._log_table.get_last_log_path())
-        self._settings.setValue('miscellaneous/clear_log_before_each_run',
-                                self._log_table.get_clear_log_before_each_run())
+        self._settings.setValue(
+            'miscellaneous/clear_log_before_each_run',
+            self._log_table.get_clear_log_before_each_run(),
+        )
 
         if self._cheat_codes_dialog_geometry is not None:
             self._settings.setValue('cheat_codes/geometry', self._cheat_codes_dialog_geometry)
@@ -2826,7 +2921,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 custom_tracks_table_header.setSortIndicator(logical_index, order)
 
         self._info_view.set_expansion_states(
-            self._settings.value('miscellaneous/info_view_expansion_states') or {})
+            self._settings.value('miscellaneous/info_view_expansion_states') or {}
+        )
 
         has_page_item_values = self._settings.contains('miscellaneous/page_item_combined_values')
         if has_page_item_values:
@@ -2846,9 +2942,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     if page_item_values:
                         legacy_format = len(page_item_values[0]) == 5
                         if legacy_format:
-                            page_item_values = [(i, 0, column, row, value, selected)
-                                                for (i, column, row, value,
-                                                     selected) in page_item_values]
+                            page_item_values = [
+                                (i, 0, column, row, value, selected)
+                                for (i, column, row, value, selected) in page_item_values
+                            ]
                         extra_page_count = max(i for i, *_ in page_item_values) + 1
                         battle_stages_enabled = max(j for _i, j, *_ in page_item_values) > 0
                     else:
@@ -2880,14 +2977,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._pal_basic_cheat_codes = self._pal_cheat_codes
             if not self._ntsc_j_basic_cheat_codes and hasattr(self, '_ntsc_j_cheat_codes'):
                 self._ntsc_j_basic_cheat_codes = self._ntsc_j_cheat_codes
-            if (not self._ntsc_u_debug_basic_cheat_codes
-                    and hasattr(self, '_ntsc_u_debug_cheat_codes')):
+            if not self._ntsc_u_debug_basic_cheat_codes and hasattr(
+                self, '_ntsc_u_debug_cheat_codes'
+            ):
                 self._ntsc_u_debug_basic_cheat_codes = self._ntsc_u_debug_cheat_codes
             # pylint: enable=access-member-before-definition
 
         self._log_table.set_last_log_path(self._settings.value('miscellaneous/last_log_path', ''))
         self._log_table.set_clear_log_before_each_run(
-            self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true')
+            self._settings.value('miscellaneous/clear_log_before_each_run', 'true') == 'true'
+        )
 
         self._cheat_codes_dialog_geometry = self._settings.value('cheat_codes/geometry') or None
 
@@ -2902,8 +3001,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(dialog)
         description_label = QtWidgets.QLabel()
         description_label.setWordWrap(True)
-        description_label.setText('This tool is used to create a backup of the current mapping, '
-                                  'and store it on the shelf to be checked out in the future.')
+        description_label.setText(
+            'This tool is used to create a backup of the current mapping, '
+            'and store it on the shelf to be checked out in the future.'
+        )
         layout.addWidget(description_label)
         layout.addSpacing(dialog.fontMetrics().height())
         name_layout = QtWidgets.QFormLayout()
@@ -2931,8 +3032,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 message_box.setText(f'An item named "{name}" already exists. Overwrite?')
                 no_button = message_box.addButton('&No', QtWidgets.QMessageBox.RejectRole)
                 message_box.setEscapeButton(no_button)
-                overwrite_button = message_box.addButton('&Overwrite',
-                                                         QtWidgets.QMessageBox.DestructiveRole)
+                overwrite_button = message_box.addButton(
+                    '&Overwrite', QtWidgets.QMessageBox.DestructiveRole
+                )
                 message_box.setDefaultButton(no_button)
                 message_box.exec_()
                 clicked_button = message_box.clickedButton()
@@ -3038,10 +3140,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         message = (
             '🌱 This is the first time that MKDD Extender is launched. Would you like to see the '
-            '<b>Instructions</b> dialog?')
+            '<b>Instructions</b> dialog?'
+        )
         post_message = (
             '<small><small>(The dialog can always be accessed via the <b>Help > Instructions</b> '
-            'menu action.)</small></small>')
+            'menu action.)</small></small>'
+        )
 
         no_button = QtWidgets.QPushButton('No')
         no_button.setAutoDefault(False)
@@ -3223,7 +3327,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if dirpath:
             progress_dialog = ProgressDialog(
                 'Scanning custom courses directory...',
-                lambda: mkdd_extender.scan_custom_tracks_directory(dirpath), self)
+                lambda: mkdd_extender.scan_custom_tracks_directory(dirpath),
+                self,
+            )
             paths_to_track_name = progress_dialog.execute_and_wait()
 
             if not paths_to_track_name:
@@ -3290,8 +3396,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _get_configured_extra_page_count(self):
         return sum(
-            int(page_widget.isVisibleTo(page_widget.parent()))
-            for page_widget in self._page_widgets)
+            int(page_widget.isVisibleTo(page_widget.parent())) for page_widget in self._page_widgets
+        )
 
     def _update_page_visibility(self, extra_page_count: int):
         self._enable_custom_battle_stages.setEnabled(extra_page_count > 0)
@@ -3343,7 +3449,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         page_index: int | None = None,
     ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        page_tables = (self._page_tables if page_index is None else [self._page_tables[page_index]])
+        page_tables = self._page_tables if page_index is None else [self._page_tables[page_index]]
         for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
@@ -3357,8 +3463,11 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         page_index: int | None = None,
     ) -> list[QtWidgets.QTableWidgetItem]:
         items = []
-        page_tables = (self._page_battle_stages_tables
-                       if page_index is None else [self._page_battle_stages_tables[page_index]])
+        page_tables = (
+            self._page_battle_stages_tables
+            if page_index is None
+            else [self._page_battle_stages_tables[page_index]]
+        )
         for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
@@ -3375,8 +3484,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if page_index is None:
             page_tables = itertools.chain(*zip(self._page_tables, self._page_battle_stages_tables))
         else:
-            page_tables = (self._page_tables[page_index],
-                           self._page_battle_stages_tables[page_index])
+            page_tables = (
+                self._page_tables[page_index],
+                self._page_battle_stages_tables[page_index],
+            )
         for page_table in page_tables:
             for column in range(page_table.columnCount()):
                 for row in range(page_table.rowCount()):
@@ -3408,9 +3519,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             page_item_values = [entry for entry in page_item_values if entry[1] == 0]
         return page_item_values
 
-    def _set_page_item_values(self,
-                              page_item_values: 'list[tuple[int, int, int, str]]',
-                              also_selected_state: bool = True):
+    def _set_page_item_values(
+        self, page_item_values: 'list[tuple[int, int, int, str]]', also_selected_state: bool = True
+    ):
         # Pad the values with an empty version of the expected tuple.
         new_item_values = []
         for i, page_tables in enumerate(zip(self._page_tables, self._page_battle_stages_tables)):
@@ -3436,8 +3547,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 page_table_lists[j][i].setItem(row, column, item)
                 if also_selected_state and selected:
                     item.setSelected(True)
-                    page_table_lists[j][i].setCurrentCell(row, column,
-                                                          QtCore.QItemSelectionModel.NoUpdate)
+                    page_table_lists[j][i].setCurrentCell(
+                        row, column, QtCore.QItemSelectionModel.NoUpdate
+                    )
 
     def _get_custom_track_names(self) -> 'set[str]':
         custom_tracks = set()
@@ -3468,7 +3580,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if text not in custom_tracks:
                     page_item.setIcon(self._error_icon)
                     page_item.setToolTip(
-                        'Custom course can no longer be located in the course list.')
+                        'Custom course can no longer be located in the course list.'
+                    )
                     page_item.setForeground(self._red_color)
                     continue
 
@@ -3476,13 +3589,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if is_battle_stage and page_item not in page_battle_stages_items:
                     page_item.setIcon(self._error_icon)
                     page_item.setToolTip(
-                        'Custom battle stage has been assigned to a race track slot.')
+                        'Custom battle stage has been assigned to a race track slot.'
+                    )
                     page_item.setForeground(self._red_color)
                     continue
                 if not is_battle_stage and page_item in page_battle_stages_items:
                     page_item.setIcon(self._error_icon)
                     page_item.setToolTip(
-                        'Custom race track has been assigned to a battle stage slot.')
+                        'Custom race track has been assigned to a battle stage slot.'
+                    )
                     page_item.setForeground(self._red_color)
                     continue
 
@@ -3493,7 +3608,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     for page_item in page_items:
                         page_item.setIcon(self._warning_icon)
                         page_item.setToolTip(
-                            'Custom course has been assigned to more than one slot.')
+                            'Custom course has been assigned to more than one slot.'
+                        )
                         page_item.setForeground(self._yellow_color)
 
         if self._custom_tracks_table.isEnabled():
@@ -3524,8 +3640,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         if not self._info_view.isVisible():
             return
 
-        all_tables = (self._page_tables + self._page_battle_stages_tables +
-                      [self._custom_tracks_table])
+        all_tables = (
+            self._page_tables + self._page_battle_stages_tables + [self._custom_tracks_table]
+        )
         for table in all_tables:
             for item in reversed(table.selectedItems()):
                 item_text = item.text()
@@ -3621,8 +3738,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         # Undo action is only collected if the values (excluding the selection state) are actually
         # different.
-        page_item_values_texts = [(i, j, column, row, value)
-                                  for i, j, column, row, value, _selected in page_item_values]
+        page_item_values_texts = [
+            (i, j, column, row, value) for i, j, column, row, value, _selected in page_item_values
+        ]
         if self._undo_history:
             previous_page_item_values = self._undo_history[-1]
             previous_page_item_values_texts = [
@@ -3678,8 +3796,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._undo_action.setEnabled(len(self._undo_history) > 1)
         self._redo_action.setEnabled(bool(self._redo_history))
 
-    def _on_custom_tracks_table_sortIndicatorChanged(self, logical_index: int,
-                                                     order: QtCore.Qt.SortOrder):
+    def _on_custom_tracks_table_sortIndicatorChanged(
+        self, logical_index: int, order: QtCore.Qt.SortOrder
+    ):
         _ = order
 
         # When the sort indicator is unset, Qt won't reset the order to the original; it will be
@@ -3811,9 +3930,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         option_widget_layout.addWidget(option_widget_label)
                         option_widget_layout.addWidget(option_widget, 1)
 
-                        def on_currentTextChanged(text,
-                                                  default_value=default_value,
-                                                  option_member_name=option_member_name):
+                        def on_currentTextChanged(
+                            text, default_value=default_value, option_member_name=option_member_name
+                        ):
                             try:
                                 value = type(default_value)(text)
                             except ValueError:
@@ -3826,12 +3945,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                     elif option_type == 'cheatcodes':
                         option_widget_label = QtWidgets.QLabel(
-                            option_label.removesuffix('Gecko Cheat Codes').removesuffix(
-                                'Basic Cheat Codes').strip())
+                            option_label
+                            .removesuffix('Gecko Cheat Codes')
+                            .removesuffix('Basic Cheat Codes')
+                            .strip()
+                        )
                         option_widget_label.setToolTip(option_help)
-                        option_widget = QtWidgets.QPushButton("Edit")
-                        option_widget.setSizePolicy(QtWidgets.QSizePolicy.Maximum,
-                                                    QtWidgets.QSizePolicy.Preferred)
+                        option_widget = QtWidgets.QPushButton('Edit')
+                        option_widget.setSizePolicy(
+                            QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Preferred
+                        )
                         option_widget.setToolTip(option_help)
                         option_widget_layout = QtWidgets.QHBoxLayout()
                         option_widget_layout.addWidget(option_widget_label)
@@ -3841,10 +3964,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                             setattr(self, option_member_name, value)
                             self._update_options_string()
 
-                        def on_edit_button_clicked(_checked,
-                                                   option_label=option_label,
-                                                   option_member_name=option_member_name,
-                                                   update_cheat_codes=update_cheat_codes):
+                        def on_edit_button_clicked(
+                            _checked,
+                            option_label=option_label,
+                            option_member_name=option_member_name,
+                            update_cheat_codes=update_cheat_codes,
+                        ):
                             option_value = getattr(self, option_member_name)
                             dialog = CheatCodesDialog(
                                 option_label,
@@ -3856,8 +3981,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                                 dialog.restoreGeometry(self._cheat_codes_dialog_geometry)
                             if self._cheat_codes_dialog_state is not None:
                                 QtCore.QTimer.singleShot(
-                                    0,
-                                    lambda: dialog.restore_state(*self._cheat_codes_dialog_state))
+                                    0, lambda: dialog.restore_state(*self._cheat_codes_dialog_state)
+                                )
                             dialog.deleteLater()
                             dialog.exec()
                             self._cheat_codes_dialog_geometry = dialog.saveGeometry()
@@ -3897,38 +4022,50 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     enabled_by = mkdd_extender.OPTIONAL_ARGUMENTS_ENABLED_BY.get(option_label)
                     if enabled_by is not None:
                         enabled_by_name, enabled_by_value = enabled_by
-                        enabler_widget = group_box.findChildren(QtWidgets.QWidget,
-                                                                enabled_by_name)[0]
-                        assert isinstance(enabler_widget,
-                                          (QtWidgets.QCheckBox, QtWidgets.QComboBox))
+                        enabler_widget = group_box.findChildren(QtWidgets.QWidget, enabled_by_name)[
+                            0
+                        ]
+                        assert isinstance(
+                            enabler_widget, (QtWidgets.QCheckBox, QtWidgets.QComboBox)
+                        )
 
                         if isinstance(enabler_widget, QtWidgets.QCheckBox):
                             enabler_widget.toggled.connect(
-                                lambda checked, option_widget=option_widget, value=enabled_by_value:
-                                option_widget.setEnabled(checked == value))
+                                lambda checked, option_widget=option_widget, value=enabled_by_value: (
+                                    option_widget.setEnabled(checked == value)
+                                )
+                            )
                             option_widget.setEnabled(enabler_widget.isChecked() == enabled_by_value)
 
                             if option_widget_label is not None:
                                 enabler_widget.toggled.connect(
-                                    lambda checked, option_widget_label=option_widget_label, value=
-                                    enabled_by_value: option_widget_label.setEnabled(checked ==
-                                                                                     value))
+                                    lambda checked, option_widget_label=option_widget_label, value=enabled_by_value: (
+                                        option_widget_label.setEnabled(checked == value)
+                                    )
+                                )
                                 option_widget_label.setEnabled(
-                                    enabler_widget.isChecked() == enabled_by_value)
+                                    enabler_widget.isChecked() == enabled_by_value
+                                )
 
                         if isinstance(enabler_widget, QtWidgets.QComboBox):
                             enabler_widget.currentTextChanged.connect(
-                                lambda text, option_widget=option_widget, value=enabled_by_value:
-                                option_widget.setEnabled(text == value))
+                                lambda text, option_widget=option_widget, value=enabled_by_value: (
+                                    option_widget.setEnabled(text == value)
+                                )
+                            )
                             option_widget.setEnabled(
-                                enabler_widget.currentText() == enabled_by_value)
+                                enabler_widget.currentText() == enabled_by_value
+                            )
 
                             if option_widget_label is not None:
                                 enabler_widget.currentTextChanged.connect(
-                                    lambda text, option_widget_label=option_widget_label, value=
-                                    enabled_by_value: option_widget_label.setEnabled(text == value))
+                                    lambda text, option_widget_label=option_widget_label, value=enabled_by_value: (
+                                        option_widget_label.setEnabled(text == value)
+                                    )
+                                )
                                 option_widget_label.setEnabled(
-                                    enabler_widget.currentText() == enabled_by_value)
+                                    enabler_widget.currentText() == enabled_by_value
+                                )
 
             vertical_layouts[int(i >= group_count / 2)].addWidget(group_box)
 
@@ -3998,14 +4135,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             'currently mapped to each of the slots.'
             '\n\n'
             'Its main purpose is to provide a directory of custom courses that can be used with '
-            'the MKDD Extender in command-line mode.')
+            'the MKDD Extender in command-line mode.'
+        )
         layout.addWidget(description_label)
         layout.addSpacing(dialog.fontMetrics().height())
         output_directory_layout = QtWidgets.QFormLayout()
         output_directory_layout.setLabelAlignment(QtCore.Qt.AlignRight)
-        output_directory_edit = PathEdit('Select Output Directory',
-                                         QtWidgets.QFileDialog.AcceptOpen,
-                                         QtWidgets.QFileDialog.Directory)
+        output_directory_edit = PathEdit(
+            'Select Output Directory',
+            QtWidgets.QFileDialog.AcceptOpen,
+            QtWidgets.QFileDialog.Directory,
+        )
         path = self._settings.value('miscellaneous/pack_generator_path')
         if path:
             output_directory_edit.set_path(path)
@@ -4015,10 +4155,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         def on_output_directory_path_changed(dirpath: str):
             _ = dirpath
-            self._settings.setValue('miscellaneous/pack_generator_path',
-                                    output_directory_edit.get_path())
-            self._settings.setValue('miscellaneous/pack_generator_last_dir',
-                                    output_directory_edit.get_last_dir())
+            self._settings.setValue(
+                'miscellaneous/pack_generator_path', output_directory_edit.get_path()
+            )
+            self._settings.setValue(
+                'miscellaneous/pack_generator_last_dir', output_directory_edit.get_last_dir()
+            )
 
         output_directory_edit.path_changed.connect(on_output_directory_path_changed)
         output_directory_layout.addRow('Output Directory', output_directory_edit)
@@ -4036,7 +4178,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if not os.path.isdir(dirpath):
                 raise mkdd_extender.MKDDExtenderError(
-                    'Output path already exists, but it is not a directory.')
+                    'Output path already exists, but it is not a directory.'
+                )
 
             if os.listdir(dirpath):
                 raise mkdd_extender.MKDDExtenderError('Output directory is not empty.')
@@ -4047,17 +4190,18 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if self._enable_custom_battle_stages.isChecked():
                 page_course_count = mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
-                page_items = self._get_page_all_items()[:extra_page_count * page_course_count]
+                page_items = self._get_page_all_items()[: extra_page_count * page_course_count]
             else:
                 page_course_count = mkdd_extender.RACE_TRACK_COUNT
-                page_items = self._get_page_items()[:extra_page_count * page_course_count]
+                page_items = self._get_page_items()[: extra_page_count * page_course_count]
 
             for item in page_items:
                 path = self._item_text_to_path.get(item.text())
                 if not path:
                     raise mkdd_extender.MKDDExtenderError(
                         'Please make sure that all slots have been assigned to a valid custom '
-                        'course.')
+                        'course.'
+                    )
                 paths.append(path)
 
             LETTER_RANGE = f'A-{chr(ord("A") + mkdd_extender.MAX_EXTRA_PAGES - 1)}'
@@ -4075,7 +4219,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                 # Also drop the potential exception, as any archive will be extracted.
                 if filtered_name.endswith('.zip'):
-                    filtered_name = filtered_name[:-len('.zip')]
+                    filtered_name = filtered_name[: -len('.zip')]
 
                 page_index = i // page_course_count
                 track_number = i % page_course_count + 1
@@ -4092,8 +4236,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             exception_info = None
 
             try:
-                progress_dialog = ProgressDialog('Processing custom courses...', generate_pack,
-                                                 self)
+                progress_dialog = ProgressDialog(
+                    'Processing custom courses...', generate_pack, self
+                )
                 progress_dialog.execute_and_wait()
 
             except mkdd_extender.MKDDExtenderError as e:
@@ -4164,14 +4309,18 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 '  `mkdd-collision` tool) to see if they contain properties that do not appear in '
                 '  the original game. If so, edit those properties out and try to play the course '
                 '  again.',
-            ))
+            )
+        )
         layout.addWidget(description_label)
         layout.addSpacing(dialog.fontMetrics().height())
         form_layout = QtWidgets.QFormLayout()
         form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
-        input_file_edit = PathEdit('Select Input ISO File', QtWidgets.QFileDialog.AcceptOpen,
-                                   QtWidgets.QFileDialog.ExistingFile,
-                                   ('ISO (*.iso)', 'GCM (*.gcm)'))
+        input_file_edit = PathEdit(
+            'Select Input ISO File',
+            QtWidgets.QFileDialog.AcceptOpen,
+            QtWidgets.QFileDialog.ExistingFile,
+            ('ISO (*.iso)', 'GCM (*.gcm)'),
+        )
         path = self._settings.value('miscellaneous/course_ripper_input_path')
         if path:
             input_file_edit.set_path(path)
@@ -4181,16 +4330,20 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         def on_input_file_path_changed(dirpath: str):
             _ = dirpath
-            self._settings.setValue('miscellaneous/course_ripper_input_path',
-                                    input_file_edit.get_path())
-            self._settings.setValue('miscellaneous/course_ripper_input_last_dir',
-                                    input_file_edit.get_last_dir())
+            self._settings.setValue(
+                'miscellaneous/course_ripper_input_path', input_file_edit.get_path()
+            )
+            self._settings.setValue(
+                'miscellaneous/course_ripper_input_last_dir', input_file_edit.get_last_dir()
+            )
 
         input_file_edit.path_changed.connect(on_input_file_path_changed)
         form_layout.addRow('Input ISO File', input_file_edit)
-        output_directory_edit = PathEdit('Select Output Directory',
-                                         QtWidgets.QFileDialog.AcceptOpen,
-                                         QtWidgets.QFileDialog.Directory)
+        output_directory_edit = PathEdit(
+            'Select Output Directory',
+            QtWidgets.QFileDialog.AcceptOpen,
+            QtWidgets.QFileDialog.Directory,
+        )
         path = self._settings.value('miscellaneous/course_ripper_output_path')
         if path:
             output_directory_edit.set_path(path)
@@ -4200,24 +4353,33 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         def on_output_directory_path_changed(dirpath: str):
             _ = dirpath
-            self._settings.setValue('miscellaneous/course_ripper_output_path',
-                                    output_directory_edit.get_path())
-            self._settings.setValue('miscellaneous/course_ripper_output_last_dir',
-                                    output_directory_edit.get_last_dir())
+            self._settings.setValue(
+                'miscellaneous/course_ripper_output_path', output_directory_edit.get_path()
+            )
+            self._settings.setValue(
+                'miscellaneous/course_ripper_output_last_dir', output_directory_edit.get_last_dir()
+            )
 
         output_directory_edit.path_changed.connect(on_output_directory_path_changed)
         form_layout.addRow('Output Directory', output_directory_edit)
         humanreadable_formats_checkbox = QtWidgets.QCheckBox(
-            'Also export files as human-readable formats')
+            'Also export files as human-readable formats'
+        )
         humanreadable_formats_checkbox.setToolTip(
             markdown_to_html(
                 '',
                 'If checked, BTI and AST files encountered in the ripped courses will be exported '
-                '_also_ in the more accessible PNG and WAV file formats.</div>'))
-        humanreadable_formats_checkbox.toggled.connect(lambda checked: self._settings.setValue(
-            'miscellaneous/course_ripper_humanreadable_export', checked))
+                '_also_ in the more accessible PNG and WAV file formats.</div>',
+            )
+        )
+        humanreadable_formats_checkbox.toggled.connect(
+            lambda checked: self._settings.setValue(
+                'miscellaneous/course_ripper_humanreadable_export', checked
+            )
+        )
         humanreadable_formats_checkbox.setChecked(
-            bool(self._settings.value('miscellaneous/course_ripper_humanreadable_export')))
+            bool(self._settings.value('miscellaneous/course_ripper_humanreadable_export'))
+        )
         form_layout.addRow('', humanreadable_formats_checkbox)
         layout.addLayout(form_layout)
         layout.addStretch()
@@ -4237,7 +4399,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if not os.path.isdir(dirpath):
                 raise mkdd_extender.MKDDExtenderError(
-                    'Output path already exists, but it is not a directory.')
+                    'Output path already exists, but it is not a directory.'
+                )
 
             return mkdd_extender.rip_courses_from_iso(filepath, dirpath, humanreadable_formats)
 
@@ -4255,11 +4418,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         'files or directories.\n\n'
                         'Would you like to delete the content of the directory?',
                     )
-                    cancel_button = message_box.addButton('&Cancel',
-                                                          QtWidgets.QMessageBox.RejectRole)
+                    cancel_button = message_box.addButton(
+                        '&Cancel', QtWidgets.QMessageBox.RejectRole
+                    )
                     message_box.setEscapeButton(cancel_button)
-                    delete_button = message_box.addButton('&Yes; delete content and continue',
-                                                          QtWidgets.QMessageBox.DestructiveRole)
+                    delete_button = message_box.addButton(
+                        '&Yes; delete content and continue', QtWidgets.QMessageBox.DestructiveRole
+                    )
                     message_box.setDefaultButton(cancel_button)
                     message_box.exec_()
                     clicked_button = message_box.clickedButton()
@@ -4308,7 +4473,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 title = 'Success!!'
                 text = (
                     f'{course_count} courses in {page_count} page{"s" if page_count > 1 else ""} '
-                    'have been ripped.')
+                    'have been ripped.'
+                )
                 detailed_text = ''
 
             show_message(icon_name, title, text, detailed_text, self)
@@ -4329,8 +4495,9 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         description_label = QtWidgets.QLabel()
         description_label.setWordWrap(True)
         description_label.setText(
-            'This is a helper tool to build text images using Mario Kart: Double Dash!!\'s '
-            'bitmap-based font.')
+            "This is a helper tool to build text images using Mario Kart: Double Dash!!'s "
+            'bitmap-based font.'
+        )
 
         form_layout = QtWidgets.QFormLayout()
         form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
@@ -4384,7 +4551,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             if not image_placeholder:
                 return
 
-            file_type = "bti" if as_bti else "png"
+            file_type = 'bti' if as_bti else 'png'
 
             last_filepath_setting_name = f'text_image_builder/last_{file_type}_filepath'
             filepath = self._settings.value(last_filepath_setting_name)
@@ -4394,11 +4561,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 dirpath = os.path.expanduser('~')
                 filepath = f'image.{file_type}'
 
-            file_dialog = QtWidgets.QFileDialog(self, f'Save text image as {file_type.upper()}',
-                                                dirpath)
+            file_dialog = QtWidgets.QFileDialog(
+                self, f'Save text image as {file_type.upper()}', dirpath
+            )
             file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
             file_dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
-            file_dialog.setNameFilters((f'{file_type.upper()} (*.{file_type})', ))
+            file_dialog.setNameFilters((f'{file_type.upper()} (*.{file_type})',))
             file_dialog.selectFile(os.path.basename(filepath))
 
             dialog_code = file_dialog.exec_()
@@ -4410,7 +4578,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     image.save(filepath)
                 else:
                     with tempfile.TemporaryDirectory(
-                            prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:
+                        prefix=mkdd_extender.TEMP_DIR_PREFIX
+                    ) as tmp_dir:
                         tmp_filepath = os.path.join(tmp_dir, 'image.png')
                         image.save(tmp_filepath)
                         mkdd_extender.convert_png_to_bti(tmp_filepath, filepath, 'IA4')
@@ -4427,9 +4596,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             image = image_placeholder[0]
             width = image.width
             height = image.height
-            data = image.tobytes("raw", "RGBA")
+            data = image.tobytes('raw', 'RGBA')
             QtWidgets.QApplication.instance().clipboard().setImage(
-                QtGui.QImage(data, width, height, QtGui.QImage.Format_RGBA8888))
+                QtGui.QImage(data, width, height, QtGui.QImage.Format_RGBA8888)
+            )
 
         copy_action.triggered.connect(on_copy_action_triggered)
 
@@ -4437,7 +4607,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         image_widget.setAlignment(QtCore.Qt.AlignCenter)
         image_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         image_widget.customContextMenuRequested.connect(
-            lambda pos: menu.exec_(image_widget.mapToGlobal(pos)))
+            lambda pos: menu.exec_(image_widget.mapToGlobal(pos))
+        )
         palette = image_widget.palette()
         palette.setColor(image_widget.foregroundRole(), QtGui.QColor(170, 20, 20))
         image_widget.setPalette(palette)
@@ -4489,16 +4660,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             image_placeholder.clear()
             image, overflow = mkdd_extender.build_text_image_from_bitmap_font(
-                text, width, height, character_spacing, word_spacing, horizontal_scaling,
-                vertical_scaling)
+                text,
+                width,
+                height,
+                character_spacing,
+                word_spacing,
+                horizontal_scaling,
+                vertical_scaling,
+            )
             image_placeholder.append(image)
 
             background = (255, 40, 40) if overflow else (128, 128, 128)
             image_with_background = Image.new('RGBA', (width, height), background)
             image_with_background.alpha_composite(image)
-            data = image_with_background.tobytes("raw", "RGBA")
+            data = image_with_background.tobytes('raw', 'RGBA')
             pixmap = QtGui.QPixmap.fromImage(
-                QtGui.QImage(data, width, height, QtGui.QImage.Format_RGBA8888))
+                QtGui.QImage(data, width, height, QtGui.QImage.Format_RGBA8888)
+            )
             image_widget.setPixmap(pixmap)
 
             image_widget.setMinimumSize(width, height)
@@ -4562,18 +4740,23 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         dialog.exec_()
 
         self._settings.setValue('text_image_builder/resolution', resolution_combobox.currentText())
-        self._settings.setValue('text_image_builder/resolution_width',
-                                resolution_width_spinbox.value())
-        self._settings.setValue('text_image_builder/resolution_height',
-                                resolution_height_spinbox.value())
+        self._settings.setValue(
+            'text_image_builder/resolution_width', resolution_width_spinbox.value()
+        )
+        self._settings.setValue(
+            'text_image_builder/resolution_height', resolution_height_spinbox.value()
+        )
         self._settings.setValue('text_image_builder/text', text_edit.text())
-        self._settings.setValue('text_image_builder/character_spacing',
-                                character_spacing_slider.get_value())
+        self._settings.setValue(
+            'text_image_builder/character_spacing', character_spacing_slider.get_value()
+        )
         self._settings.setValue('text_image_builder/word_spacing', word_spacing_slider.get_value())
-        self._settings.setValue('text_image_builder/horizontal_scaling',
-                                horizontal_scaling_slider.get_value())
-        self._settings.setValue('text_image_builder/vertical_scaling',
-                                vertical_scaling_slider.get_value())
+        self._settings.setValue(
+            'text_image_builder/horizontal_scaling', horizontal_scaling_slider.get_value()
+        )
+        self._settings.setValue(
+            'text_image_builder/vertical_scaling', vertical_scaling_slider.get_value()
+        )
 
     def _on_ast_converter_action_triggered(self):
         dialog = QtWidgets.QDialog(self)
@@ -4581,11 +4764,19 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         dialog.setWindowTitle('AST Converter')
         dialog.setFocusPolicy(QtCore.Qt.StrongFocus)
 
-        name_filters = ('WAV or AST (*.wav *.ast)', )
-        input_file_edit = PathEdit('Select Input Audio File', QtWidgets.QFileDialog.AcceptOpen,
-                                   QtWidgets.QFileDialog.ExistingFile, name_filters)
-        output_file_edit = PathEdit('Select Output Audio File', QtWidgets.QFileDialog.AcceptSave,
-                                    QtWidgets.QFileDialog.AnyFile, name_filters)
+        name_filters = ('WAV or AST (*.wav *.ast)',)
+        input_file_edit = PathEdit(
+            'Select Input Audio File',
+            QtWidgets.QFileDialog.AcceptOpen,
+            QtWidgets.QFileDialog.ExistingFile,
+            name_filters,
+        )
+        output_file_edit = PathEdit(
+            'Select Output Audio File',
+            QtWidgets.QFileDialog.AcceptSave,
+            QtWidgets.QFileDialog.AnyFile,
+            name_filters,
+        )
 
         form_layout = QtWidgets.QFormLayout()
         form_layout.setLabelAlignment(QtCore.Qt.AlignRight)
@@ -4752,14 +4943,17 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if input_path.endswith('.ast'):
                     if output_ext != '.wav':
                         raise mkdd_extender.MKDDExtenderError(
-                            f'Unexpected output file extension: "{output_ext}" (expected ".wav")')
+                            f'Unexpected output file extension: "{output_ext}" (expected ".wav")'
+                        )
 
                     def func():
                         ast_converter.convert_to_wav(input_path, output_path)
+
                 else:
                     if output_ext != '.ast':
                         raise mkdd_extender.MKDDExtenderError(
-                            f'Unexpected output file extension: "{output_ext}" (expected ".ast")')
+                            f'Unexpected output file extension: "{output_ext}" (expected ".ast")'
+                        )
 
                     def func():
                         if looped_box.isChecked():
@@ -4885,15 +5079,18 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             pages = len(course_names) // page_course_count
 
             for page in range(pages):
-                page_courses_names = course_names[page * page_course_count:(page + 1) *
-                                                  page_course_count]
+                page_courses_names = course_names[
+                    page * page_course_count : (page + 1) * page_course_count
+                ]
                 margin = 0.0 if page == 0 else 0.8
-                html += ('<tr>'
-                         f'<td colspan="{columns}" style="text-align: center; '
-                         f'padding-top: {margin}em; '
-                         f'font-size: {header_font_size}px;">'
-                         f'<b>Page {page + 2}/{pages + 1}</b></td>'
-                         '</tr>')
+                html += (
+                    '<tr>'
+                    f'<td colspan="{columns}" style="text-align: center; '
+                    f'padding-top: {margin}em; '
+                    f'font-size: {header_font_size}px;">'
+                    f'<b>Page {page + 2}/{pages + 1}</b></td>'
+                    '</tr>'
+                )
                 for row in range(4):
                     html += '<tr>'
                     for col in range(columns):
@@ -4906,15 +5103,19 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                             rowspan = 1
                             index = row + 4 * col
                         course_name = page_courses_names[index] or '-'
-                        html += (f'<td style="padding: 0.3em; font-size: {font_size}px;" '
-                                 f'rowspan="{rowspan}">'
-                                 f'{course_name}</td>')
+                        html += (
+                            f'<td style="padding: 0.3em; font-size: {font_size}px;" '
+                            f'rowspan="{rowspan}">'
+                            f'{course_name}</td>'
+                        )
                     html += '</tr>'
 
             if not pages:
-                html += ('<tr><td style="text-align: center; padding: 0.8em">'
-                         'No extra course page is configured'
-                         '</td></tr>')
+                html += (
+                    '<tr><td style="text-align: center; padding: 0.8em">'
+                    'No extra course page is configured'
+                    '</td></tr>'
+                )
 
             html += '</table>'
 
@@ -4935,7 +5136,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             load_button.clicked.connect(shelf_menu.close)
             update_button = QtWidgets.QPushButton('Update')
             update_button.clicked.connect(
-                lambda _checked=False, name=name: self._update_shelf_item(name))
+                lambda _checked=False, name=name: self._update_shelf_item(name)
+            )
             delete_button = QtWidgets.QPushButton('Delete')
             delete_button.clicked.connect(lambda _checked=False, i=i: self._delete_shelf_item(i))
             buttons_layout = QtWidgets.QHBoxLayout()
@@ -4989,10 +5191,12 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if not input_path:
                 raise mkdd_extender.MKDDExtenderError(
-                    'Path to the input ISO file has not been specified.')
+                    'Path to the input ISO file has not been specified.'
+                )
             if not output_path:
                 raise mkdd_extender.MKDDExtenderError(
-                    'Path to the output ISO file has not been specified.')
+                    'Path to the output ISO file has not been specified.'
+                )
 
             if input_path == output_path:
                 raise mkdd_extender.MKDDExtenderError('Input and output paths cannot be identical.')
@@ -5000,7 +5204,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             _stem, ext = os.path.splitext(output_path)
             if ext not in ('.iso', '.gcm'):
                 raise mkdd_extender.MKDDExtenderError(
-                    'File extension in output path should be either `.iso` or `.gcm`.')
+                    'File extension in output path should be either `.iso` or `.gcm`.'
+                )
 
             args = argparse.Namespace()
             args.input = input_path
@@ -5011,10 +5216,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if self._enable_custom_battle_stages.isChecked():
                 page_course_count = mkdd_extender.RACE_AND_BATTLE_COURSE_COUNT
-                page_items = self._get_page_all_items()[:extra_page_count * page_course_count]
+                page_items = self._get_page_all_items()[: extra_page_count * page_course_count]
             else:
                 page_course_count = mkdd_extender.RACE_TRACK_COUNT
-                page_items = self._get_page_items()[:extra_page_count * page_course_count]
+                page_items = self._get_page_items()[: extra_page_count * page_course_count]
 
             for item in page_items:
                 path = self._item_text_to_path.get(item.text())
@@ -5027,16 +5232,21 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             slots_assigned = len(args.tracks) - slots_unassigned
 
             if slots_unassigned > 0:
-                mkdd_extender.log.warning(f'Only {slots_assigned} slots have been assigned. Empty '
-                                          f'slots ({slots_unassigned}) will be provided with a '
-                                          'placeholder.')
+                mkdd_extender.log.warning(
+                    f'Only {slots_assigned} slots have been assigned. Empty '
+                    f'slots ({slots_unassigned}) will be provided with a '
+                    'placeholder.'
+                )
 
                 for i, path in enumerate(tuple(args.tracks)):
                     if not path:
                         track_index = i % page_course_count
                         is_battle_stage = track_index >= mkdd_extender.RACE_TRACK_COUNT
-                        args.tracks[i] = (placeholder_battle_stage_dir
-                                          if is_battle_stage else placeholder_race_track_dir)
+                        args.tracks[i] = (
+                            placeholder_battle_stage_dir
+                            if is_battle_stage
+                            else placeholder_race_track_dir
+                        )
 
             assert len(args.tracks) % page_course_count == 0
 
@@ -5059,8 +5269,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     raise mkdd_extender.MKDDExtenderCanceled('Canceled by user.')
 
             progress_dialog = ProgressDialog(
-                'Building ISO file...', lambda: mkdd_extender.extend_game(args, raise_if_canceled),
-                self)
+                'Building ISO file...',
+                lambda: mkdd_extender.extend_game(args, raise_if_canceled),
+                self,
+            )
 
             progress_dialog.set_cancel_button(cancel_button)
 
@@ -5115,7 +5327,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         '<code>auxiliary_audio_track</code> field.</li>'
                         '<li>Mark the <b>Use Replacee Audio Track</b> option to use the stock '
                         'audio tracks for all tracks.</li>'
-                        '</ul>')
+                        '</ul>'
+                    )
 
         show_message(icon_name, title, text, detailed_text, self)
 
