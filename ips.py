@@ -38,7 +38,7 @@ def read_ips_file(filepath: str) -> list[tuple[int, bytes]]:
     return blocks
 
 
-def apply_ips_file(ips_filepath: str, filepath: str):
+def apply_ips_file(ips_filepath: str, filepath: str) -> None:
     blocks = read_ips_file(ips_filepath)
     if not blocks:
         return

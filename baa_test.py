@@ -12,7 +12,7 @@ import pytest
 import baa
 
 
-def test_stock_data_set():
+def test_stock_data_set() -> None:
     """
     Exercises the module by unpacking, and repacking a set of BAA files.
     """

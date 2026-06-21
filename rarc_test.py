@@ -23,7 +23,7 @@ def __cmpdir(dirpath_a: str, dirpath_b: str) -> bool:
     return True
 
 
-def test_synthetic_data_set():
+def test_synthetic_data_set() -> None:
     """
     Each data set is a list of path and size tuples. If size is `None`, an empty directory is
     created; otherwise a file of the given size is created.
@@ -82,7 +82,7 @@ def test_synthetic_data_set():
                 assert __cmpdir(test_dir, extracted_test_dir)
 
 
-def test_stock_data_set():
+def test_stock_data_set() -> None:
     """
     Exercises the module by extracting, repacking, and re-extracting a set of RARC files generated
     by third-party tools.

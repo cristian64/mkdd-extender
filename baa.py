@@ -15,21 +15,23 @@ def _read_uint32(f):
     return struct.unpack('>I', f.read(4))[0]
 
 
-def _write_uint32(f, value):
+def _write_uint32(f, value) -> None:
     f.write(struct.pack('>I', value))
 
 
-def _prepare_destination_directory(dirpath: str):
+def _prepare_destination_directory(dirpath: str) -> None:
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
     elif not os.path.isdir(dirpath):
+        msg = f'Destination directory "{dirpath}" is not a valid directory and cannot be created'
         raise RuntimeError(
-            f'Destination directory "{dirpath}" is not a valid directory and cannot be created',
+            msg,
         )
     else:
         with os.scandir(dirpath) as it:
             if any(it):
-                raise RuntimeError(f'Destination directory "{dirpath}" is not empty')
+                msg = f'Destination directory "{dirpath}" is not empty'
+                raise RuntimeError(msg)
 
 
 def _aligned(value: int, alignment: int) -> int:
@@ -69,7 +71,8 @@ def _parse_baa_header(f) -> list[dict]:
 
     magic = _read_uint32(f)
     if magic != _BAA_MAGIC:
-        raise RuntimeError(f'Bad magic in BAA file: 0x{magic:08X} (expected 0x{_BAA_MAGIC:08X})')
+        msg = f'Bad magic in BAA file: 0x{magic:08X} (expected 0x{_BAA_MAGIC:08X})'
+        raise RuntimeError(msg)
 
     while True:
         section_type = _read_uint32(f)
@@ -79,7 +82,8 @@ def _parse_baa_header(f) -> list[dict]:
         try:
             section_type = _SectionType(section_type)
         except ValueError as e:
-            raise RuntimeError(f'Unexpected file type in BAA file: 0x{section_type:08X}') from e
+            msg = f'Unexpected file type in BAA file: 0x{section_type:08X}'
+            raise RuntimeError(msg) from e
 
         section = {'type': section_type}
 
@@ -146,7 +150,8 @@ def _get_baa_section_size(section: dict, f) -> int:
         return size
 
     if section_type == _SectionType.BFCA:
-        raise RuntimeError('Unable to calculate size for unknown BFCA type')
+        msg = 'Unable to calculate size for unknown BFCA type'
+        raise RuntimeError(msg)
 
     return section['end'] - section_start
 
@@ -154,9 +159,10 @@ def _get_baa_section_size(section: dict, f) -> int:
 _INFO_FILE_EXTENSION = '.baa_info.json'
 
 
-def unpack_baa(src_filepath: str, dst_dirpath: str):
+def unpack_baa(src_filepath: str, dst_dirpath: str) -> None:
     if not src_filepath.endswith('.baa'):
-        raise ValueError(f'Input filepath "{src_filepath}" should use the ".baa" extension.')
+        msg = f'Input filepath "{src_filepath}" should use the ".baa" extension.'
+        raise ValueError(msg)
 
     _prepare_destination_directory(dst_dirpath)
 
@@ -181,14 +187,17 @@ def unpack_baa(src_filepath: str, dst_dirpath: str):
         f.write(json.dumps(sections, indent=4))
 
 
-def pack_baa(src_dirpath: str, dst_filepath: str):
+def pack_baa(src_dirpath: str, dst_filepath: str) -> None:
     if os.path.isfile(src_dirpath):
         # If it's a file, it shoudl be pointing to the BAA info file.
         src_filepath = src_dirpath
         if not src_filepath.endswith(_INFO_FILE_EXTENSION):
-            raise ValueError(
+            msg = (
                 f'Input filepath "{src_filepath}" should use the '
-                f'"{_INFO_FILE_EXTENSION}" extension.',
+                f'"{_INFO_FILE_EXTENSION}" extension.'
+            )
+            raise ValueError(
+                msg,
             )
         src_dirpath = os.path.dirname(src_filepath)
     else:
@@ -197,15 +206,18 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
             name for name in os.listdir(src_dirpath) if name.endswith(_INFO_FILE_EXTENSION)
         ]
         if not src_filenames:
-            raise ValueError(f'No BAA info file was found in "{src_dirpath}".')
+            msg = f'No BAA info file was found in "{src_dirpath}".'
+            raise ValueError(msg)
         if len(src_filenames) > 1:
+            msg = f'Only one BAA info file was expected in "{src_dirpath}"; found: {src_filenames}'
             raise ValueError(
-                f'Only one BAA info file was expected in "{src_dirpath}"; found: {src_filenames}',
+                msg,
             )
         src_filepath = os.path.join(src_dirpath, src_filenames[0])
 
     if not dst_filepath.endswith('.baa'):
-        raise ValueError(f'Destination filepath "{dst_filepath}" should use the ".baa" extension.')
+        msg = f'Destination filepath "{dst_filepath}" should use the ".baa" extension.'
+        raise ValueError(msg)
 
     with open(src_filepath, encoding='utf-8') as input_file:
         sections = json.load(input_file)
@@ -290,9 +302,10 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
             output_file.seek(cursor)
 
 
-def unpack_baac(src_filepath: str, dst_dirpath: str):
+def unpack_baac(src_filepath: str, dst_dirpath: str) -> None:
     if not src_filepath.endswith('.baac'):
-        raise ValueError(f'Input filepath "{src_filepath}" should use the ".baac" extension.')
+        msg = f'Input filepath "{src_filepath}" should use the ".baac" extension.'
+        raise ValueError(msg)
 
     _prepare_destination_directory(dst_dirpath)
 
@@ -315,12 +328,14 @@ def unpack_baac(src_filepath: str, dst_dirpath: str):
                 output_file.write(data)
 
 
-def pack_baac(src_filepaths: list[str], dst_filepath: str):
+def pack_baac(src_filepaths: list[str], dst_filepath: str) -> None:
     for src_filepath in src_filepaths:
         if not src_filepath.endswith('.baa'):
-            raise ValueError(f'Input filepath "{src_filepath}" should use the ".baa" extension.')
+            msg = f'Input filepath "{src_filepath}" should use the ".baa" extension.'
+            raise ValueError(msg)
     if not dst_filepath.endswith('.baac'):
-        raise ValueError(f'Destination filepath "{dst_filepath}" should use the ".baac" extension.')
+        msg = f'Destination filepath "{dst_filepath}" should use the ".baac" extension.'
+        raise ValueError(msg)
 
     with open(dst_filepath, 'wb') as output_file:
         _write_uint32(output_file, len(src_filepaths))
@@ -342,7 +357,8 @@ def pack_baac(src_filepaths: list[str], dst_filepath: str):
 
 def read_bsft(src_filepath: str) -> list[tuple[int, str]]:
     if not src_filepath.endswith('.bsft'):
-        raise ValueError(f'Input filepath "{src_filepath}" should use the ".bsft" extension.')
+        msg = f'Input filepath "{src_filepath}" should use the ".bsft" extension.'
+        raise ValueError(msg)
 
     with open(src_filepath, 'rb') as f:
         magic = f.read(4)
@@ -361,9 +377,10 @@ def read_bsft(src_filepath: str) -> list[tuple[int, str]]:
     return offsets_and_strings
 
 
-def write_bsft(strings: list[str], dst_filepath: str):
+def write_bsft(strings: list[str], dst_filepath: str) -> None:
     if not dst_filepath.endswith('.bsft'):
-        raise ValueError(f'Destination filepath "{dst_filepath}" should use the ".bsft" extension.')
+        msg = f'Destination filepath "{dst_filepath}" should use the ".bsft" extension.'
+        raise ValueError(msg)
 
     with open(dst_filepath, 'wb') as f:
         f.write(b'bsft')

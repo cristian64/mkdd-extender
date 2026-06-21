@@ -133,7 +133,7 @@ def _decompress(data: memoryview) -> memoryview:
     return uncompressed_data_view
 
 
-def extract(src_filepath: str, dst_dirpath: str):
+def extract(src_filepath: str, dst_dirpath: str) -> None:
     # Read all file into nearby memory.
     with open(src_filepath, 'rb') as f:
         data = memoryview(f.read())
@@ -225,7 +225,8 @@ def extract(src_filepath: str, dst_dirpath: str):
                 'end of string table as the end of the string.',
             )
             return remainder
-        raise RuntimeError(f'String at offset {string_offset} not found.')
+        msg = f'String at offset {string_offset} not found.'
+        raise RuntimeError(msg)
 
     # In the RARC files seen in Mario Kart: Double Dash!!, these two strings always appear first.
     assert get_string(0) == b'.'
@@ -382,9 +383,10 @@ def extract(src_filepath: str, dst_dirpath: str):
                         pending_nodes.append((node, current_dirpath))
 
 
-def pack(src_dirpath: str, dst_filepath: str):
+def pack(src_dirpath: str, dst_filepath: str) -> None:
     if not os.path.isdir(src_dirpath):
-        raise ValueError(f'"{src_dirpath}" is not a valid directory.')
+        msg = f'"{src_dirpath}" is not a valid directory.'
+        raise ValueError(msg)
 
     src_dirpath = os.path.normpath(src_dirpath)  # Trailing slashes not wanted.
 
@@ -425,7 +427,7 @@ def pack(src_dirpath: str, dst_filepath: str):
         # a depth-first search, while we are doing breadth-first search.
         dirnames.sort()
         filenames = sorted(filenames)
-        dirnames = dirnames + ['.', '..']
+        dirnames = [*dirnames, '.', '..']
 
         parentname = os.path.basename(parentpath)
         string_offset = register_string(parentname)
@@ -595,7 +597,7 @@ def pack(src_dirpath: str, dst_filepath: str):
             f.write(b'\x00' * (aligned(entry_data_size) - entry_data_size))
 
 
-def main():
+def main() -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         level=logging.INFO,
@@ -622,9 +624,12 @@ def main():
         pack(args.input, args.output)
 
     else:
-        raise ValueError(
+        msg = (
             f'Input path ("{args.input}") cannot be extracted or packed because it is '
-            'not a valid file or directory.',
+            'not a valid file or directory.'
+        )
+        raise ValueError(
+            msg,
         )
 
 

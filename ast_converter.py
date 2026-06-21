@@ -19,7 +19,7 @@ import wave
 log = logging.getLogger('ast')
 
 try:
-    import numpy
+    import numpy as np
 
     _NUMPY_AVAILABLE = True
 except ImportError:
@@ -129,14 +129,14 @@ def get_ast_info(filepath: str) -> 'dict[str, int]':
     }
 
 
-def _print_mapping(mapping: 'dict[str, int]'):
+def _print_mapping(mapping: 'dict[str, int]') -> None:
     max_label_length = max(len(entry) + 1 for entry in mapping)
     for entry, value in mapping.items():
         label = entry.title().replace('_', ' ') + ':'
         print(f'{label: <{max_label_length}} {value}')
 
 
-def _swap_bytes_naive(data: bytearray, bit_depth: int):
+def _swap_bytes_naive(data: bytearray, bit_depth: int) -> None:
     if bit_depth == 8:
         return
 
@@ -154,21 +154,23 @@ def _swap_bytes_naive(data: bytearray, bit_depth: int):
             )
 
     else:
-        raise ValueError(f'Unsupported bit depth: {bit_depth}')
+        msg = f'Unsupported bit depth: {bit_depth}'
+        raise ValueError(msg)
 
 
-def _swap_bytes_numpy(data: bytearray, bit_depth: int):
+def _swap_bytes_numpy(data: bytearray, bit_depth: int) -> None:
     if bit_depth == 8:
         return
 
     if bit_depth == 16:
-        dtype = numpy.int16
+        dtype = np.int16
     elif bit_depth == 32:
-        dtype = numpy.int32
+        dtype = np.int32
     else:
-        raise ValueError(f'Unsupported bit depth: {bit_depth}')
+        msg = f'Unsupported bit depth: {bit_depth}'
+        raise ValueError(msg)
 
-    array = numpy.frombuffer(data, dtype=dtype)
+    array = np.frombuffer(data, dtype=dtype)
     array.byteswap(inplace=True)
     data[:] = array.tobytes()
 
@@ -192,25 +194,26 @@ def _interleave_channels_naive(data: memoryview, channel_count: int, bit_depth: 
 
 def _interleave_channels_numpy(data: memoryview, channel_count: int, bit_depth: int) -> bytearray:
     if bit_depth == 8:
-        dtype = numpy.uint8
+        dtype = np.uint8
     elif bit_depth == 16:
-        dtype = numpy.int16
+        dtype = np.int16
     elif bit_depth == 32:
-        dtype = numpy.int32
+        dtype = np.int32
     else:
-        raise ValueError(f'Unsupported bit depth: {bit_depth}')
+        msg = f'Unsupported bit depth: {bit_depth}'
+        raise ValueError(msg)
 
     bytes_per_channel = len(data) // channel_count
 
     arrays = []
     for i in range(channel_count):
-        array = numpy.frombuffer(
+        array = np.frombuffer(
             data[i * bytes_per_channel : (i + 1) * bytes_per_channel],
             dtype=dtype,
         )
         arrays.append(array)
 
-    placeholder = numpy.empty(sum(a.size for a in arrays), dtype=dtype)
+    placeholder = np.empty(sum(a.size for a in arrays), dtype=dtype)
     for i, a in enumerate(arrays):
         placeholder[i::channel_count] = a
 
@@ -240,22 +243,23 @@ def _deinterleave_channels_numpy(
     bit_depth: int,
 ) -> 'tuple[memoryview]':
     if bit_depth == 8:
-        dtype = numpy.uint8
+        dtype = np.uint8
     elif bit_depth == 16:
-        dtype = numpy.int16
+        dtype = np.int16
     elif bit_depth == 32:
-        dtype = numpy.int32
+        dtype = np.int32
     else:
-        raise ValueError(f'Unsupported bit depth: {bit_depth}')
+        msg = f'Unsupported bit depth: {bit_depth}'
+        raise ValueError(msg)
 
-    array = numpy.frombuffer(data, dtype=dtype)
+    array = np.frombuffer(data, dtype=dtype)
 
     # A copy of the slice is made to ensure it is in contiguous memory; then a view of the array
     # (as unsigned chars) is created, which can then be wrapped up with a `memoryview` object.
     # Note that the reason for not converting the slice to bytes (via `numpy.ndarray.tobytes()`) is
     # that it performs poorly.
     return tuple(
-        memoryview(array[i::channel_count].copy().view(dtype=numpy.uint8))
+        memoryview(array[i::channel_count].copy().view(dtype=np.uint8))
         for i in range(channel_count)
     )
 
@@ -270,7 +274,7 @@ else:
     _deinterleave_channels = _deinterleave_channels_naive
 
 
-def convert_to_wav(src_filepath: str, dst_filepath: str):
+def convert_to_wav(src_filepath: str, dst_filepath: str) -> None:
     filesize = os.path.getsize(src_filepath)
 
     with open(src_filepath, 'rb') as f:
@@ -382,13 +386,13 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
 def convert_to_ast(
     src_filepath: str,
     dst_filepath: str,
-    looped: int = None,
-    sample_count: int = None,
-    loop_start: int = None,
-    loop_end: int = None,
-    volume: int = None,
-    last_block_size: int = None,
-):
+    looped: int | None = None,
+    sample_count: int | None = None,
+    loop_start: int | None = None,
+    loop_end: int | None = None,
+    volume: int | None = None,
+    last_block_size: int | None = None,
+) -> None:
 
     if looped is None:
         looped = 0xFFFF
@@ -484,7 +488,7 @@ def convert_to_ast(
         f.write(block_data)
 
 
-def main():
+def main() -> None:
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         level=logging.INFO,
@@ -571,9 +575,12 @@ def main():
             args.last_block_size,
         )
     else:
-        raise ValueError(
+        msg = (
             f'Input path ("{args.input}") does not have a recognizable file extension. '
-            'Expect either `.ast` or `.wav`.',
+            'Expect either `.ast` or `.wav`.'
+        )
+        raise ValueError(
+            msg,
         )
 
 

@@ -24,7 +24,8 @@ for line in data.splitlines():
         version = re.search(r"'(.+)'", line).group(1)
         break
 else:
-    raise RuntimeError('Unable to parse product version.')
+    msg = 'Unable to parse product version.'
+    raise RuntimeError(msg)
 
 system = platform.system().lower()
 

@@ -437,15 +437,21 @@ def read_minimap_values(
             for v in (v0, v1, v2, v3):
                 if -100000000.0 <= v <= 100000000.0:
                     continue
-                raise RuntimeError(
+                msg = (
                     'Unable to extract minimap values values from DOL file. '
-                    f'Corner value ({v4}) is unexpectedly large.',
+                    f'Corner value ({v4}) is unexpectedly large.'
+                )
+                raise RuntimeError(
+                    msg,
                 )
 
             if v4 not in (0, 1, 2, 3):
-                raise RuntimeError(
+                msg = (
                     'Unable to extract minimap orientation values from DOL file. '
-                    f'Orientation enum value ({v4}) not in [0, 3].',
+                    f'Orientation enum value ({v4}) not in [0, 3].'
+                )
+                raise RuntimeError(
+                    msg,
                 )
 
             minimap_values[course] = (v0, v1, v2, v3, v4)
@@ -598,7 +604,7 @@ FILE_STRINGS = (
 )
 
 
-def find_addresses():
+def find_addresses() -> None:
     """
     Helper function for finding the relevant strings in a memory dump for each region.
 
@@ -952,12 +958,12 @@ List of strings (and their addresses in static memory) that need to be modified 
 code.
 """
 
-for _game_id, addresses in STRING_ADDRESSES.items():
+for addresses in STRING_ADDRESSES.values():
     for string in addresses:
         assert string in DIR_STRINGS + FILE_STRINGS
 
 for string in DIR_STRINGS + FILE_STRINGS:
-    for _game_id, addresses in STRING_ADDRESSES.items():
+    for addresses in STRING_ADDRESSES.values():
         assert string in addresses
 
 
@@ -1486,8 +1492,8 @@ GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES = {
     'GM4E01dbg': 0x802EFB04,
 }
 """
-A call to the function getStaggerCode, which ordinarily returns true when the material hash's 
-second byte is set to 1. 0x50000000 would not trigger it, but 0x50000100 would. This call to 
+A call to the function getStaggerCode, which ordinarily returns true when the material hash's
+second byte is set to 1. 0x50000000 would not trigger it, but 0x50000100 would. This call to
 the function is from "KartGame::DoAirCheck".
 """
 
@@ -1751,7 +1757,8 @@ def read_osarena(dol_path, game_id) -> int:
 
         instruction = struct.unpack('>H', dol_file.read(2))[0]
         if instruction != 0x3C60:  # lis r3, _
-            raise RuntimeError(f'Unexpected instruction: 0x{instruction:04X}')
+            msg = f'Unexpected instruction: 0x{instruction:04X}'
+            raise RuntimeError(msg)
         value_high = struct.unpack('>H', dol_file.read(2))[0]
 
         instruction = struct.unpack('>H', dol_file.read(2))[0]
@@ -1762,24 +1769,31 @@ def read_osarena(dol_path, game_id) -> int:
             value_low = struct.unpack('>H', dol_file.read(2))[0]
             value = (value_high << 16) | value_low
         else:
-            raise RuntimeError(f'Unexpected instruction: 0x{instruction:04X}')
+            msg = f'Unexpected instruction: 0x{instruction:04X}'
+            raise RuntimeError(msg)
 
         instruction = struct.unpack('>I', dol_file.read(4))[0]
         if instruction == 0x3803001F:  # addi r0, r3, 0x1f
             value += 31
         else:
-            raise RuntimeError(f'Unexpected instruction: 0x{instruction:08X}')
+            msg = f'Unexpected instruction: 0x{instruction:08X}'
+            raise RuntimeError(msg)
 
         instruction = struct.unpack('>I', dol_file.read(4))[0]
         if instruction == 0x54030034:  # rlwinm r3, r0, 0x0, 0x0, 0x1a
             value &= 0xFFFFFFE0
         else:
-            raise RuntimeError(f'Unexpected instruction: 0x{instruction:08X}')
+            msg = f'Unexpected instruction: 0x{instruction:08X}'
+            raise RuntimeError(msg)
 
         return value
 
 
-def patch_bti_filenames_in_blo_file(game_id: str, battle_stages_enabled: bool, blo_path: str):
+def patch_bti_filenames_in_blo_file(
+    game_id: str,
+    battle_stages_enabled: bool,
+    blo_path: str,
+) -> None:
     with open(blo_path, 'rb') as f:
         data = f.read()
 
@@ -1816,15 +1830,18 @@ def patch_dol_file(
     dol_path: str,
     log: logging.Logger,
     debug_output: bool,
-):
+) -> None:
     import mkdd_extender  # pylint: disable=import-outside-toplevel
 
     log.info('Generating and injecting C code...')
 
     if bouncy_terrain_type and game_id == 'GM4E01dbg':
-        raise mkdd_extender.MKDDExtenderError(
+        msg = (
             'The **Bouncy Terrain Type** code patch is not currently compatible with the NTSC-U '
-            'Debug build.',
+            'Debug build.'
+        )
+        raise mkdd_extender.MKDDExtenderError(
+            msg,
         )
 
     if args.lan_choose_character_and_kart:
@@ -1851,7 +1868,7 @@ def patch_dol_file(
     unaligned_new_osarena_value = 0
     injected_code_size = 0
 
-    def patch_osarena(dol_file, dol_section_address_plus_size):
+    def patch_osarena(dol_file, dol_section_address_plus_size) -> None:
         nonlocal unaligned_new_osarena_value
         nonlocal injected_code_size
         nonlocal injected_code_size
@@ -2410,10 +2427,8 @@ def patch_dol_file(
                 if pass_number == 1 and debug_output:
                     # If Clang-Format is available in the system, run the C file through it.
                     shutil.copyfile(os.path.join(code_dir, '.clang-format'), '.clang-format')
-                    try:
+                    with contextlib.suppress(Exception):
                         subprocess.call(('clang-format', '-i', 'lib.c'))
-                    except Exception:
-                        pass
 
                     with open('lib.c', encoding='ascii') as f:
                         print('#' * 80)
@@ -2454,7 +2469,8 @@ def patch_dol_file(
                     bsft_filepath = os.path.join(tmp_dir, name)
                     break
             else:
-                raise RuntimeError('Unable to locate BSFT file in GCKart.baa.')
+                msg = 'Unable to locate BSFT file in GCKart.baa.'
+                raise RuntimeError(msg)
 
             paths = [path for _offset, path in baa.read_bsft(bsft_filepath)]
 

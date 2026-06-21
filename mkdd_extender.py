@@ -265,7 +265,7 @@ class _CustomFormatter(logging.Formatter):
     bold_fucsia = '\x1b[1;95m' if not windows else ''
     reset = '\x1b[0m' if not windows else ''
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         fmt = '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
@@ -311,7 +311,7 @@ except AttributeError:
 
 
 class MKDDExtenderError(Exception):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.text = None
@@ -328,10 +328,12 @@ if frozen:
     def geckoloader_resource_path(relative_path: pathlib.Path) -> pathlib.Path:
         base_path = pathlib.Path(sys.executable).parent / '_internal'
         if not base_path.is_dir():
-            raise MKDDExtenderError(f'"{base_path}" not found or not a directory')
+            msg = f'"{base_path}" not found or not a directory'
+            raise MKDDExtenderError(msg)
         path = base_path / relative_path
         if not path.exists():
-            raise MKDDExtenderError(f'"{path}" not found')
+            msg = f'"{path}" not found'
+            raise MKDDExtenderError(msg)
         return path
 
     GeckoLoader.resource_path = geckoloader_resource_path
@@ -347,11 +349,9 @@ def current_directory(dirpath):
         os.chdir(cwd)
 
 
-def remove_file(filepath: str):
-    try:
+def remove_file(filepath: str) -> None:
+    with contextlib.suppress(Exception):
         os.remove(filepath)
-    except Exception:
-        pass
 
 
 def safe_copyfile(src_filepath: str, dst_filepath: str) -> None:
@@ -360,18 +360,18 @@ def safe_copyfile(src_filepath: str, dst_filepath: str) -> None:
         shutil.copyfile(src_filepath, dst_filepath)
 
 
-def make_link(src_filepath: str, dst_filepath: str, attempt_copy_on_error: bool = True):
+def make_link(src_filepath: str, dst_filepath: str, attempt_copy_on_error: bool = True) -> None:
     remove_file(dst_filepath)
     try:
         os.link(src_filepath, dst_filepath)
-    except OSError as e:
+    except OSError:
         if attempt_copy_on_error:
             shutil.copyfile(src_filepath, dst_filepath)
         else:
-            raise e
+            raise
 
 
-def rename(src_path: str, dst_path: str):
+def rename(src_path: str, dst_path: str) -> None:
     if src_path == dst_path:
         return
 
@@ -384,7 +384,8 @@ def rename(src_path: str, dst_path: str):
         return
 
     if os.path.exists(dst_path):
-        raise RuntimeError(f'Rename "{src_path}" to "{dst_path}" failed: destination exists.')
+        msg = f'Rename "{src_path}" to "{dst_path}" failed: destination exists.'
+        raise RuntimeError(msg)
 
     if windows and os.path.isdir(src_path) and shutil.which('robocopy'):
         with subprocess.Popen(
@@ -396,31 +397,33 @@ def rename(src_path: str, dst_path: str):
             process.communicate()
             success_code = 0 <= process.returncode <= 7  # https://ss64.com/nt/robocopy-exit.html
             if not success_code:
-                raise RuntimeError(
+                msg = (
                     f'Rename "{src_path}" to "{dst_path}" failed: '
-                    f'robocopy returned {process.returncode}.',
+                    f'robocopy returned {process.returncode}.'
+                )
+                raise RuntimeError(
+                    msg,
                 )
     else:
         try:
             os.rename(src_path, dst_path)
         except Exception as e:
             error = str(e) or 'Unknown error'
-            raise RuntimeError(f'Rename "{src_path}" to "{dst_path}" failed: {error}') from e
+            msg = f'Rename "{src_path}" to "{dst_path}" failed: {error}'
+            raise RuntimeError(msg) from e
 
 
-def clean_stale_temp_dirs():
+def clean_stale_temp_dirs() -> None:
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         user_tmp_dir = os.path.dirname(tmp_dir)
 
     for name in os.listdir(user_tmp_dir):
         if name.startswith(TEMP_DIR_PREFIX):
-            try:
+            with contextlib.suppress(Exception):
                 shutil.rmtree(os.path.join(user_tmp_dir, name))
-            except Exception:
-                pass
 
 
-def run(command: list, verbose: bool = False, cwd: str = None) -> int:
+def run(command: list, verbose: bool = False, cwd: str | None = None) -> int:
     creationflags = 0
     if windows:
         creationflags |= subprocess.CREATE_NO_WINDOW
@@ -540,7 +543,7 @@ def scan_custom_tracks_directory(dirpath: str) -> 'dict[str, str]':
     return paths_to_track_name
 
 
-def extract_and_flatten(src_path: str, dst_dirpath: str):
+def extract_and_flatten(src_path: str, dst_dirpath: str) -> None:
     # Extracts a ZIP archive into the given directory. If the archive contains a single directory,
     # it will be unwrapped. If the archive contains a nested archive, it will be extracted too.
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
@@ -571,7 +574,7 @@ def extract_and_flatten(src_path: str, dst_dirpath: str):
                 shutil.move(path, dst_dirpath)
 
 
-def unwrap_custom_track(dirpath: str):
+def unwrap_custom_track(dirpath: str) -> None:
     # With the assumption that a `trackinfo.ini` file exists in the given directory, or in a
     # subdirectory, ensure that the file remains reachable in the top-level directory.
 
@@ -590,7 +593,8 @@ def unwrap_custom_track(dirpath: str):
                 break
 
         if nested_dirpath is None:
-            raise MKDDExtenderError(f'Unable to locate `trackinfo.ini` in "{dirpath}".')
+            msg = f'Unable to locate `trackinfo.ini` in "{dirpath}".'
+            raise MKDDExtenderError(msg)
 
         shutil.move(nested_dirpath, tmp_dir)
         shutil.rmtree(dirpath)
@@ -751,7 +755,8 @@ def rip_courses_from_iso(
     os.makedirs(dirpath, exist_ok=True)
 
     if os.listdir(dirpath):
-        raise MKDDExtenderError(f'Destination directory "{dirpath}" is not empty')
+        msg = f'Destination directory "{dirpath}" is not empty'
+        raise MKDDExtenderError(msg)
 
     iso_tmp_dir = tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX)
     iso_tmp_dirpath = iso_tmp_dir.name
@@ -760,7 +765,8 @@ def rip_courses_from_iso(
     try:
         gcm_file.read_entire_disc()
     except Exception as e:
-        raise MKDDExtenderError(f'Unable to read input ISO image: {e!s}') from e
+        msg = f'Unable to read input ISO image: {e!s}'
+        raise MKDDExtenderError(msg) from e
     tuple(gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dirpath))  # It's a generator.
 
     RARC_FILENAMES = ('coursename.arc', 'courseselect.arc', 'mapselect.arc')
@@ -1040,7 +1046,7 @@ def get_tilt_setting_from_bol_file(course_filepath: str) -> int:
         course_dirpath = os.path.join(tmp_dir, os.listdir(tmp_dir)[0])
         bol_filepath = os.path.join(
             course_dirpath,
-            tuple(p for p in os.listdir(course_dirpath) if p.endswith('.bol'))[0],
+            next(p for p in os.listdir(course_dirpath) if p.endswith('.bol')),
         )
 
         with open(bol_filepath, 'r+b') as f:
@@ -1048,7 +1054,7 @@ def get_tilt_setting_from_bol_file(course_filepath: str) -> int:
             return f.read(1)[0]
 
 
-def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
+def patch_music_id_in_bol_file(course_filepath: str, track_index: int) -> None:
     assert course_filepath.endswith('.arc')
     assert 0 <= track_index < RACE_AND_BATTLE_COURSE_COUNT
 
@@ -1106,7 +1112,7 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
         course_dirpath = os.path.join(tmp_dir, os.listdir(tmp_dir)[0])
         bol_filepath = os.path.join(
             course_dirpath,
-            tuple(p for p in os.listdir(course_dirpath) if p.endswith('.bol'))[0],
+            next(p for p in os.listdir(course_dirpath) if p.endswith('.bol')),
         )
 
         with open(bol_filepath, 'r+b') as f:
@@ -1118,7 +1124,7 @@ def patch_music_id_in_bol_file(course_filepath: str, track_index: int):
         rarc.pack(course_dirpath, course_filepath)
 
 
-def repack_course_arc_file(archive_filepath: str, new_dirname: str):
+def repack_course_arc_file(archive_filepath: str, new_dirname: str) -> None:
     """
     Extracts a RARC archive, renames its root directory and its files, and re-packs it.
     """
@@ -1127,9 +1133,12 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str):
 
         dirnames = os.listdir(tmp_dir)
         if len(dirnames) != 1:
-            raise MKDDExtenderError(
+            msg = (
                 f'Unable to rename entries in "{archive_filepath}". Unexpected '
-                'number of root entries in directory.',
+                'number of root entries in directory.'
+            )
+            raise MKDDExtenderError(
+                msg,
             )
 
         dirname = dirnames[0]
@@ -1180,7 +1189,7 @@ def convert_bti_to_image(filepath: str) -> Image.Image:
         return None
 
 
-def convert_bti_to_png(src_filepath: str, dst_filepath: str):
+def convert_bti_to_png(src_filepath: str, dst_filepath: str) -> None:
     assert src_filepath.endswith('.bti')
 
     os.makedirs(os.path.dirname(dst_filepath), exist_ok=True)
@@ -1194,10 +1203,11 @@ def convert_bti_to_png(src_filepath: str, dst_filepath: str):
         with open(src_filepath, 'rb') as f:
             bti.BTI(f).render().save(dst_filepath)
         if not os.path.isfile(dst_filepath):
-            raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
+            msg = f'Error occurred while converting image file ("{src_filepath}").'
+            raise RuntimeError(msg)
 
 
-def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
+def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str) -> None:
     assert src_filepath.endswith('.png')
 
     os.makedirs(os.path.dirname(dst_filepath), exist_ok=True)
@@ -1217,7 +1227,8 @@ def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
     )
 
     if 0 != run(command):
-        raise RuntimeError(f'Error occurred while converting image file ("{src_filepath}").')
+        msg = f'Error occurred while converting image file ("{src_filepath}").'
+        raise RuntimeError(msg)
 
     # Wrap S/T fields will be zeroed. It's been advised to do this:
     #
@@ -1228,7 +1239,7 @@ def convert_png_to_bti(src_filepath: str, dst_filepath: str, image_format: str):
     zero_bti_wrap_values(dst_filepath)
 
 
-def zero_bti_wrap_values(filepath: str):
+def zero_bti_wrap_values(filepath: str) -> None:
     with open(filepath, 'r+b') as f:
         f.seek(0x06)
         f.write(bytes((0x00, 0x00)))
@@ -1241,7 +1252,7 @@ def extract_bti_wrap_values(filepath: str) -> 'tuple[int, int]':
         return wrap_st[0], wrap_st[1]
 
 
-def copy_or_link_bti_image(src_filepath: str, dst_filepath: str):
+def copy_or_link_bti_image(src_filepath: str, dst_filepath: str) -> None:
     wrap_st = extract_bti_wrap_values(src_filepath)
     if wrap_st == (0x00, 0x00):
         make_link(src_filepath, dst_filepath)
@@ -1253,7 +1264,7 @@ def copy_or_link_bti_image(src_filepath: str, dst_filepath: str):
     zero_bti_wrap_values(dst_filepath)
 
 
-def conform_bti_image(filepath: str, width: int, height: int, image_format: str):
+def conform_bti_image(filepath: str, width: int, height: int, image_format: str) -> None:
     assert filepath.endswith('.bti')
 
     with open(filepath, 'rb') as f:
@@ -1261,7 +1272,8 @@ def conform_bti_image(filepath: str, width: int, height: int, image_format: str)
 
     KNOWN_IMAGE_FORMATS = {f.value: f.name for f in bti.ImageFormat}
     if src_image_format not in KNOWN_IMAGE_FORMATS:
-        raise MKDDExtenderError(f'Unrecognized image format: 0x{src_image_format:02X}')
+        msg = f'Unrecognized image format: 0x{src_image_format:02X}'
+        raise MKDDExtenderError(msg)
     src_image_format = KNOWN_IMAGE_FORMATS[src_image_format]
 
     if src_image_format == image_format and width == src_width and height == src_height:
@@ -1301,12 +1313,16 @@ def split_image(image: Image.Image) -> 'list[Image.Image]':
         else:
             left_image = image.crop((0, 0, w, height))
             right_images = split_image(image.crop((w + 1, 0, width, height)))
-            return [left_image] + right_images
+            return [left_image, *right_images]
 
     return [image]
 
 
-def add_controls_to_title_image(filepath: str, language: str, use_alternative_buttons: bool):
+def add_controls_to_title_image(
+    filepath: str,
+    language: str,
+    use_alternative_buttons: bool,
+) -> None:
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         title_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, title_filename[: -len('.bti')] + '.png')
@@ -1374,7 +1390,7 @@ def build_page_numbers_image(page_number: int, page_count: int) -> Image.Image:
     return image
 
 
-def add_page_number_to_cup_name_image(filepath: str, page_number: int, page_count: int):
+def add_page_number_to_cup_name_image(filepath: str, page_number: int, page_count: int) -> None:
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         cupname_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, cupname_filename[: -len('.bti')] + '.png')
@@ -1419,7 +1435,7 @@ def add_page_number_to_cup_name_image(filepath: str, page_number: int, page_coun
         convert_png_to_bti(tmp_filepath, filepath, 'IA4')
 
 
-def add_page_number_to_preview_image(filepath: str, page_number: int, page_count: int):
+def add_page_number_to_preview_image(filepath: str, page_number: int, page_count: int) -> None:
     with tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX) as tmp_dir:
         cupname_filename = os.path.basename(filepath)
         tmp_filepath = os.path.join(tmp_dir, cupname_filename[: -len('.bti')] + '.png')
@@ -1558,14 +1574,14 @@ combination such as "TA" less awkward, as otherwise the gap between the lower pa
 upper part in "A" is too great; it would almost look like as a word separation.
 """
 
-JAPANESE_CHARACTER_SET = set(('カ', 'ッ', 'プ', 'コ', 'ー', 'ス'))
+JAPANESE_CHARACTER_SET = {'カ', 'ッ', 'プ', 'コ', 'ー', 'ス'}
 JAPANESE_CHARACTER_SPACING_OVERRIDE = -22
 """
 A hardcoded value determined empirically so that Japanese characters combined with non-Japanese
 character do not overlap.
 """
 
-FOREGROUND_CHARACTERS = set(("'",))
+FOREGROUND_CHARACTERS = {"'"}
 """
 Set of characters that will be drawn on top of the rest. This idea is seen in the stock Bowser's
 Castle text image, where the apostrophe doesn't respect the depth of its position in the list of
@@ -1641,7 +1657,7 @@ def build_text_image_from_bitmap_font(
             required_width += image.width
         if character_spacing > 0 and word_images:
             required_width += character_spacing * (len(word_images) - 1)
-        for prev_character_image, character_image in zip(word_images, word_images[1:]):
+        for prev_character_image, character_image in itertools.pairwise(word_images):
             prev_c = prev_character_image.character
             c = character_image.character
             if (c in JAPANESE_CHARACTER_SET) != (prev_c in JAPANESE_CHARACTER_SET):
@@ -1685,9 +1701,9 @@ def generate_bti_image_from_bitmap_font(
     image_format: str,
     background: 'tuple[int, int, int, int]',
     filepath: str,
-    default_scale: float = None,
-    postprocessing_callback: callable = None,
-):
+    default_scale: float | None = None,
+    postprocessing_callback: callable | None = None,
+) -> None:
     assert filepath.endswith('.bti')
 
     words = text.split()
@@ -1802,7 +1818,7 @@ def generate_bti_image(
     image_format: str,
     background: 'tuple[int, int, int, int]',
     filepath: str,
-):
+) -> None:
     assert filepath.endswith('.bti')
 
     filtered_text = ''
@@ -1885,7 +1901,7 @@ def generate_bti_image(
         convert_png_to_bti(tmp_filepath, filepath, image_format)
 
 
-def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate: int):
+def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate: int) -> None:
     if not mix_to_mono and not downsample_sample_rate:
         return
 
@@ -1896,9 +1912,12 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
     sample_rate = ast_info['sample_rate']
 
     if channel_count not in (1, 2, 4):
-        raise MKDDExtenderError(
+        msg = (
             f'Unsupported channel count ({channel_count}) in "{filepath}". '
-            'Expected 1, 2, or 4 channels.',
+            'Expected 1, 2, or 4 channels.'
+        )
+        raise MKDDExtenderError(
+            msg,
         )
 
     needs_mixing = mix_to_mono and channel_count != 1
@@ -1974,7 +1993,7 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
         )
 
 
-def patch_bnr_file(iso_tmp_dir: str):
+def patch_bnr_file(iso_tmp_dir: str) -> None:
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     bnr_filepath = os.path.join(files_dirpath, 'opening.bnr')
 
@@ -2045,7 +2064,11 @@ def patch_bnr_file(iso_tmp_dir: str):
     log.info('Game title tweaked.')
 
 
-def patch_title_lines(use_alternative_buttons: bool, battle_stages_enabled: bool, iso_tmp_dir: str):
+def patch_title_lines(
+    use_alternative_buttons: bool,
+    battle_stages_enabled: bool,
+    iso_tmp_dir: str,
+) -> None:
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -2124,7 +2147,7 @@ def with_page_index_infix(page_index: int, path: str) -> str:
     return os.path.join(dirname, filename)
 
 
-def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str):
+def patch_cup_names(args: argparse.Namespace, page_count: int, iso_tmp_dir: str) -> None:
     files_dirpath = os.path.join(iso_tmp_dir, 'files')
     scenedata_dirpath = os.path.join(files_dirpath, 'SceneData')
 
@@ -2281,7 +2304,7 @@ def execute_script(filepath: str, exec_locals: dict) -> None:
         e = MKDDExtenderError(f'{message}: {e}')
         e.text = f'{message}.'
         e.detailed_text = detailed_text
-        raise e
+        raise
 
     exec_locals['__file__'] = os.path.normpath(filepath)
 
@@ -2293,7 +2316,7 @@ def execute_script(filepath: str, exec_locals: dict) -> None:
         e = MKDDExtenderError(f'{message}:\n\n{detailed_text}')
         e.text = f'{message}.'
         e.detailed_text = detailed_text
-        raise e
+        raise
 
 
 def meld_courses(
@@ -2389,7 +2412,8 @@ def meld_courses(
                     if prefix_to_nodename and len(prefix_to_nodename) % page_course_count == 0:
                         break
 
-                    raise MKDDExtenderError(f'No track assigned to slot {prefix}.')
+                    msg = f'No track assigned to slot {prefix}.'
+                    raise MKDDExtenderError(msg)
         else:
             # Since there is not common multiple, the course count can be used to determine whether
             # custom battle stages are present.
@@ -2421,9 +2445,12 @@ def meld_courses(
 
         initial_page_number = max(1, args.initial_page_number or 0)
         if initial_page_number > total_page_count:
-            raise MKDDExtenderError(
+            msg = (
                 f'Initial page number has been set to {initial_page_number}, but only '
-                f'{total_page_count} pages have been configured.',
+                f'{total_page_count} pages have been configured.'
+            )
+            raise MKDDExtenderError(
+                msg,
             )
 
         # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
@@ -2493,7 +2520,7 @@ def meld_courses(
 
         raise_if_canceled()
 
-        def meld_course(prefix: str, nodename: str):
+        def meld_course(prefix: str, nodename: str) -> None:
             nonlocal melded
 
             track_dirpath = os.path.join(tracks_tmp_dir, prefix)
@@ -2558,12 +2585,15 @@ def meld_courses(
             # Verify that a race track has not been assigned to a battle stage slot and viceversa.
             replaces_is_battle_stage = course_name_to_course(replaces).startswith('Mini')
             if is_battle_stage != replaces_is_battle_stage:
-                raise MKDDExtenderError(
+                msg = (
                     f'"{nodename}" (a custom '
                     f'{"battle stage" if replaces_is_battle_stage else "race track"} that replaces '
                     f'{replaces}) '
                     f'has been assigned to {COURSE_TO_NAME[COURSES[track_index]]} (a '
-                    f'{"battle stage" if is_battle_stage else "race track"} slot).',
+                    f'{"battle stage" if is_battle_stage else "race track"} slot).'
+                )
+                raise MKDDExtenderError(
+                    msg,
                 )
 
             # Verify that the required code patches for the track have been enabled.
@@ -2584,14 +2614,20 @@ def meld_courses(
                     log.warning(message)
                 else:
                     if supported:
-                        raise MKDDExtenderError(
+                        msg = (
                             f'{message} Enable the code patch, or re-run with '
                             '--skip-code-patches-check to circumvent this '
-                            'safety measure.',
+                            'safety measure.'
                         )
-                    raise MKDDExtenderError(
+                        raise MKDDExtenderError(
+                            msg,
+                        )
+                    msg = (
                         f'{message} Re-run with --skip-code-patches-check '
-                        'to circumvent this safety measure.',
+                        'to circumvent this safety measure.'
+                    )
+                    raise MKDDExtenderError(
+                        msg,
                     )
 
             raise_if_canceled()
@@ -2608,7 +2644,8 @@ def meld_courses(
             # Copy course files.
             track_filepath = os.path.join(track_dirpath, 'track.arc')
             if not os.path.isfile(track_filepath):
-                raise MKDDExtenderError(f'Unable to locate `track.arc` file in "{nodename}".')
+                msg = f'Unable to locate `track.arc` file in "{nodename}".'
+                raise MKDDExtenderError(msg)
             track_mp_filepath = os.path.join(track_dirpath, 'track_mp.arc')
             if not os.path.isfile(track_mp_filepath):
                 track_mp_filepath = track_filepath
@@ -2708,7 +2745,7 @@ def meld_courses(
                 use_replacee_audio_track = replaces and args.use_replacee_audio_track
                 use_alternative_audio_track = use_auxiliary_audio_track or use_replacee_audio_track
 
-            def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args):
+            def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args) -> None:
                 # Before copying a AST file to destination, check whether its checksum already
                 # exists, and, if so, insert an entry in the override table instead of copying the
                 # file over.
@@ -2806,7 +2843,7 @@ def meld_courses(
                 height: int,
                 image_format: str,
                 background: 'tuple[int, int, int, int]',
-                margin: float = None,
+                margin: float | None = None,
             ) -> str:
                 # pylint: disable=cell-var-from-loop
 
@@ -2865,8 +2902,9 @@ def meld_courses(
             expected_languages = os.listdir(page_coursename_dirpath)
             expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
             if not expected_languages:
+                msg = f'Unable to locate language directories in "{nodename}" for course logo.'
                 raise MKDDExtenderError(
-                    f'Unable to locate language directories in "{nodename}" for course logo.',
+                    msg,
                 )
             for language in expected_languages:
                 logo_filepath = find_and_conform_or_generate_image_path(
@@ -2892,8 +2930,9 @@ def meld_courses(
             expected_languages = os.listdir(scenedata_dirpath)
             expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
             if not expected_languages:
+                msg = f'Unable to locate `SceneData/language` directories in "{nodename}".'
                 raise MKDDExtenderError(
-                    f'Unable to locate `SceneData/language` directories in "{nodename}".',
+                    msg,
                 )
 
             preview_image_partial_name = COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]
@@ -3015,8 +3054,9 @@ def meld_courses(
                     int(minimap_json['Orientation']),
                 )
             except Exception as e:
+                msg = f'Unable to parse minimap data in "{nodename}": {e!s}.'
                 raise MKDDExtenderError(
-                    f'Unable to parse minimap data in "{nodename}": {e!s}.',
+                    msg,
                 ) from e
 
             # Gather cheat codes for each region.
@@ -3051,8 +3091,9 @@ def meld_courses(
                 raise
             except (AssertionError, Exception) as e:
                 error_message = f': {e!s}' if str(e) else ''
+                msg = f'Unexpected error while processing "{nodename}"{error_message}'
                 raise type(e)(
-                    f'Unexpected error while processing "{nodename}"{error_message}',
+                    msg,
                 ) from e
 
         raise_if_canceled()
@@ -3220,7 +3261,7 @@ def gather_audio_file_indices(
 
     stock_audio_track_indices = []
     for speed_type in SPEED_TYPES:
-        for _course, subnames in COURSE_STREAM_ORDER.items():
+        for subnames in COURSE_STREAM_ORDER.values():
             filenames = tuple(f'{speed_type}_{subname}' for subname in subnames)
             for filename in filenames:
                 appended = False
@@ -3232,8 +3273,11 @@ def gather_audio_file_indices(
                 if appended:
                     break
             else:
+                msg = (
+                    f'Unable to locate a valid audio track candidate in the file list: {filenames}.'
+                )
                 raise MKDDExtenderError(
-                    f'Unable to locate a valid audio track candidate in the file list: {filenames}.',
+                    msg,
                 )
     stock_audio_track_indices = tuple(stock_audio_track_indices)
 
@@ -3283,12 +3327,12 @@ def gather_audio_file_indices(
                 pass  # Fallback audio file index will be used.
 
     # Move stock indices to the front.
-    audio_track_data = [audio_track_data[-1]] + list(audio_track_data[:-1])
+    audio_track_data = [audio_track_data[-1], *list(audio_track_data[:-1])]
 
     return tuple(tuple(indices) for indices in audio_track_data)
 
 
-def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
+def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str) -> None:
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
 
@@ -3305,9 +3349,12 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str):
         if args.skip_dol_checksum_check:
             log.warning(message)
         else:
-            raise MKDDExtenderError(
+            msg = (
                 f'{message} Re-run with --skip-dol-checksum-check to '
-                'circumvent this safety measure.',
+                'circumvent this safety measure.'
+            )
+            raise MKDDExtenderError(
+                msg,
             )
 
 
@@ -3534,7 +3581,11 @@ def bake_cheat_codes(
     return conflicts_message
 
 
-def patch_cheat_codes(args: argparse.Namespace, cheat_codes_text_by_mod: dict, dol_path: str):
+def patch_cheat_codes(
+    args: argparse.Namespace,
+    cheat_codes_text_by_mod: dict,
+    dol_path: str,
+) -> None:
     if not cheat_codes_text_by_mod:
         return
 
@@ -3654,7 +3705,7 @@ def patch_dol_file(
     battle_stages_enabled: bool,
     iso_tmp_dir: str,
     game_id: str,
-):
+) -> None:
     sys_dirpath = os.path.join(iso_tmp_dir, 'sys')
     dol_path = os.path.join(sys_dirpath, 'main.dol')
     bi2_path = os.path.join(sys_dirpath, 'bi2.bin')
@@ -3922,9 +3973,12 @@ def patch_dol_file(
 
         functions_offset = data.find(FUNCTIONS_INSTRUCTIONS)
         if functions_offset < 0:
-            raise MKDDExtenderError(
+            msg = (
                 'Unable to locate minimap transforms functions in DOL file. Re-run with '
-                '--skip-minimap-transforms-removal to proceed.',
+                '--skip-minimap-transforms-removal to proceed.'
+            )
+            raise MKDDExtenderError(
+                msg,
             )
 
         with open(dol_path, 'r+b') as f:
@@ -3938,7 +3992,7 @@ def write_description_file(
     added_author_names: 'list[str]',
     battle_stages_enabled: bool,
     iso_tmp_dir: str,
-):
+) -> None:
     lines = []
 
     lines.append('# MKDD Extender - Description File')
@@ -3953,7 +4007,7 @@ def write_description_file(
     lines.append('## Options')
     lines.append('')
     option_lines = []
-    for _group_name, group_options in OPTIONAL_ARGUMENTS.items():
+    for group_options in OPTIONAL_ARGUMENTS.values():
         for option_label, option_type, _option_help in group_options:
             if option_label == '---':
                 continue
@@ -4538,16 +4592,19 @@ def create_args_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: None):
+def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: None) -> None:
     start_time = time.monotonic()
 
     if not args.input:
-        raise MKDDExtenderError('Path to the input ISO file cannot be empty.')
+        msg = 'Path to the input ISO file cannot be empty.'
+        raise MKDDExtenderError(msg)
     if not args.output:
-        raise MKDDExtenderError('Path to the output ISO file cannot be empty.')
+        msg = 'Path to the output ISO file cannot be empty.'
+        raise MKDDExtenderError(msg)
 
     if args.input == args.output:
-        raise MKDDExtenderError('Paths to the input and output ISO files must be different.')
+        msg = 'Paths to the input and output ISO files must be different.'
+        raise MKDDExtenderError(msg)
 
     if isinstance(args.tracks, str):
         paths = tuple(os.path.join(args.tracks, p) for p in sorted(os.listdir(args.tracks)))
@@ -4556,14 +4613,18 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         if (len(args.tracks) % RACE_TRACK_COUNT != 0) and (
             len(args.tracks) % RACE_AND_BATTLE_COURSE_COUNT != 0
         ):
-            raise MKDDExtenderError(
+            msg = (
                 f'Number of items in the `tracks` argument not a multiple of {RACE_TRACK_COUNT} or '
-                f'{RACE_AND_BATTLE_COURSE_COUNT}: {args.tracks}',
+                f'{RACE_AND_BATTLE_COURSE_COUNT}: {args.tracks}'
+            )
+            raise MKDDExtenderError(
+                msg,
             )
         paths = args.tracks
         tracks_is_dir = False
     else:
-        raise MKDDExtenderError('Unexpected value in `tracks` argument.')
+        msg = 'Unexpected value in `tracks` argument.'
+        raise MKDDExtenderError(msg)
 
     # Reset the options that are not relevant when there are no custom courses in the list.
     if not paths:
@@ -4584,9 +4645,11 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         try:
             gcm_file.read_entire_disc()
         except Exception as e:
-            raise MKDDExtenderError(f'Unable to read input ISO image: {e!s}') from e
+            msg = f'Unable to read input ISO image: {e!s}'
+            raise MKDDExtenderError(msg) from e
         if os.path.join('files', 'Cours0') in gcm_file.dirs_by_path:
-            raise MKDDExtenderError('The input ISO image appears to have been extended already.')
+            msg = 'The input ISO image appears to have been extended already.'
+            raise MKDDExtenderError(msg)
         files_extracted = 0
         for _filepath, files_done in gcm_file.export_disc_to_folder_with_changed_files(iso_tmp_dir):
             if files_done > 0:
@@ -4801,9 +4864,12 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 if args.skip_filesize_check:
                     log.warning(message)
                     continue
-                raise MKDDExtenderError(
+                msg = (
                     f'{message}. Re-run with --skip-filesize-check to '
-                    'circumvent this safety measure.',
+                    'circumvent this safety measure.'
+                )
+                raise MKDDExtenderError(
+                    msg,
                 )
 
         raise_if_canceled()
@@ -4907,10 +4973,13 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                     files_written = files_done
                 raise_if_canceled()
         except gcm.MaxFileSizeError as e:
-            raise MKDDExtenderError(
+            msg = (
                 f'ISO file is larger than the absolute maximum file size ({EXTREME_MAX_ISO_SIZE} '
                 'bytes). Possible solutions: remove some audio tracks, downsample audio tracks, or '
-                'remove some custom courses.',
+                'remove some custom courses.'
+            )
+            raise MKDDExtenderError(
+                msg,
             ) from e
         iso_size = os.path.getsize(args.output)
         human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
@@ -4919,10 +4988,13 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         raise_if_canceled()
 
         if iso_size > EXTREME_MAX_ISO_SIZE:
-            raise MKDDExtenderError(
+            msg = (
                 f'ISO file ({iso_size} bytes) is larger than the absolute maximum file size '
                 f'({EXTREME_MAX_ISO_SIZE} bytes). Possible solutions: remove some audio tracks, '
-                'downsample audio tracks, or remove some custom courses.',
+                'downsample audio tracks, or remove some custom courses.'
+            )
+            raise MKDDExtenderError(
+                msg,
             )
 
         if iso_size > MAX_ISO_SIZE:
@@ -4936,7 +5008,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
         log.info(f'Process completed in {elapsed_time:.2f} seconds.')
 
 
-def main():
+def main() -> None:
     clean_stale_temp_dirs()
 
     # When no arguments are provided, the application will be launched in GUI mode. On Windows, if
