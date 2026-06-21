@@ -1,4 +1,3 @@
-# -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller specification file for generating the bundles for the MKDD Extender.
 """
@@ -18,7 +17,7 @@ if windows:
     icon_cli_path = 'data/gui/logocli256x256.png'
 
 # To avoid importing the module, simply parse the file to find the version variable in it.
-with open('mkdd_extender.py', 'r', encoding='utf-8') as f:
+with open('mkdd_extender.py', encoding='utf-8') as f:
     data = f.read()
 for line in data.splitlines():
     if '__version__' in line:
@@ -36,7 +35,7 @@ arch = ARCH_USER_FRIENDLY_ALIASES.get(machine) or machine.lower()
 collection_name = f'mkdd-extender-{version}-{system}-{arch}'
 
 # Insert build date.
-with open('gui.py', 'r', encoding='utf-8') as f:
+with open('gui.py', encoding='utf-8') as f:
     data = f.read()
 build_date = datetime.datetime.now().strftime('%Y-%m-%d')
 data = data.replace("build_date = ''", f"build_date = '{build_date}'")
@@ -68,10 +67,12 @@ for wimgt_filename in wimgt_filenames:
     datas.append((f'tools/wimgt/{wimgt_filename}', 'tools/wimgt/'))
 datas.append(('tools/wimgt/gpl-2.0.txt', 'tools/wimgt/'))
 datas.append(('tools/wimgt/README.txt', 'tools/wimgt/'))
-datas.append((
-    f'tools/devkitPPC/{platform.system().lower()}',
-    f'tools/devkitPPC/{platform.system().lower()}',
-))
+datas.append(
+    (
+        f'tools/devkitPPC/{platform.system().lower()}',
+        f'tools/devkitPPC/{platform.system().lower()}',
+    ),
+)
 datas.append(('tools/devkitPPC/buildscripts-devkitPPC_r41.tar.gz', 'tools/devkitPPC/'))
 datas.append(('tools/devkitPPC/README.txt', 'tools/devkitPPC/'))
 datas.append(('tools/lan_choose_character_kart/asm', 'tools/lan_choose_character_kart/asm'))

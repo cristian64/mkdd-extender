@@ -22,7 +22,7 @@ def _test_stock_data_set(use_naive_to_wav: bool, use_naive_to_ast: bool):
     if not os.getenv('AST_TEST_DATA_SET_DIR'):
         pytest.fail(
             'AST_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
-            'containing stock AST files must be provided.'
+            'containing stock AST files must be provided.',
         )
 
     data_set_dir = os.environ['AST_TEST_DATA_SET_DIR']

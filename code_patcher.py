@@ -20,9 +20,7 @@ import textwrap
 from string import printable
 
 import baa
-from tools.gc_c_kit import devkit_tools
-from tools.gc_c_kit import dolreader
-from tools.gc_c_kit import doltools
+from tools.gc_c_kit import devkit_tools, dolreader, doltools
 from tools.lan_choose_character_kart import lan_choose_character_kart
 
 script_path = os.path.realpath(__file__)
@@ -47,7 +45,11 @@ if (
     devkit_tools.OBJCOPYPATH = os.path.join(devkitppc_dir, f'powerpc-eabi-objcopy{exe_extension}')
 
     powerpc_eabi_dir = os.path.join(
-        tools_dir, 'devkitPPC', platform.system().lower(), 'powerpc-eabi', 'bin'
+        tools_dir,
+        'devkitPPC',
+        platform.system().lower(),
+        'powerpc-eabi',
+        'bin',
     )
     devkit_tools.ASPATH = os.path.join(powerpc_eabi_dir, f'as{exe_extension}')
 
@@ -406,7 +408,8 @@ The stock minimap values for each course.
 
 
 def read_minimap_values(
-    game_id: str, dol_path: str
+    game_id: str,
+    dol_path: str,
 ) -> 'dict[str, tuple[float, float, float, float, int]]':
     """
     Helper function that reads the minimap values from the DOL file.
@@ -436,13 +439,13 @@ def read_minimap_values(
                     continue
                 raise RuntimeError(
                     'Unable to extract minimap values values from DOL file. '
-                    f'Corner value ({v4}) is unexpectedly large.'
+                    f'Corner value ({v4}) is unexpectedly large.',
                 )
 
             if v4 not in (0, 1, 2, 3):
                 raise RuntimeError(
                     'Unable to extract minimap orientation values from DOL file. '
-                    f'Orientation enum value ({v4}) not in [0, 3].'
+                    f'Orientation enum value ({v4}) not in [0, 3].',
                 )
 
             minimap_values[course] = (v0, v1, v2, v3, v4)
@@ -602,7 +605,12 @@ def find_addresses():
     If the set of strings change, `STRING_ADDRESSES` will need to be regenerated again.
     """
     raw_filepath = os.path.join(
-        os.path.expanduser('~'), '.local', 'share', 'dolphin-emu', 'Dump', 'mem1.raw'
+        os.path.expanduser('~'),
+        '.local',
+        'share',
+        'dolphin-emu',
+        'Dump',
+        'mem1.raw',
     )
     with open(raw_filepath, 'rb') as f:
         data = f.read()
@@ -1816,7 +1824,7 @@ def patch_dol_file(
     if bouncy_terrain_type and game_id == 'GM4E01dbg':
         raise mkdd_extender.MKDDExtenderError(
             'The **Bouncy Terrain Type** code patch is not currently compatible with the NTSC-U '
-            'Debug build.'
+            'Debug build.',
         )
 
     if args.lan_choose_character_and_kart:
@@ -1898,7 +1906,7 @@ def patch_dol_file(
         minimap_data_code_lines.append(f'(char*)0x{addresses[4] + 3:08X}')
     minimap_data_code_lines.append('};')
     minimap_data_code_lines.append(
-        f'const float coordinates[PAGE_COUNT][{page_course_count} * 4] = {{'
+        f'const float coordinates[PAGE_COUNT][{page_course_count} * 4] = {{',
     )
     for page_index in range(page_count):
         minimap_data_code_lines.append('{' if page_index == 0 else ', {')
@@ -1945,7 +1953,7 @@ def patch_dol_file(
     audio_data_code_lines.insert(0, f'const {audio_data_type} audio_indexes[PAGE_COUNT][32] = {{')
     audio_data_code_lines.append(
         f'const unsigned {audio_data_type}* const page_audio_indexes = '
-        f'(const unsigned {audio_data_type}*)audio_indexes[(int)page];'
+        f'(const unsigned {audio_data_type}*)audio_indexes[(int)page];',
     )
     audio_data_code = '\n'.join(audio_data_code_lines)
 
@@ -2084,7 +2092,7 @@ def patch_dol_file(
             ('// __COURSE_AUTHOR_NAMES_DATA_PLACEHOLDER__', course_author_names_data_code),
             ('__APPMGR_MSGAMEAPP_ADDRESS__', f'0x{APPMGR_MSGAMEAPP_ADDRESSES[game_id]:08X}'),
         )
-        with open(os.path.join(code_dir, 'lib.c'), 'r', encoding='ascii') as f:
+        with open(os.path.join(code_dir, 'lib.c'), encoding='ascii') as f:
             code = f.read()
         for name, value in replacements:
             code = code.replace(name, value)
@@ -2183,7 +2191,8 @@ def patch_dol_file(
                     )
                     if not args.skip_course_and_author_names_overlay:
                         project.branchlink(
-                            RACEMGR_DRAWRACE_CALL_ADDRESSES[game_id], 'racemgr_drawrace_ex'
+                            RACEMGR_DRAWRACE_CALL_ADDRESSES[game_id],
+                            'racemgr_drawrace_ex',
                         )
                         project.branchlink(
                             KARTGAME_DOCHAPTERONE_CALL_ADDRESSES[game_id],
@@ -2196,16 +2205,19 @@ def patch_dol_file(
                         )
                     if battle_stages_enabled or tilting_courses:
                         project.branchlink(
-                            IS_TILTING_COURSE_CALL_ADDRESSES[game_id], 'is_tilting_course'
+                            IS_TILTING_COURSE_CALL_ADDRESSES[game_id],
+                            'is_tilting_course',
                         )
                         project.dol.seek(IS_TILTING_COURSE_CALL_ADDRESSES[game_id] + 4)
                         project.dol.write(struct.pack('>I', 0x2C030001))  # cmpwi r3, 0x1
                     project.branchlink(
-                        LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id], 'lanselectmode_calcanm_ex'
+                        LANSELECTMODE_CALCANM_CALL_ADDRESSES[game_id],
+                        'lanselectmode_calcanm_ex',
                     )
                     if args.reset_course_page_on_lan_initialization:
                         project.branchlink(
-                            LANPLAYINFO_INIT_CALL_ADDRESSES[game_id], 'lanplayinfo_init_ex'
+                            LANPLAYINFO_INIT_CALL_ADDRESSES[game_id],
+                            'lanplayinfo_init_ex',
                         )
                     if pass_number == 1:
                         if args.reset_course_page_on_title_screen:
@@ -2229,10 +2241,12 @@ def patch_dol_file(
                     project.dol.seek(GP_TOTAL_COURSE_COUNT_INSTRUCTION_ADDRESSES[game_id])
                     doltools.write_li(project.dol, 24, page_count * 16)
                     project.branchlink(
-                        ON_GP_ABOUT_TO_START_INSERTION_ADDRESSES[game_id], 'on_gp_about_to_start'
+                        ON_GP_ABOUT_TO_START_INSERTION_ADDRESSES[game_id],
+                        'on_gp_about_to_start',
                     )
                     project.branchlink(
-                        GET_GP_COURSE_INDEX_INSERTION_ADDRESSES[game_id], 'get_gp_course_index'
+                        GET_GP_COURSE_INDEX_INSERTION_ADDRESSES[game_id],
+                        'get_gp_course_index',
                     )
                     project.branchlink(
                         SEQUENCEINFO_SETCLRGPCOURSE_CALL_ADDRESSES[game_id],
@@ -2242,11 +2256,17 @@ def patch_dol_file(
                     if pass_number == 1:
                         project.dol.seek(CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES[game_id])
                         doltools.write_lis(
-                            project.dol, 3, extender_cup_cup_filenames_address >> 16, signed=False
+                            project.dol,
+                            3,
+                            extender_cup_cup_filenames_address >> 16,
+                            signed=False,
                         )
                         project.dol.seek(CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES[game_id] + 8)
                         doltools.write_ori(
-                            project.dol, 3, 28, extender_cup_cup_filenames_address & 0x0000FFFF
+                            project.dol,
+                            3,
+                            28,
+                            extender_cup_cup_filenames_address & 0x0000FFFF,
                         )
 
                         for address in PREVIEW_FILENAMES_ARRAY_INSTRUCTIONS_ADDRESSES[game_id]:
@@ -2277,7 +2297,8 @@ def patch_dol_file(
 
                 if args.idle_autopilot:
                     project.branchlink(
-                        INIT_IDLE_COUNT_INJECTION_ADDRESSES[game_id], 'init_idle_count'
+                        INIT_IDLE_COUNT_INJECTION_ADDRESSES[game_id],
+                        'init_idle_count',
                     )
                     project.branchlink(
                         KARTCHECK_CHECKALLCLEARKEY_CALL_ADDRESSES[game_id],
@@ -2300,7 +2321,7 @@ def patch_dol_file(
                     )
                     for i in range(2, 17):
                         project.dol.seek(
-                            CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] + 0x04 * i
+                            CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] + 0x04 * i,
                         )
                         doltools.write_nop(project.dol)
                     project.dol.seek(CFS_GEOGRAPHYOBJ_GETGEORND_CALL_ADDRESSES[game_id] + 0x04 * 17)
@@ -2317,32 +2338,39 @@ def patch_dol_file(
 
                 if sectioned_courses:
                     project.branchlink(
-                        RESET_SECTION_COUNT_CALL_ADDRESSES[game_id], 'reset_section_count'
+                        RESET_SECTION_COUNT_CALL_ADDRESSES[game_id],
+                        'reset_section_count',
                     )
                     project.branchlink(
-                        COUNT_SECTION_POINT_CALL_ADDRESSES[game_id], 'count_section_point'
+                        COUNT_SECTION_POINT_CALL_ADDRESSES[game_id],
+                        'count_section_point',
                     )
                     project.branchlink(
-                        OVERRIDE_TOTAL_LAP_COUNT_CALL_ADDRESSES[game_id], 'override_total_lap_count'
+                        OVERRIDE_TOTAL_LAP_COUNT_CALL_ADDRESSES[game_id],
+                        'override_total_lap_count',
                     )
                     project.branchlink(CHECK_LAP_EX_CALL_ADDRESSES[game_id], 'check_lap_ex')
 
                 if bouncy_terrain_type:
                     project.branchlink(
-                        DO_SPD_CTRL_CALL_HIJACK_ADDRESSES[game_id], 'do_spd_ctrl_call_hijack'
+                        DO_SPD_CTRL_CALL_HIJACK_ADDRESSES[game_id],
+                        'do_spd_ctrl_call_hijack',
                     )
                     project.branchlink(
-                        GET_SPLASH_HEIGHT_INLINE_ADDRESSES[game_id], 'get_splash_code_inline'
+                        GET_SPLASH_HEIGHT_INLINE_ADDRESSES[game_id],
+                        'get_splash_code_inline',
                     )
                     project.branchlink(
-                        GET_SPLASH_ID_INLINE_ADDRESSES[game_id], 'get_splash_code_inline'
+                        GET_SPLASH_ID_INLINE_ADDRESSES[game_id],
+                        'get_splash_code_inline',
                     )
                     project.branchlink(
                         IS_ITEM_INVAL_GROUND_HIJACK_ADDRESSES[game_id],
                         'is_item_inval_ground_hijack',
                     )
                     project.branchlink(
-                        GET_ADD_THICKNESS_INLINE_ADDRESSES[game_id], 'get_add_thickness_inline'
+                        GET_ADD_THICKNESS_INLINE_ADDRESSES[game_id],
+                        'get_add_thickness_inline',
                     )
                     project.branchlink(
                         GET_STAGGER_CODE_HIJACK_AIR_CHECK_ADDRESSES[game_id],
@@ -2358,15 +2386,17 @@ def patch_dol_file(
                 # Further symbol post-processing once the map is available.
                 if pass_number == 0:
                     if extender_cup or args.reset_course_page_on_title_screen:
-                        with open('project.map', 'r', encoding='ascii') as f:
+                        with open('project.map', encoding='ascii') as f:
                             for line in f:
                                 if 'g_extender_cup_cup_filenames' in line:
                                     extender_cup_cup_filenames_address = int(
-                                        line.split()[0], base=16
+                                        line.split()[0],
+                                        base=16,
                                     )
                                 elif 'g_extender_cup_preview_filenames' in line:
                                     extender_cup_preview_filename_address = int(
-                                        line.split()[0], base=16
+                                        line.split()[0],
+                                        base=16,
                                     )
                                 elif 'scenetitle_init_ex' in line:
                                     scenetitle_init_ex_address = int(line.split()[0], base=16)
@@ -2385,19 +2415,19 @@ def patch_dol_file(
                     except Exception:
                         pass
 
-                    with open('lib.c', 'r', encoding='ascii') as f:
+                    with open('lib.c', encoding='ascii') as f:
                         print('#' * 80)
                         print(f'{" C Code ":#^80}')
                         print('#' * 80)
                         print(f.read())
 
-                    with open('lib.c.s', 'r', encoding='ascii') as f:
+                    with open('lib.c.s', encoding='ascii') as f:
                         print('#' * 80)
                         print(f'{" Assembly Code ":#^80}')
                         print('#' * 80)
                         print(f.read())
 
-                    with open('project.map', 'r', encoding='ascii') as f:
+                    with open('project.map', encoding='ascii') as f:
                         print('#' * 80)
                         print(f'{" Symbols Map ":#^80}')
                         print('#' * 80)
@@ -2446,7 +2476,7 @@ def patch_dol_file(
         log.info(
             f'Injected {injected_code_size} bytes of new code. '
             f'OS Arena: 0x{aligned(unaligned_previous_osarena_value):08X} (previous) -> '
-            f'0x{aligned(unaligned_new_osarena_value):08X} (new).'
+            f'0x{aligned(unaligned_new_osarena_value):08X} (new).',
         )
     else:
         log.info('No new code has been injected.')

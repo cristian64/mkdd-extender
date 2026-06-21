@@ -19,7 +19,7 @@ def test_stock_data_set():
     if not os.getenv('BAA_TEST_DATA_SET_DIR'):
         pytest.fail(
             'BAA_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
-            'containing stock BAA files (e.g. `GCKart.baa`) must be provided.'
+            'containing stock BAA files (e.g. `GCKart.baa`) must be provided.',
         )
 
     data_set_dir = os.environ['BAA_TEST_DATA_SET_DIR']

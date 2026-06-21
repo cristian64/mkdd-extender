@@ -205,7 +205,8 @@ def _interleave_channels_numpy(data: memoryview, channel_count: int, bit_depth: 
     arrays = []
     for i in range(channel_count):
         array = numpy.frombuffer(
-            data[i * bytes_per_channel : (i + 1) * bytes_per_channel], dtype=dtype
+            data[i * bytes_per_channel : (i + 1) * bytes_per_channel],
+            dtype=dtype,
         )
         arrays.append(array)
 
@@ -217,7 +218,9 @@ def _interleave_channels_numpy(data: memoryview, channel_count: int, bit_depth: 
 
 
 def _deinterleave_channels_naive(
-    data: memoryview, channel_count: int, bit_depth: int
+    data: memoryview,
+    channel_count: int,
+    bit_depth: int,
 ) -> 'tuple[memoryview]':
     result_data = tuple(bytearray() for _ in range(channel_count))
 
@@ -232,7 +235,9 @@ def _deinterleave_channels_naive(
 
 
 def _deinterleave_channels_numpy(
-    data: memoryview, channel_count: int, bit_depth: int
+    data: memoryview,
+    channel_count: int,
+    bit_depth: int,
 ) -> 'tuple[memoryview]':
     if bit_depth == 8:
         dtype = numpy.uint8
@@ -328,7 +333,8 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
                 padding1,
                 padding2,
             ) = struct.unpack(
-                '>LLQQQ', block_data[block_offset : block_offset + _BLOCK_HEADER_SIZE]
+                '>LLQQQ',
+                block_data[block_offset : block_offset + _BLOCK_HEADER_SIZE],
             )
 
             assert block_magic_bytes == _BLOCK_MAGIC
@@ -360,7 +366,7 @@ def convert_to_wav(src_filepath: str, dst_filepath: str):
                 log.warning(
                     f'Inconsistent last block size. Expected {expected_payload_size} '
                     f'bytes, but read {payload_size} bytes '
-                    f'({payload_delta_sign}{payload_delta}).'
+                    f'({payload_delta_sign}{payload_delta}).',
                 )
 
             bytes_written += payload_size
@@ -446,7 +452,7 @@ def convert_to_ast(
         if last_block:
             break
 
-    block_data = bytes().join(block_chunks)
+    block_data = b''.join(block_chunks)
     block_data_size = len(block_data)
 
     if os.path.splitdrive(os.path.dirname(dst_filepath))[1]:
@@ -488,7 +494,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Path to the AST/WAV file to converted.')
     parser.add_argument(
-        'output', type=str, help='Path to the WAV/AST file that is going to be written.'
+        'output',
+        type=str,
+        help='Path to the WAV/AST file that is going to be written.',
     )
 
     def int_hex(x):
@@ -565,7 +573,7 @@ def main():
     else:
         raise ValueError(
             f'Input path ("{args.input}") does not have a recognizable file extension. '
-            'Expect either `.ast` or `.wav`.'
+            'Expect either `.ast` or `.wav`.',
         )
 
 

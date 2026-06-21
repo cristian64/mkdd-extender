@@ -90,7 +90,7 @@ def test_stock_data_set():
     if not os.getenv('RARC_TEST_DATA_SET_DIR'):
         pytest.fail(
             'RARC_TEST_DATA_SET_DIR environment variable not set. A path to a directory '
-            'containing stock ARC files must be provided.'
+            'containing stock ARC files must be provided.',
         )
 
     data_set_dir = os.environ['RARC_TEST_DATA_SET_DIR']

@@ -8,7 +8,6 @@ BAA format specification was extracted from Jampacked by Xayr (https://github.co
 import json
 import os
 import struct
-
 from enum import IntEnum
 
 
@@ -25,7 +24,7 @@ def _prepare_destination_directory(dirpath: str):
         os.makedirs(dirpath)
     elif not os.path.isdir(dirpath):
         raise RuntimeError(
-            f'Destination directory "{dirpath}" is not a valid directory and cannot be created'
+            f'Destination directory "{dirpath}" is not a valid directory and cannot be created',
         )
     else:
         with os.scandir(dirpath) as it:
@@ -189,7 +188,7 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
         if not src_filepath.endswith(_INFO_FILE_EXTENSION):
             raise ValueError(
                 f'Input filepath "{src_filepath}" should use the '
-                f'"{_INFO_FILE_EXTENSION}" extension.'
+                f'"{_INFO_FILE_EXTENSION}" extension.',
             )
         src_dirpath = os.path.dirname(src_filepath)
     else:
@@ -201,14 +200,14 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
             raise ValueError(f'No BAA info file was found in "{src_dirpath}".')
         if len(src_filenames) > 1:
             raise ValueError(
-                f'Only one BAA info file was expected in "{src_dirpath}"; found: {src_filenames}'
+                f'Only one BAA info file was expected in "{src_dirpath}"; found: {src_filenames}',
             )
         src_filepath = os.path.join(src_dirpath, src_filenames[0])
 
     if not dst_filepath.endswith('.baa'):
         raise ValueError(f'Destination filepath "{dst_filepath}" should use the ".baa" extension.')
 
-    with open(src_filepath, 'r', encoding='utf-8') as input_file:
+    with open(src_filepath, encoding='utf-8') as input_file:
         sections = json.load(input_file)
 
     with open(dst_filepath, 'wb') as output_file:
@@ -241,13 +240,15 @@ def pack_baa(src_dirpath: str, dst_filepath: str):
             with open(filepath, 'rb') as input_file:
                 data = input_file.read()
 
-            file_data_blobs.append((
-                section['start'],
-                data,
-                start_offset_offset,
-                end_offset_offset,
-                section_type,
-            ))
+            file_data_blobs.append(
+                (
+                    section['start'],
+                    data,
+                    start_offset_offset,
+                    end_offset_offset,
+                    section_type,
+                ),
+            )
 
         _write_uint32(output_file, _BAA_FOOTER)
 

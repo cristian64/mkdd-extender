@@ -16,10 +16,10 @@ directory, a packing operation will be assumed.
 """
 
 import argparse
+import logging
 import os
 import platform
 import struct
-import logging
 
 log = logging.getLogger(__name__)
 
@@ -178,12 +178,12 @@ def extract(src_filepath: str, dst_dirpath: str):
         # wild report file count as 0, which doesn't really make much sense.
         log.warning(
             f'File count in header ({file_count}) and entry count in header '
-            f'({entry_count}) do not match.'
+            f'({entry_count}) do not match.',
         )
     if file_format_version != __FILE_FORMAT_VERSION:
         log.warning(
             f'Expected format version {__FILE_FORMAT_VERSION}, but encountered '
-            f'{file_format_version}.'
+            f'{file_format_version}.',
         )
     assert padding == 0x00000000
 
@@ -203,7 +203,7 @@ def extract(src_filepath: str, dst_dirpath: str):
         # raising an assertion error, a warning will be reported.
         log.warning(
             f"String table's size ({string_table_size} bytes) is not a multiple of "
-            f'{__ALIGNMENT}; it should have been padded.'
+            f'{__ALIGNMENT}; it should have been padded.',
         )
 
     entry_data_section = data[
@@ -222,7 +222,7 @@ def extract(src_filepath: str, dst_dirpath: str):
         if remainder:
             log.warning(
                 f'Null character in string at offset {string_offset} not found. Assuming '
-                'end of string table as the end of the string.'
+                'end of string table as the end of the string.',
             )
             return remainder
         raise RuntimeError(f'String at offset {string_offset} not found.')
@@ -252,7 +252,7 @@ def extract(src_filepath: str, dst_dirpath: str):
         if calculated_hash != string_hash:
             log.warning(
                 f'Hash for "{name.decode("ascii")}" is 0x{calculated_hash:02X}, but hash '
-                f'in header is 0x{string_hash:02X}.'
+                f'in header is 0x{string_hash:02X}.',
             )
 
         name = __cleanup_name(name)
@@ -261,7 +261,7 @@ def extract(src_filepath: str, dst_dirpath: str):
             if identifier != b'ROOT':
                 str_identifier = bytes(identifier).decode('ascii')
                 log.warning(
-                    f'Identifier in root directory should be "ROOT", but is "{str_identifier}".'
+                    f'Identifier in root directory should be "ROOT", but is "{str_identifier}".',
                 )
         else:
             calculated_identifier = name.upper()[0:4].ljust(4)
@@ -271,7 +271,7 @@ def extract(src_filepath: str, dst_dirpath: str):
                 str_name = name.decode('ascii')
                 log.warning(
                     f'Identifier in header ("{str_identifier}") does not match first four '
-                    f'bytes ("{str_calculated_identifier}") of the name ("{str_name}").'
+                    f'bytes ("{str_calculated_identifier}") of the name ("{str_name}").',
                 )
 
         nodes.append((name, child_count, first_child_index))
@@ -301,7 +301,7 @@ def extract(src_filepath: str, dst_dirpath: str):
                     # this entry in the `entries` directory at index i is correct.
                     log.warning(
                         f'Entry index in header is {entry_index}, but {i} was expected. '
-                        f'Entry index in header will be ignored; {i} will be used.'
+                        f'Entry index in header will be ignored; {i} will be used.',
                     )
                 assert entry_data_offset % __ALIGNMENT == 0
                 assert entry_data_offset + entry_data_size <= entry_data_section_size
@@ -311,7 +311,7 @@ def extract(src_filepath: str, dst_dirpath: str):
                 if entry_index != 0xFFFF:
                     log.warning(
                         f'Entry index in header is 0x{entry_index:04X}, but 0xFFFF was '
-                        'expected for a directory node.'
+                        'expected for a directory node.',
                     )
                 assert entry_data_size == __NODE_SIZE
 
@@ -342,7 +342,7 @@ def extract(src_filepath: str, dst_dirpath: str):
                     log.warning(
                         f'Node name from node section ("{str_name_node_section}") does '
                         'not match node name in the entry section '
-                        f'("{str_name_entry_section}"). It will be updated.'
+                        f'("{str_name_entry_section}"). It will be updated.',
                     )
                     node = list(nodes[node_index])
                     node[0] = name
@@ -445,14 +445,16 @@ def pack(src_dirpath: str, dst_filepath: str):
             entry_data_offset = entry_data_section_size
             entry_data_section_size = aligned(entry_data_section_size + entry_data_size)
             entry_data_sizes.append(entry_data_size)
-            entries.append((
-                __FILE_TYPE,
-                filepath,
-                string_offset,
-                string_hash,
-                entry_data_size,
-                entry_data_offset,
-            ))
+            entries.append(
+                (
+                    __FILE_TYPE,
+                    filepath,
+                    string_offset,
+                    string_hash,
+                    entry_data_size,
+                    entry_data_offset,
+                ),
+            )
 
         for dirname in dirnames:
             dirpath = os.path.join(parentpath, dirname)
@@ -496,7 +498,7 @@ def pack(src_dirpath: str, dst_filepath: str):
                 entry_data_section_size,
                 entry_data_section_size,
                 0x0000000000000000,
-            )
+            ),
         )
 
         f.write(
@@ -511,13 +513,13 @@ def pack(src_dirpath: str, dst_filepath: str):
                 file_count,
                 __FILE_FORMAT_VERSION,
                 0x00000000,
-            )
+            ),
         )
 
         dirpath_indices = {}
 
         for i, (dirpath, string_offset, string_hash, child_count, first_child_index) in enumerate(
-            nodes
+            nodes,
         ):
             if i == 0:
                 identifier = b'ROOT'
@@ -533,7 +535,7 @@ def pack(src_dirpath: str, dst_filepath: str):
                     string_hash,
                     child_count,
                     first_child_index,
-                )
+                ),
             )
 
             dirpath_indices[dirpath] = i
@@ -555,7 +557,7 @@ def pack(src_dirpath: str, dst_filepath: str):
                         entry_data_offset,
                         entry_data_size,
                         0x00000000,
-                    )
+                    ),
                 )
             else:
                 dirpath, string_offset, string_hash = args
@@ -573,13 +575,12 @@ def pack(src_dirpath: str, dst_filepath: str):
                         node_index,
                         __NODE_SIZE,
                         0x00000000,
-                    )
+                    ),
                 )
 
         f.write(b'\x00' * (string_table_offset - f.tell()))
 
-        for text in string_list:
-            f.write(text + b'\x00')
+        f.writelines(text + b'\x00' for text in string_list)
 
         f.write(b'\x00' * (entry_data_section_offset - f.tell()))
 
@@ -603,10 +604,14 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        'input', type=str, help='Path to the file or directory that is to be extracted or packed.'
+        'input',
+        type=str,
+        help='Path to the file or directory that is to be extracted or packed.',
     )
     parser.add_argument(
-        'output', type=str, help='Path to the file or directory that is to be written.'
+        'output',
+        type=str,
+        help='Path to the file or directory that is to be written.',
     )
     args = parser.parse_args()
 
@@ -619,7 +624,7 @@ def main():
     else:
         raise ValueError(
             f'Input path ("{args.input}") cannot be extracted or packed because it is '
-            'not a valid file or directory.'
+            'not a valid file or directory.',
         )
 
 
