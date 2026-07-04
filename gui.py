@@ -4003,7 +4003,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         output_directory_layout = QtWidgets.QFormLayout()
         output_directory_layout.setLabelAlignment(QtCore.Qt.AlignRight)
         output_directory_edit = PathEdit('Select Output Directory',
-                                         QtWidgets.QFileDialog.AcceptSave,
+                                         QtWidgets.QFileDialog.AcceptOpen,
                                          QtWidgets.QFileDialog.Directory)
         path = self._settings.value('miscellaneous/pack_generator_path')
         if path:
