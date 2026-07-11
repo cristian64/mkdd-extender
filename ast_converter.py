@@ -34,7 +34,7 @@ _BLOCK_HEADER_SIZE = 0x20
 _ALIGNMENT = 0x20
 
 
-def get_ast_info(filepath: str) -> 'dict[str, int]':
+def get_ast_info(filepath: str) -> dict[str, int]:
     filesize = os.path.getsize(filepath)
 
     with open(filepath, 'rb') as f:
@@ -129,7 +129,7 @@ def get_ast_info(filepath: str) -> 'dict[str, int]':
     }
 
 
-def _print_mapping(mapping: 'dict[str, int]') -> None:
+def _print_mapping(mapping: dict[str, int]) -> None:
     max_label_length = max(len(entry) + 1 for entry in mapping)
     for entry, value in mapping.items():
         label = entry.title().replace('_', ' ') + ':'
@@ -224,7 +224,7 @@ def _deinterleave_channels_naive(
     data: memoryview,
     channel_count: int,
     bit_depth: int,
-) -> 'tuple[memoryview]':
+) -> tuple[memoryview]:
     result_data = tuple(bytearray() for _ in range(channel_count))
 
     bytes_per_sample = bit_depth // 8
@@ -241,7 +241,7 @@ def _deinterleave_channels_numpy(
     data: memoryview,
     channel_count: int,
     bit_depth: int,
-) -> 'tuple[memoryview]':
+) -> tuple[memoryview]:
     if bit_depth == 8:
         dtype = np.uint8
     elif bit_depth == 16:

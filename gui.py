@@ -392,7 +392,7 @@ class PathEdit(QtWidgets.QWidget):
         caption: str,
         accept_mode: QtWidgets.QFileDialog.AcceptMode,
         file_mode: QtWidgets.QFileDialog.FileMode,
-        name_filters: 'tuple[str]' = (),
+        name_filters: tuple[str] = (),
         use_small_button: bool = False,
         parent: QtWidgets.QWidget = None,
     ) -> None:
@@ -804,7 +804,7 @@ class DropWidget(QtWidgets.QWidget):
 
         self.setAcceptDrops(True)
 
-    def set_sources(self, sources: 'list[QtCore.QObject]') -> None:
+    def set_sources(self, sources: list[QtCore.QObject]) -> None:
         self._source_ids = tuple(id(src) for src in sources)
 
     @typing.override
@@ -1375,7 +1375,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
     def get_expansion_states(self) -> dict[str, bool]:
         return self._expansion_states.copy()
 
-    def set_expansion_states(self, expansion_states: 'dict[str, bool]') -> None:
+    def set_expansion_states(self, expansion_states: dict[str, bool]) -> None:
         self._expansion_states.clear()
         self._expansion_states.update(expansion_states)
 
@@ -1674,7 +1674,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
     def _verify_image_files_ready(
         self,
-        image_filepaths_by_language: 'dict[str, list[str]]',
+        image_filepaths_by_language: dict[str, list[str]],
     ) -> bool:
         for image_filepaths in image_filepaths_by_language.values():
             for image_filepath in image_filepaths:
@@ -1686,7 +1686,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                     return False
         return True
 
-    def _show_image_files(self, image_filepaths_by_language: 'dict[str, list[str]]') -> None:
+    def _show_image_files(self, image_filepaths_by_language: dict[str, list[str]]) -> None:
         if not self._verify_image_files_ready(image_filepaths_by_language):
             # Cancel all pending futures to prioritize the current request.
             cancel_futures(self._thread_pool_executor)
@@ -1762,7 +1762,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             if image_group_boxes is not None:
                 image_group_boxes.layout().addWidget(language_box)
 
-    def _load_images_async(self, image_filepaths_by_language: 'dict[str, list[str]]') -> None:
+    def _load_images_async(self, image_filepaths_by_language: dict[str, list[str]]) -> None:
         for image_filepaths in image_filepaths_by_language.values():
             # The images within a given language will likely be different (different checksum),
             # which means they can be parallelized without risking loading the same image twice.
@@ -1811,7 +1811,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         self._pixmap_cache[checksum] = pixmap
 
-    def _on_images_loaded(self, image_filepaths_by_language: 'dict[str, list[str]]') -> None:
+    def _on_images_loaded(self, image_filepaths_by_language: dict[str, list[str]]) -> None:
         if image_filepaths_by_language == self._pending_image_filepaths_by_language:
             self._show_image_files(image_filepaths_by_language)
 
@@ -2224,7 +2224,7 @@ class LogTable(QtWidgets.QTableWidget):
 
     def _on_log_handler_log_message_received(
         self,
-        log_message: 'tuple[str, int, str, str, str]',
+        log_message: tuple[str, int, str, str, str],
     ) -> None:
         MAX_ROW_COUNT = 20000
         if self.rowCount() >= MAX_ROW_COUNT:
@@ -3075,7 +3075,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
         self._cheat_codes_dialog_geometry = self._settings.value('cheat_codes/geometry') or None
 
-    def _get_shelf_items(self) -> 'tuple[tuple[str, list[tuple[int, int, int, int, str, bool]]]]':
+    def _get_shelf_items(self) -> tuple[tuple[str, list[tuple[int, int, int, int, str, bool]]]]:
         return tuple(self._settings.value('shelf/items', ()))
 
     def _create_shelf_item(self) -> None:
@@ -3584,7 +3584,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         items.append(item)
         return items
 
-    def _get_page_item_values(self) -> 'list[tuple[int, int, int, int, str, bool]]':
+    def _get_page_item_values(self) -> list[tuple[int, int, int, int, str, bool]]:
         page_item_values = []
         for i, page_tables in enumerate(
             zip(self._page_tables, self._page_battle_stages_tables, strict=False),
@@ -3600,7 +3600,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         page_item_values.append((i, j, column, row, value, selected))
         return page_item_values
 
-    def _get_page_item_values_enabled_only(self) -> 'list[tuple[int, int, int, int, str, bool]]':
+    def _get_page_item_values_enabled_only(self) -> list[tuple[int, int, int, int, str, bool]]:
         extra_page_count = self._get_configured_extra_page_count()
         battle_stages_enabled = self._enable_custom_battle_stages.isChecked()
         page_item_values = self._get_page_item_values()
@@ -3611,7 +3611,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
     def _set_page_item_values(
         self,
-        page_item_values: 'list[tuple[int, int, int, str]]',
+        page_item_values: list[tuple[int, int, int, str]],
         also_selected_state: bool = True,
     ) -> None:
         # Pad the values with an empty version of the expected tuple.
@@ -3647,7 +3647,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         QtCore.QItemSelectionModel.NoUpdate,
                     )
 
-    def _get_custom_track_names(self) -> 'set[str]':
+    def _get_custom_track_names(self) -> set[str]:
         custom_tracks = set()
         if self._custom_tracks_table.isEnabled():
             for i in range(self._custom_tracks_table.rowCount()):

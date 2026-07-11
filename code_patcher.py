@@ -411,7 +411,7 @@ The stock minimap values for each course.
 def read_minimap_values(
     game_id: str,
     dol_path: str,
-) -> 'dict[str, tuple[float, float, float, float, int]]':
+) -> dict[str, tuple[float, float, float, float, int]]:
     """
     Helper function that reads the minimap values from the DOL file.
 
@@ -1819,7 +1819,7 @@ def patch_dol_file(
     minimap_data: dict,
     course_author_names: list[tuple[str, str]],
     tilt_setting_data: dict,
-    audio_track_data: 'tuple[tuple[int]]',
+    audio_track_data: tuple[tuple[int]],
     battle_stages_enabled: bool,
     remove_movie_trailer: bool,
     extender_cup: bool,

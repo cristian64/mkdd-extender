@@ -458,7 +458,7 @@ def stablehash(obj: object) -> int:
     return hash(obj)
 
 
-def build_file_list(dirpath: str) -> 'tuple[str]':
+def build_file_list(dirpath: str) -> tuple[str]:
 
     def _build_file_list(dirpath: str) -> tuple[str]:
         result = []
@@ -519,7 +519,7 @@ def get_custom_track_name(path: str) -> str:
     return ''
 
 
-def scan_custom_tracks_directory(dirpath: str) -> 'dict[str, str]':
+def scan_custom_tracks_directory(dirpath: str) -> dict[str, str]:
     try:
         names = sorted(os.listdir(dirpath))
     except Exception:
@@ -1248,7 +1248,7 @@ def zero_bti_wrap_values(filepath: str) -> None:
         f.write(bytes((0x00, 0x00)))
 
 
-def extract_bti_wrap_values(filepath: str) -> 'tuple[int, int]':
+def extract_bti_wrap_values(filepath: str) -> tuple[int, int]:
     with open(filepath, 'rb') as f:
         f.seek(0x06)
         wrap_st = f.read(2)
@@ -1302,7 +1302,7 @@ def crop_image_sides(image: Image.Image) -> Image.Image:
     return image.crop(bbox)
 
 
-def split_image(image: Image.Image) -> 'list[Image.Image]':
+def split_image(image: Image.Image) -> list[Image.Image]:
     image = crop_image_sides(image)
 
     width = image.width
@@ -1702,7 +1702,7 @@ def generate_bti_image_from_bitmap_font(
     width: int,
     height: int,
     image_format: str,
-    background: 'tuple[int, int, int, int]',
+    background: tuple[int, int, int, int],
     filepath: str,
     default_scale: float | None = None,
     postprocessing_callback: Callable[[], Image] | None = None,
@@ -1819,7 +1819,7 @@ def generate_bti_image(
     width: int,
     height: int,
     image_format: str,
-    background: 'tuple[int, int, int, int]',
+    background: tuple[int, int, int, int],
     filepath: str,
 ) -> None:
     assert filepath.endswith('.bti')
@@ -2327,7 +2327,7 @@ def meld_courses(
     tracks_is_dir: bool,
     raise_if_canceled: callable,
     iso_tmp_dir: str,
-) -> 'tuple[dict | list]':
+) -> tuple[dict | list]:
     replaces_data = {}
     minimap_data = {}
     cheat_codes_data = {'US': {}, 'PAL': {}, 'JP': {}, 'US_DEBUG': {}}
@@ -2843,7 +2843,7 @@ def meld_courses(
                 width: int,
                 height: int,
                 image_format: str,
-                background: 'tuple[int, int, int, int]',
+                background: tuple[int, int, int, int],
                 margin: float | None = None,
             ) -> str:
                 # pylint: disable=cell-var-from-loop
@@ -3231,8 +3231,8 @@ def meld_courses(
 
 def gather_audio_file_indices(
     iso_tmp_dir: str,
-    alternative_audio_data: 'dict[str, str]',
-    matching_audio_override_data: 'dict[str, str]',
+    alternative_audio_data: dict[str, str],
+    matching_audio_override_data: dict[str, str],
 ) -> tuple:
     # The code generator needs the list of 32 integers with the file index of each audio track
     # mapped to each track.
@@ -3701,8 +3701,8 @@ def patch_dol_file(
     cheat_codes_data: dict,
     course_author_names: list[[tuple[str, str]]],
     tilt_setting_data: dict,
-    alternative_audio_data: 'dict[str, str]',
-    matching_audio_override_data: 'dict[str, str]',
+    alternative_audio_data: dict[str, str],
+    matching_audio_override_data: dict[str, str],
     battle_stages_enabled: bool,
     iso_tmp_dir: str,
     game_id: str,
@@ -3989,8 +3989,8 @@ def patch_dol_file(
 
 def write_description_file(
     args: argparse.Namespace,
-    added_course_names: 'list[str]',
-    added_author_names: 'list[str]',
+    added_course_names: list[str],
+    added_author_names: list[str],
     battle_stages_enabled: bool,
     iso_tmp_dir: str,
 ) -> None:
