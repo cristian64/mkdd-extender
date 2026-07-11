@@ -586,7 +586,7 @@ def pack(src_dirpath: str, dst_filepath: str) -> None:
 
         f.write(b'\x00' * (entry_data_section_offset - f.tell()))
 
-        for i, (entry_type, *args) in enumerate(entries):
+        for entry_type, *args in entries:
             if entry_type not in (__FILE_TYPE, __YAZ0_COMPRESSED_FILE_TYPE):
                 continue
             filepath, _string_offset, _string_hash, entry_data_size, entry_data_offset = args
@@ -628,9 +628,7 @@ def main() -> None:
             f'Input path ("{args.input}") cannot be extracted or packed because it is '
             'not a valid file or directory.'
         )
-        raise ValueError(
-            msg,
-        )
+        raise ValueError(msg)
 
 
 if __name__ == '__main__':

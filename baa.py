@@ -9,13 +9,14 @@ import json
 import os
 import struct
 from enum import IntEnum
+from typing import BinaryIO
 
 
-def _read_uint32(f):
+def _read_uint32(f: BinaryIO) -> int:
     return struct.unpack('>I', f.read(4))[0]
 
 
-def _write_uint32(f, value) -> None:
+def _write_uint32(f: BinaryIO, value: int) -> None:
     f.write(struct.pack('>I', value))
 
 
@@ -24,9 +25,7 @@ def _prepare_destination_directory(dirpath: str) -> None:
         os.makedirs(dirpath)
     elif not os.path.isdir(dirpath):
         msg = f'Destination directory "{dirpath}" is not a valid directory and cannot be created'
-        raise RuntimeError(
-            msg,
-        )
+        raise RuntimeError(msg)
     else:
         with os.scandir(dirpath) as it:
             if any(it):
@@ -66,7 +65,7 @@ _BAA_MAGIC = 0x41415F3C
 _BAA_FOOTER = 0x3E5F4141
 
 
-def _parse_baa_header(f) -> list[dict]:
+def _parse_baa_header(f: BinaryIO) -> list[dict]:
     sections = []
 
     magic = _read_uint32(f)
@@ -120,7 +119,7 @@ def _parse_baa_header(f) -> list[dict]:
     return sections
 
 
-def _get_baa_section_size(section: dict, f) -> int:
+def _get_baa_section_size(section: dict, f: BinaryIO) -> int:
     section_type = section['type']
     section_start = section['start']
 
@@ -196,9 +195,7 @@ def pack_baa(src_dirpath: str, dst_filepath: str) -> None:
                 f'Input filepath "{src_filepath}" should use the '
                 f'"{_INFO_FILE_EXTENSION}" extension.'
             )
-            raise ValueError(
-                msg,
-            )
+            raise ValueError(msg)
         src_dirpath = os.path.dirname(src_filepath)
     else:
         # If it's a directory, it should contain a single BAA file file in the root directory.
@@ -210,9 +207,7 @@ def pack_baa(src_dirpath: str, dst_filepath: str) -> None:
             raise ValueError(msg)
         if len(src_filenames) > 1:
             msg = f'Only one BAA info file was expected in "{src_dirpath}"; found: {src_filenames}'
-            raise ValueError(
-                msg,
-            )
+            raise ValueError(msg)
         src_filepath = os.path.join(src_dirpath, src_filenames[0])
 
     if not dst_filepath.endswith('.baa'):

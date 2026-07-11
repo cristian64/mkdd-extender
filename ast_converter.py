@@ -503,7 +503,7 @@ def main() -> None:
         help='Path to the WAV/AST file that is going to be written.',
     )
 
-    def int_hex(x):
+    def int_hex(x: str) -> int:
         return int(x, 0)
 
     ast_to_wav_group = parser.add_argument_group('WAV to AST only')
@@ -579,9 +579,7 @@ def main() -> None:
             f'Input path ("{args.input}") does not have a recognizable file extension. '
             'Expect either `.ast` or `.wav`.'
         )
-        raise ValueError(
-            msg,
-        )
+        raise ValueError(msg)
 
 
 if __name__ == '__main__':

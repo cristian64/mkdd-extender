@@ -17,6 +17,7 @@ import struct
 import subprocess
 import tempfile
 import textwrap
+from collections.abc import Generator
 from string import printable
 
 import baa
@@ -967,7 +968,7 @@ for string in DIR_STRINGS + FILE_STRINGS:
         assert string in addresses
 
 
-def get_string_addresses(game_id: str, battle_stages_enabled: bool):
+def get_string_addresses(game_id: str, battle_stages_enabled: bool) -> dict[str, int]:
     string_addresses = STRING_ADDRESSES[game_id]
 
     if battle_stages_enabled:
@@ -1723,7 +1724,7 @@ Minimal symbols map for each region.
 
 
 @contextlib.contextmanager
-def current_directory(dirpath):
+def current_directory(dirpath: str) -> Generator[None, None, None]:
     cwd = os.getcwd()
     try:
         os.chdir(dirpath)
@@ -1750,7 +1751,7 @@ def find_char_offset_in_string(string: str) -> int:
     return len(os.path.splitext(string)[0]) - 1
 
 
-def read_osarena(dol_path, game_id) -> int:
+def read_osarena(dol_path: str, game_id: str) -> int:
     with open(dol_path, 'rb') as f:
         dol_file = dolreader.DolFile(f)
         dol_file.seek(OSARENALO_INSTRUCTIONS_ADDRESSES[game_id])
@@ -1831,7 +1832,7 @@ def patch_dol_file(
     log: logging.Logger,
     debug_output: bool,
 ) -> None:
-    import mkdd_extender  # pylint: disable=import-outside-toplevel
+    import mkdd_extender  # pylint: disable=import-outside-toplevel  # noqa: PLC0415
 
     log.info('Generating and injecting C code...')
 
@@ -1868,7 +1869,7 @@ def patch_dol_file(
     unaligned_new_osarena_value = 0
     injected_code_size = 0
 
-    def patch_osarena(dol_file, dol_section_address_plus_size) -> None:
+    def patch_osarena(dol_file: dolreader.DolFile, dol_section_address_plus_size: int) -> None:
         nonlocal unaligned_new_osarena_value
         nonlocal injected_code_size
         nonlocal injected_code_size
@@ -2114,7 +2115,7 @@ def patch_dol_file(
         for name, value in replacements:
             code = code.replace(name, value)
 
-        with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:  # noqa: SIM117
             with current_directory(tmp_dir):
                 project = devkit_tools.Project(dol_path, address=dol_section_address)
                 project.set_osarena_patcher(patch_osarena)

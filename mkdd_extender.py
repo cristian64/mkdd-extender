@@ -29,6 +29,8 @@ import traceback
 import warnings
 import wave
 import zipfile
+from collections.abc import Callable, Generator
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -277,7 +279,7 @@ class _CustomFormatter(logging.Formatter):
             logging.CRITICAL: logging.Formatter(self.bold_fucsia + fmt + self.reset),
         }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         return self.__formatters[record.levelno].format(record)
 
 
@@ -311,7 +313,7 @@ except AttributeError:
 
 
 class MKDDExtenderError(Exception):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.text = None
@@ -340,7 +342,7 @@ if frozen:
 
 
 @contextlib.contextmanager
-def current_directory(dirpath):
+def current_directory(dirpath: str) -> Generator[None, None, None]:
     cwd = os.getcwd()
     try:
         os.chdir(dirpath)
@@ -458,7 +460,7 @@ def stablehash(obj: object) -> int:
 
 def build_file_list(dirpath: str) -> 'tuple[str]':
 
-    def _build_file_list(dirpath):
+    def _build_file_list(dirpath: str) -> tuple[str]:
         result = []
         for name in sorted(os.listdir(dirpath) if dirpath else os.listdir()):
             path = os.path.normpath(os.path.join(dirpath, name))
@@ -481,9 +483,10 @@ def get_custom_track_name(path: str) -> str:
             name = name.strip().lstrip('🎈').strip()
             course = course_name_to_course(trackinfo['Config']['replaces'])
             is_battle_stage = course.startswith('Mini')
-            return f'🎈 {name}' if is_battle_stage else name
         except Exception:
             return ''
+        else:
+            return f'🎈 {name}' if is_battle_stage else name
 
     # If it's a directory, check if it contains the `trackinfo.ini` file. If it contains a single
     # directory, check also in that directory.
@@ -1589,7 +1592,7 @@ letters from right to left.
 """
 
 
-def pad_image_sides(image: Image.Image, left_padding: int, right_padding: int):
+def pad_image_sides(image: Image.Image, left_padding: int, right_padding: int) -> Image.Image:
     result = Image.new(image.mode, (image.width + left_padding + right_padding, image.height))
     result.paste(image, (left_padding, 0))
     return result
@@ -1702,7 +1705,7 @@ def generate_bti_image_from_bitmap_font(
     background: 'tuple[int, int, int, int]',
     filepath: str,
     default_scale: float | None = None,
-    postprocessing_callback: callable | None = None,
+    postprocessing_callback: Callable[[], Image] | None = None,
 ) -> None:
     assert filepath.endswith('.bti')
 
@@ -2042,9 +2045,7 @@ def patch_bnr_file(iso_tmp_dir: str) -> None:
     TITLE_OFFSET = 0x1860
     NEXT_TITLE_OFFSET_STEP = 0x0140
 
-    title_offsets = []
-    for title_offset in range(TITLE_OFFSET, len(data), NEXT_TITLE_OFFSET_STEP):
-        title_offsets.append(title_offset)
+    title_offsets = list(range(TITLE_OFFSET, len(data), NEXT_TITLE_OFFSET_STEP))
 
     if region != 'J':
         EXCLAMATION_MARKS = b'!!'
@@ -2126,7 +2127,8 @@ def patch_title_lines(
                 f.write(struct.pack('>LLLL', 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF))
             else:
                 log.warning(
-                    "Unexpected colors in BLO file. Titles' color gradient will not be desaturated.",
+                    "Unexpected colors in BLO file. Titles' color gradient will not be "
+                    'desaturated.',
                 )
 
     log.info('Title lines patched.')
@@ -2616,19 +2618,14 @@ def meld_courses(
                     if supported:
                         msg = (
                             f'{message} Enable the code patch, or re-run with '
-                            '--skip-code-patches-check to circumvent this '
+                            '--skip-code-patches-check to circumvent this safety measure.'
+                        )
+                    else:
+                        msg = (
+                            f'{message} Re-run with --skip-code-patches-check to circumvent this '
                             'safety measure.'
                         )
-                        raise MKDDExtenderError(
-                            msg,
-                        )
-                    msg = (
-                        f'{message} Re-run with --skip-code-patches-check '
-                        'to circumvent this safety measure.'
-                    )
-                    raise MKDDExtenderError(
-                        msg,
-                    )
+                    raise MKDDExtenderError(msg)
 
             raise_if_canceled()
 
@@ -2745,7 +2742,11 @@ def meld_courses(
                 use_replacee_audio_track = replaces and args.use_replacee_audio_track
                 use_alternative_audio_track = use_auxiliary_audio_track or use_replacee_audio_track
 
-            def conform_and_copy_if_not_cached(src_ast_filepath, dst_ast_filepath, args) -> None:
+            def conform_and_copy_if_not_cached(
+                src_ast_filepath: str,
+                dst_ast_filepath: str,
+                args: argparse.Namespace,
+            ) -> None:
                 # Before copying a AST file to destination, check whether its checksum already
                 # exists, and, if so, insert an entry in the override table instead of copying the
                 # file over.
@@ -5020,7 +5021,7 @@ def main() -> None:
 
     if gui_mode:
         try:
-            import gui  # pylint: disable=import-outside-toplevel
+            import gui  # pylint: disable=import-outside-toplevel  # noqa: PLC0415
 
             sys.exit(gui.run())
         except ImportError as e:

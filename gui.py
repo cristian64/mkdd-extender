@@ -26,7 +26,9 @@ import textwrap
 import threading
 import time
 import traceback
+import typing
 import wave
+from collections.abc import Callable, Generator
 from typing import Any
 
 from PIL import Image
@@ -122,7 +124,7 @@ def set_dark_theme(app: QtWidgets.QApplication) -> None:
 
 
 @contextlib.contextmanager
-def blocked_signals(obj: QtCore.QObject):
+def blocked_signals(obj: QtCore.QObject) -> Generator[None, None, None]:
     # QSignalBlocker may or may not be available in some versions of the different Qt bindings.
     signals_were_blocked = obj.blockSignals(True)
     try:
@@ -460,7 +462,7 @@ class PathEdit(QtWidgets.QWidget):
                 path = file_dialog.selectedFiles()[0]
             self._line_edit.setText(os.path.normpath(path) if path else path)
 
-    def _on_line_edit_textChanged(self, text: str) -> None:
+    def _on_line_edit_textChanged(self, text: str) -> None:  # noqa: N802
         text = os.path.normpath(text) if text else text
 
         current_dir = os.path.dirname(text)
@@ -475,11 +477,13 @@ class VerticalLabel(QtWidgets.QWidget):
         super().__init__(parent=parent)
         self._text = text
 
+    @typing.override
     def setText(self, text: str) -> None:
         if self._text != text:
             self._text = text
             self.update()
 
+    @typing.override
     def minimumSizeHint(self) -> QtCore.QSize:
         font_metrics = self.fontMetrics()
         width = font_metrics.height()
@@ -489,6 +493,7 @@ class VerticalLabel(QtWidgets.QWidget):
         height += margin * 2
         return QtCore.QSize(width, height)
 
+    @typing.override
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         _ = event
         painter = QtGui.QPainter(self)
@@ -554,9 +559,11 @@ class CollapsibleGroupBox(QtWidgets.QWidget):
         self._checkbox.toggled.connect(self._widget.setVisible)
         self._checkbox.toggled.connect(self.toggled)
 
+    @typing.override
     def setLayout(self, layout: QtWidgets.QLayout) -> None:
         self._widget.setLayout(layout)
 
+    @typing.override
     def layout(self) -> QtWidgets.QLayout:
         return self._widget.layout()
 
@@ -639,25 +646,29 @@ class HelpButton(QtWidgets.QPushButton):
 
         self.clicked.connect(self._on_clicked)
 
-    def enterEvent(self, event) -> None:
+    @typing.override
+    def enterEvent(self, event: QtGui.QEnterEvent) -> None:
         super().enterEvent(event)
 
         if not self._pressed:
             self.setIcon(HelpButton._hover_icon)
 
-    def leaveEvent(self, event) -> None:
+    @typing.override
+    def leaveEvent(self, event: QtCore.QEvent) -> None:
         super().leaveEvent(event)
 
         if not self._pressed:
             self.setIcon(HelpButton._normal_icon)
 
-    def mousePressEvent(self, event) -> None:
+    @typing.override
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         super().mousePressEvent(event)
 
         if event.button() == QtCore.Qt.LeftButton:
             self.setIcon(HelpButton._pressed_icon)
 
-    def mouseReleaseEvent(self, event) -> None:
+    @typing.override
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
         super().mouseReleaseEvent(event)
 
         if event.button() == QtCore.Qt.LeftButton:
@@ -723,7 +734,7 @@ class CopyableImageWidget(QtWidgets.QLabel):
 class SpinnableSlider(QtWidgets.QWidget):
     value_changed = QtCore.Signal(int)
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent=parent)
 
         self.setContentsMargins(0, 0, 0, 0)
@@ -767,6 +778,7 @@ class SpinnableSlider(QtWidgets.QWidget):
 
 
 class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
+    @typing.override
     def initStyleOption(
         self,
         option: QtWidgets.QStyleOptionViewItem,
@@ -784,7 +796,7 @@ class SelectionStyledItemDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class DropWidget(QtWidgets.QWidget):
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent=parent)
 
         self._source_ids = ()
@@ -795,6 +807,7 @@ class DropWidget(QtWidgets.QWidget):
     def set_sources(self, sources: 'list[QtCore.QObject]') -> None:
         self._source_ids = tuple(id(src) for src in sources)
 
+    @typing.override
     def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
         if id(event.source()) in self._source_ids:
             event.accept()
@@ -818,6 +831,7 @@ class DropWidget(QtWidgets.QWidget):
                 region = QtGui.QRegion(rect).xored(QtGui.QRegion(inner_rect))
                 self._overlay_widget.setMask(region)
 
+    @typing.override
     def dragLeaveEvent(self, event: QtGui.QDragLeaveEvent) -> None:
         _ = event
 
@@ -825,6 +839,7 @@ class DropWidget(QtWidgets.QWidget):
             self._overlay_widget.deleteLater()
             self._overlay_widget = None
 
+    @typing.override
     def dropEvent(self, event: QtGui.QDropEvent) -> None:
         event.accept()
 
@@ -834,7 +849,8 @@ class DropWidget(QtWidgets.QWidget):
 
 
 class DragTableWidget(QtWidgets.QTableWidget):
-    def supportedDropActions(self):
+    @typing.override
+    def supportedDropActions(self) -> QtCore.Qt.DropActions:
         return super().supportedDropActions() & ~QtCore.Qt.MoveAction
 
 
@@ -879,6 +895,7 @@ class DragDropTableHeaderWidget(QtWidgets.QWidget):
         self._columns.append((emoji, label, widget))
         self.layout().addWidget(widget)
 
+    @typing.override
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
 
@@ -937,6 +954,7 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
     def add_companion_table(self, table: QtWidgets.QTableWidget) -> None:
         self.__companion_tables.append(table)
 
+    @typing.override
     def dropEvent(self, event: QtGui.QDropEvent) -> None:
         # When a drop occurs on the edge between two items, Qt may try to insert a row. This is a
         # workaround that modifies the drop position to match the center of the target item,
@@ -1002,6 +1020,7 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
 
         super().dropEvent(event)
 
+    @typing.override
     def startDrag(self, supportedActions: QtCore.Qt.DropActions) -> None:
         # Reimplemented to disallow drag start actions on empty cells.
         model = self.model()
@@ -1010,10 +1029,10 @@ class DragDropTableWidget(QtWidgets.QTableWidget):
                 super().startDrag(supportedActions)
                 break
 
-    def _on_itemSelectionChanged(self) -> None:
+    def _on_itemSelectionChanged(self) -> None:  # noqa: N802
         self._create_missing_items()
 
-    def _on_itemChanged(self, item: QtWidgets.QTableWidgetItem) -> None:
+    def _on_itemChanged(self, item: QtWidgets.QTableWidgetItem) -> None:  # noqa: N802
         # The QTableWidget's drag and drop default behavior can be odd when movable rows have been
         # disabled: it may append rows when an item is dropped between two cells. In case things go
         # wrong, the number of rows will be trimmed.
@@ -1146,7 +1165,7 @@ class ASTPlayer(QtWidgets.QWidget):
             if self._media_player is not None:
                 self._media_player.pause()
 
-    def _on_media_player_playbackStateChanged(
+    def _on_media_player_playbackStateChanged(  # noqa: N802
         self,
         state: QtMultimedia.QMediaPlayer.PlaybackState,
     ) -> None:
@@ -1158,21 +1177,21 @@ class ASTPlayer(QtWidgets.QWidget):
         icon = ASTPlayer._pause_icon if playing else ASTPlayer._play_icon
         self._play_button.setIcon(icon)
 
-    def _on_media_player_seekableChanged(self, seekable: bool) -> None:
+    def _on_media_player_seekableChanged(self, seekable: bool) -> None:  # noqa: N802
         if seekable:
             self._timeline_slider.setEnabled(True)
 
-    def _on_media_player_durationChanged(self, duration: int) -> None:
+    def _on_media_player_durationChanged(self, duration: int) -> None:  # noqa: N802
         with blocked_signals(self._timeline_slider):
             self._timeline_slider.setMaximum(duration)
             self._timeline_slider.setPageStep(round(duration / 10))
             self._timeline_slider.setSingleStep(round(duration / 100))
 
-    def _on_media_player_positionChanged(self, position: int) -> None:
+    def _on_media_player_positionChanged(self, position: int) -> None:  # noqa: N802
         with blocked_signals(self._timeline_slider):
             self._timeline_slider.setValue(position)
 
-    def _on_timeline_slider_valueChanged(self, value: int) -> None:
+    def _on_timeline_slider_valueChanged(self, value: int) -> None:  # noqa: N802
         with blocked_signals(self._media_player):
             self._media_player.setPosition(value)
 
@@ -1347,12 +1366,13 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         self.show_placeholder_message()
 
+    @typing.override
     def showEvent(self, event: QtGui.QShowEvent) -> None:
         super().showEvent(event)
 
         self.shown.emit()
 
-    def get_expansion_states(self):
+    def get_expansion_states(self) -> dict[str, bool]:
         return self._expansion_states.copy()
 
     def set_expansion_states(self, expansion_states: 'dict[str, bool]') -> None:
@@ -1477,7 +1497,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 <tr><td><b>Code Patches: </b> </td><td>{code_patches}</td></tr>
                 <tr><td><b>Auxiliary Audio Track: </b> </td><td>{auxiliary_audio_track}</td></tr>
                 </table>
-            """),
+            """),  # noqa: E501
             )
         info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         info_box.layout().addWidget(info_widget)
@@ -1548,7 +1568,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             <tr><td><b>Bottom Right Corner Z: </b> </td><td><code>{bottom_right_corner_z}</code></td></tr>
             <tr><td><b>Orientation: </b> </td><td>{orientation}</td></tr>
             </table>
-        """),
+        """),  # noqa: E501
         )
         minimap_info_widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         minimap_box.layout().addWidget(minimap_info_widget)
@@ -1623,7 +1643,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
         self.setWidget(widget)
         widget.show()
 
-    def generate_ast_file_tool_tip(self, ast_filepath, cache=True) -> str:
+    def generate_ast_file_tool_tip(self, ast_filepath: str, cache: bool = True) -> str:
         metadata = self._ast_metadata_cache.get(ast_filepath) if cache else None
         if metadata is None:
             metadata = ast_converter.get_ast_info(ast_filepath)
@@ -1708,9 +1728,10 @@ class InfoViewWidget(QtWidgets.QScrollArea):
                 continue
 
             language_box = CollapsibleGroupBox(f'{"/".join(languages)} Images')
-            language_box.set_expanded(self._expansion_states.get(languages[0].lower(), True))
+            language = languages[0].lower()
+            language_box.set_expanded(self._expansion_states.get(language, True))
             language_box.toggled.connect(
-                lambda expanded, language=languages[0].lower(): self._expansion_states.update(
+                lambda expanded, language=language: self._expansion_states.update(
                     {
                         language: expanded,
                     },
@@ -1899,7 +1920,8 @@ class CheatCodeSyntaxHighlighter(QtGui.QSyntaxHighlighter):
             (re.compile(pattern), group_index, style) for pattern, group_index, style in rules
         )
 
-    def highlightBlock(self, text) -> None:
+    @typing.override
+    def highlightBlock(self, text: str) -> None:
         self.setFormat(0, len(text), self.__base_color)
 
         for pattern, group_index, style in self.__rules:
@@ -1916,7 +1938,7 @@ class CheatCodesDialog(QtWidgets.QDialog):
         self,
         label: str,
         text: str,
-        callback: callable,
+        callback: Callable[[str], None],
         parent: QtWidgets.QWidget = None,
     ) -> None:
         super().__init__(parent)
@@ -2001,25 +2023,33 @@ class ProgressDialog:
 
             self.finished = False
 
+        @typing.override
         def closeEvent(self, event: QtGui.QCloseEvent) -> None:
             if not self.finished:
                 event.ignore()
                 return
             super().closeEvent(event)
 
+        @typing.override
         def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
             if not self.finished:
                 event.ignore()
                 return
             super().keyPressEvent(event)
 
+        @typing.override
         def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
             if not self.finished:
                 event.ignore()
                 return
             super().keyReleaseEvent(event)
 
-    def __init__(self, text: str, func: callable, parent: QtWidgets.QWidget = None) -> None:
+    def __init__(
+        self,
+        text: str,
+        func: Callable[[], None],
+        parent: QtWidgets.QWidget = None,
+    ) -> None:
         self._text = text
         self._func = func
         self._parent = parent
@@ -2101,6 +2131,7 @@ class SplitterChildHolder(QtWidgets.QWidget):
 
         QtCore.QTimer.singleShot(0, self._update_visibility)
 
+    @typing.override
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
 
@@ -2188,8 +2219,8 @@ class LogTable(QtWidgets.QTableWidget):
     def get_clear_log_before_each_run(self) -> bool:
         return self._clear_log_before_each_run_action.isChecked()
 
-    def set_clear_log_before_each_run(self, clear_log_before_each_run: bool):
-        return self._clear_log_before_each_run_action.setChecked(clear_log_before_each_run)
+    def set_clear_log_before_each_run(self, clear_log_before_each_run: bool) -> None:
+        self._clear_log_before_each_run_action.setChecked(clear_log_before_each_run)
 
     def _on_log_handler_log_message_received(
         self,
@@ -2336,7 +2367,7 @@ class DelayedDirectoryWatcher(QtCore.QObject):
         self._watch_directories()
         self.changed.emit()
 
-    def _on_watcher_directoryChanged(self, dirpath: str) -> None:
+    def _on_watcher_directoryChanged(self, dirpath: str) -> None:  # noqa: N802
         _ = dirpath
 
         if self._notification_scheduled:
@@ -2358,7 +2389,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
     def __init__(
         self,
         parent: QtWidgets.QWidget = None,
-        flags: QtCore.Qt.WindowFlags = QtCore.Qt.WindowFlags(),
+        flags: QtCore.Qt.WindowFlags = QtCore.Qt.WindowFlags(),  # noqa: B008
     ) -> None:
         super().__init__(parent=parent, flags=flags)
 
@@ -2599,7 +2630,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 page_battle_stages_table_header = DragDropTableHeaderWidget()
                 page_battle_stages_table.header_buddy = page_battle_stages_table_header
                 page_battle_stages_table_container_layout.addWidget(page_battle_stages_table_header)
-                for i, (header_emoji, header_label) in enumerate(BATTLE_HEADER_LABELS.items()):
+                for header_emoji, header_label in BATTLE_HEADER_LABELS.items():
                     page_battle_stages_table_header.add_column(
                         header_emoji,
                         header_label,
@@ -2814,11 +2845,13 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 lambda: self._save_settings() or self._open_first_run_dialog(),
             )
 
+    @typing.override
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._save_settings()
 
         super().closeEvent(event)
 
+    @typing.override
     def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
         super().keyReleaseEvent(event)
 
@@ -3103,7 +3136,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         create_button = QtWidgets.QPushButton('Create')
         create_button.clicked.connect(on_create_button_clicked)
 
-        def on_name_edit_textChanged(text: str) -> None:
+        def on_name_edit_textChanged(text: str) -> None:  # noqa: N802
             create_button.setEnabled(bool(text))
 
         name_edit.textChanged.connect(on_name_edit_textChanged)
@@ -3436,7 +3469,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._update_info_view()
 
     @contextlib.contextmanager
-    def _blocked_page_signals(self):
+    def _blocked_page_signals(self) -> Generator[None, None, None]:
         signals_were_blocked_map = {}
         for page_table in self._page_tables + self._page_battle_stages_tables:
             signals_were_blocked_map[page_table] = page_table.blockSignals(True)
@@ -3447,7 +3480,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if not signals_were_blocked:
                     page_table.blockSignals(False)
 
-    def _get_configured_extra_page_count(self):
+    def _get_configured_extra_page_count(self) -> int:
         return sum(
             int(page_widget.isVisibleTo(page_widget.parent())) for page_widget in self._page_widgets
         )
@@ -3465,7 +3498,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         with blocked_signals(self._extra_pages_count_combobox):
             self._extra_pages_count_combobox.setCurrentIndex(extra_page_count)
 
-    def _on_extra_pages_count_combobox_currentIndexChanged(self, index: int) -> None:
+    def _on_extra_pages_count_combobox_currentIndexChanged(self, index: int) -> None:  # noqa: N802
         extra_page_count = index
         items = self._get_page_item_values_enabled_only()
         items = [entry for entry in items if entry[0] < extra_page_count]
@@ -3695,7 +3728,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 self._custom_tracks_table.clearSelection()
                 self._custom_tracks_table.clearFocus()
 
-    def _on_tables_itemSelectionChanged(self) -> None:
+    def _on_tables_itemSelectionChanged(self) -> None:  # noqa: N802
         self._sync_tables_selection()
         self._update_info_view()
 
@@ -3729,7 +3762,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._sync_emblems()
         self._update_info_view()
 
-    def _on_page_table_itemChanged(self, item: QtWidgets.QTableWidgetItem) -> None:
+    def _on_page_table_itemChanged(self, item: QtWidgets.QTableWidgetItem) -> None:  # noqa: N802
         _ = item
 
         # Drag and drop events may generate several of these events in bursts. To avoid wasting
@@ -3742,7 +3775,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._pending_undo_actions += 1
         QtCore.QTimer.singleShot(0, self._process_undo_action)
 
-    def _on_custom_tracks_table_customContextMenuRequested(self, pos: QtCore.QPoint) -> None:
+    def _on_custom_tracks_table_customContextMenuRequested(self, pos: QtCore.QPoint) -> None:  # noqa: N802
         item = self._custom_tracks_table.itemAt(pos)
         if item is None:
             return
@@ -3859,7 +3892,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         self._undo_action.setEnabled(len(self._undo_history) > 1)
         self._redo_action.setEnabled(bool(self._redo_history))
 
-    def _on_custom_tracks_table_sortIndicatorChanged(
+    def _on_custom_tracks_table_sortIndicatorChanged(  # noqa: N802
         self,
         logical_index: int,
         order: QtCore.Qt.SortOrder,
@@ -3946,7 +3979,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_widget.setToolTip(option_help)
                     option_widget.setChecked(bool(option_value))
 
-                    def on_toggled(checked, option_member_name=option_member_name) -> None:
+                    def on_toggled(
+                        checked: bool,
+                        option_member_name: str = option_member_name,
+                    ) -> None:
                         setattr(self, option_member_name, checked)
 
                     option_widget.toggled.connect(on_toggled)
@@ -3965,7 +4001,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                     option_widget_layout.addWidget(option_widget_label)
                     option_widget_layout.addWidget(option_widget)
 
-                    def on_textChanged(text, option_member_name=option_member_name) -> None:
+                    def on_textChanged(  # noqa: N802
+                        text: str,
+                        option_member_name: str = option_member_name,
+                    ) -> None:
                         try:
                             value = int(text)
                         except ValueError:
@@ -3995,10 +4034,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         option_widget_layout.addWidget(option_widget_label)
                         option_widget_layout.addWidget(option_widget, 1)
 
-                        def on_currentTextChanged(
-                            text,
-                            default_value=default_value,
-                            option_member_name=option_member_name,
+                        def on_currentTextChanged(  # noqa: N802
+                            text: str,
+                            default_value: Any = default_value,
+                            option_member_name: str = option_member_name,
                         ) -> None:
                             try:
                                 value = type(default_value)(text)
@@ -4012,7 +4051,8 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                     elif option_type == 'cheatcodes':
                         option_widget_label = QtWidgets.QLabel(
-                            option_label.removesuffix('Gecko Cheat Codes')
+                            option_label
+                            .removesuffix('Gecko Cheat Codes')
                             .removesuffix('Basic Cheat Codes')
                             .strip(),
                         )
@@ -4029,16 +4069,16 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
                         def update_cheat_codes(
                             value: str,
-                            option_member_name=option_member_name,
+                            option_member_name: str = option_member_name,
                         ) -> None:
                             setattr(self, option_member_name, value)
                             self._update_options_string()
 
                         def on_edit_button_clicked(
-                            _checked,
-                            option_label=option_label,
-                            option_member_name=option_member_name,
-                            update_cheat_codes=update_cheat_codes,
+                            _checked: bool,
+                            option_label: str = option_label,
+                            option_member_name: str = option_member_name,
+                            update_cheat_codes: Callable[[str, str], None] = update_cheat_codes,
                         ) -> None:
                             option_value = getattr(self, option_member_name)
                             dialog = CheatCodesDialog(
@@ -4102,19 +4142,27 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         )
 
                         if isinstance(enabler_widget, QtWidgets.QCheckBox):
-                            enabler_widget.toggled.connect(
-                                lambda checked, option_widget=option_widget, value=enabled_by_value: (
-                                    option_widget.setEnabled(checked == value)
-                                ),
-                            )
+
+                            def on_toggled(
+                                checked: bool,
+                                option_widget: QtWidgets.QWidget = option_widget,
+                                value: bool = enabled_by_value,
+                            ) -> None:
+                                option_widget.setEnabled(checked == value)
+
+                            enabler_widget.toggled.connect(on_toggled)
                             option_widget.setEnabled(enabler_widget.isChecked() == enabled_by_value)
 
                             if option_widget_label is not None:
-                                enabler_widget.toggled.connect(
-                                    lambda checked, option_widget_label=option_widget_label, value=enabled_by_value: (
-                                        option_widget_label.setEnabled(checked == value)
-                                    ),
-                                )
+
+                                def on_toggled(
+                                    checked: bool,
+                                    option_widget_label: str = option_widget_label,
+                                    value: bool = enabled_by_value,
+                                ) -> None:
+                                    option_widget_label.setEnabled(checked == value)
+
+                                enabler_widget.toggled.connect(on_toggled)
                                 option_widget_label.setEnabled(
                                     enabler_widget.isChecked() == enabled_by_value,
                                 )
@@ -4130,11 +4178,15 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                             )
 
                             if option_widget_label is not None:
-                                enabler_widget.currentTextChanged.connect(
-                                    lambda text, option_widget_label=option_widget_label, value=enabled_by_value: (
-                                        option_widget_label.setEnabled(text == value)
-                                    ),
-                                )
+
+                                def on_currentTextChanged(  # noqa: N802
+                                    text: str,
+                                    option_widget_label: str = option_widget_label,
+                                    value: str = enabled_by_value,
+                                ) -> None:
+                                    option_widget_label.setEnabled(text == value)
+
+                                enabler_widget.currentTextChanged.connect(on_currentTextChanged)
                                 option_widget_label.setEnabled(
                                     enabler_widget.currentText() == enabled_by_value,
                                 )
@@ -4471,7 +4523,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         layout.addStretch()
         layout.addSpacing(dialog.fontMetrics().height())
 
-        def rip_courses():
+        def rip_courses() -> tuple[int, int]:
             filepath = input_file_edit.get_path()
             dirpath = output_directory_edit.get_path()
             humanreadable_formats = humanreadable_formats_checkbox.isChecked()
@@ -5164,7 +5216,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
         header_font_size = int(font_height * 0.85)
         font_size = int(font_height * 0.75)
 
-        def generate_html(course_names):
+        def generate_html(course_names: list[str]) -> str:
             html = '<table style="white-space: nowrap; vertical-align: middle;">'
 
             battle_stages_enabled = len(course_names) % mkdd_extender.RACE_TRACK_COUNT != 0
