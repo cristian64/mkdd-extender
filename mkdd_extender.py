@@ -403,9 +403,7 @@ def rename(src_path: str, dst_path: str) -> None:
                     f'Rename "{src_path}" to "{dst_path}" failed: '
                     f'robocopy returned {process.returncode}.'
                 )
-                raise RuntimeError(
-                    msg,
-                )
+                raise RuntimeError(msg)
     else:
         try:
             os.rename(src_path, dst_path)
@@ -1140,9 +1138,7 @@ def repack_course_arc_file(archive_filepath: str, new_dirname: str) -> None:
                 f'Unable to rename entries in "{archive_filepath}". Unexpected '
                 'number of root entries in directory.'
             )
-            raise MKDDExtenderError(
-                msg,
-            )
+            raise MKDDExtenderError(msg)
 
         dirname = dirnames[0]
         dirpath = os.path.join(tmp_dir, dirname)
@@ -1919,9 +1915,7 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
             f'Unsupported channel count ({channel_count}) in "{filepath}". '
             'Expected 1, 2, or 4 channels.'
         )
-        raise MKDDExtenderError(
-            msg,
-        )
+        raise MKDDExtenderError(msg)
 
     needs_mixing = mix_to_mono and channel_count != 1
     needs_downsampling = downsample_sample_rate and sample_rate != downsample_sample_rate
@@ -2451,9 +2445,7 @@ def meld_courses(
                 f'Initial page number has been set to {initial_page_number}, but only '
                 f'{total_page_count} pages have been configured.'
             )
-            raise MKDDExtenderError(
-                msg,
-            )
+            raise MKDDExtenderError(msg)
 
         # RARC file gets too large, and causes a crash. Reducing image size is a workaround.
         # However, if extended memory has been set, the retail dimensions can be used instead.
@@ -2594,9 +2586,7 @@ def meld_courses(
                     f'has been assigned to {COURSE_TO_NAME[COURSES[track_index]]} (a '
                     f'{"battle stage" if is_battle_stage else "race track"} slot).'
                 )
-                raise MKDDExtenderError(
-                    msg,
-                )
+                raise MKDDExtenderError(msg)
 
             # Verify that the required code patches for the track have been enabled.
             for code_patch in code_patches.replace('"', '').replace("'", '').split(','):
@@ -2904,9 +2894,7 @@ def meld_courses(
             expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
             if not expected_languages:
                 msg = f'Unable to locate language directories in "{nodename}" for course logo.'
-                raise MKDDExtenderError(
-                    msg,
-                )
+                raise MKDDExtenderError(msg)
             for language in expected_languages:
                 logo_filepath = find_and_conform_or_generate_image_path(
                     language,
@@ -2932,9 +2920,7 @@ def meld_courses(
             expected_languages = tuple(lang for lang in LANGUAGES if lang in expected_languages)
             if not expected_languages:
                 msg = f'Unable to locate `SceneData/language` directories in "{nodename}".'
-                raise MKDDExtenderError(
-                    msg,
-                )
+                raise MKDDExtenderError(msg)
 
             preview_image_partial_name = COURSE_TO_PREVIEW_IMAGE_NAME[COURSES[track_index]]
             label_image_partial_name = COURSE_TO_LABEL_IMAGE_NAME[COURSES[track_index]]
@@ -3056,9 +3042,7 @@ def meld_courses(
                 )
             except Exception as e:
                 msg = f'Unable to parse minimap data in "{nodename}": {e!s}.'
-                raise MKDDExtenderError(
-                    msg,
-                ) from e
+                raise MKDDExtenderError(msg) from e
 
             # Gather cheat codes for each region.
             if not args.skip_course_cheat_codes:
@@ -3093,9 +3077,7 @@ def meld_courses(
             except (AssertionError, Exception) as e:
                 error_message = f': {e!s}' if str(e) else ''
                 msg = f'Unexpected error while processing "{nodename}"{error_message}'
-                raise type(e)(
-                    msg,
-                ) from e
+                raise type(e)(msg) from e
 
         raise_if_canceled()
 
@@ -3277,9 +3259,7 @@ def gather_audio_file_indices(
                 msg = (
                     f'Unable to locate a valid audio track candidate in the file list: {filenames}.'
                 )
-                raise MKDDExtenderError(
-                    msg,
-                )
+                raise MKDDExtenderError(msg)
     stock_audio_track_indices = tuple(stock_audio_track_indices)
 
     FALLBACK_AUDIO_COURSE = 'Luigi'
@@ -3354,9 +3334,7 @@ def verify_dol_checksum(args: argparse.Namespace, iso_tmp_dir: str) -> None:
                 f'{message} Re-run with --skip-dol-checksum-check to '
                 'circumvent this safety measure.'
             )
-            raise MKDDExtenderError(
-                msg,
-            )
+            raise MKDDExtenderError(msg)
 
 
 def get_game_id(iso_tmp_dir: str) -> str:
@@ -3978,9 +3956,7 @@ def patch_dol_file(
                 'Unable to locate minimap transforms functions in DOL file. Re-run with '
                 '--skip-minimap-transforms-removal to proceed.'
             )
-            raise MKDDExtenderError(
-                msg,
-            )
+            raise MKDDExtenderError(msg)
 
         with open(dol_path, 'r+b') as f:
             f.seek(functions_offset)
@@ -4618,9 +4594,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 f'Number of items in the `tracks` argument not a multiple of {RACE_TRACK_COUNT} or '
                 f'{RACE_AND_BATTLE_COURSE_COUNT}: {args.tracks}'
             )
-            raise MKDDExtenderError(
-                msg,
-            )
+            raise MKDDExtenderError(msg)
         paths = args.tracks
         tracks_is_dir = False
     else:
@@ -4869,9 +4843,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                     f'{message}. Re-run with --skip-filesize-check to '
                     'circumvent this safety measure.'
                 )
-                raise MKDDExtenderError(
-                    msg,
-                )
+                raise MKDDExtenderError(msg)
 
         raise_if_canceled()
 
@@ -4979,9 +4951,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 'bytes). Possible solutions: remove some audio tracks, downsample audio tracks, or '
                 'remove some custom courses.'
             )
-            raise MKDDExtenderError(
-                msg,
-            ) from e
+            raise MKDDExtenderError(msg) from e
         iso_size = os.path.getsize(args.output)
         human_readable_iso_size = round(os.path.getsize(args.output) / 1024.0 / 1024.0)
         log.info(f'ISO image written ({files_written} files - {human_readable_iso_size} MiB).')
@@ -4994,9 +4964,7 @@ def extend_game(args: argparse.Namespace, raise_if_canceled: callable = lambda: 
                 f'({EXTREME_MAX_ISO_SIZE} bytes). Possible solutions: remove some audio tracks, '
                 'downsample audio tracks, or remove some custom courses.'
             )
-            raise MKDDExtenderError(
-                msg,
-            )
+            raise MKDDExtenderError(msg)
 
         if iso_size > MAX_ISO_SIZE:
             log.warning(

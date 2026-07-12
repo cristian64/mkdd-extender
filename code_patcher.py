@@ -442,18 +442,14 @@ def read_minimap_values(
                     'Unable to extract minimap values values from DOL file. '
                     f'Corner value ({v4}) is unexpectedly large.'
                 )
-                raise RuntimeError(
-                    msg,
-                )
+                raise RuntimeError(msg)
 
             if v4 not in (0, 1, 2, 3):
                 msg = (
                     'Unable to extract minimap orientation values from DOL file. '
                     f'Orientation enum value ({v4}) not in [0, 3].'
                 )
-                raise RuntimeError(
-                    msg,
-                )
+                raise RuntimeError(msg)
 
             minimap_values[course] = (v0, v1, v2, v3, v4)
 
@@ -1841,9 +1837,7 @@ def patch_dol_file(
             'The **Bouncy Terrain Type** code patch is not currently compatible with the NTSC-U '
             'Debug build.'
         )
-        raise mkdd_extender.MKDDExtenderError(
-            msg,
-        )
+        raise mkdd_extender.MKDDExtenderError(msg)
 
     if args.lan_choose_character_and_kart:
         with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as temp_dir:

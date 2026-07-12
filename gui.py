@@ -4305,9 +4305,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if not os.path.isdir(dirpath):
                 msg = 'Output path already exists, but it is not a directory.'
-                raise mkdd_extender.MKDDExtenderError(
-                    msg,
-                )
+                raise mkdd_extender.MKDDExtenderError(msg)
 
             if os.listdir(dirpath):
                 msg = 'Output directory is not empty.'
@@ -4331,9 +4329,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         'Please make sure that all slots have been assigned to a valid custom '
                         'course.'
                     )
-                    raise mkdd_extender.MKDDExtenderError(
-                        msg,
-                    )
+                    raise mkdd_extender.MKDDExtenderError(msg)
                 paths.append(path)
 
             LETTER_RANGE = f'A-{chr(ord("A") + mkdd_extender.MAX_EXTRA_PAGES - 1)}'
@@ -4539,9 +4535,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if not os.path.isdir(dirpath):
                 msg = 'Output path already exists, but it is not a directory.'
-                raise mkdd_extender.MKDDExtenderError(
-                    msg,
-                )
+                raise mkdd_extender.MKDDExtenderError(msg)
 
             return mkdd_extender.rip_courses_from_iso(filepath, dirpath, humanreadable_formats)
 
@@ -5093,9 +5087,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 if input_path.endswith('.ast'):
                     if output_ext != '.wav':
                         msg = f'Unexpected output file extension: "{output_ext}" (expected ".wav")'
-                        raise mkdd_extender.MKDDExtenderError(
-                            msg,
-                        )
+                        raise mkdd_extender.MKDDExtenderError(msg)
 
                     def func() -> None:
                         ast_converter.convert_to_wav(input_path, output_path)
@@ -5103,9 +5095,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 else:
                     if output_ext != '.ast':
                         msg = f'Unexpected output file extension: "{output_ext}" (expected ".ast")'
-                        raise mkdd_extender.MKDDExtenderError(
-                            msg,
-                        )
+                        raise mkdd_extender.MKDDExtenderError(msg)
 
                     def func() -> None:
                         if looped_box.isChecked():
@@ -5343,14 +5333,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
 
             if not input_path:
                 msg = 'Path to the input ISO file has not been specified.'
-                raise mkdd_extender.MKDDExtenderError(
-                    msg,
-                )
+                raise mkdd_extender.MKDDExtenderError(msg)
             if not output_path:
                 msg = 'Path to the output ISO file has not been specified.'
-                raise mkdd_extender.MKDDExtenderError(
-                    msg,
-                )
+                raise mkdd_extender.MKDDExtenderError(msg)
 
             if input_path == output_path:
                 msg = 'Input and output paths cannot be identical.'
@@ -5359,9 +5345,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
             _stem, ext = os.path.splitext(output_path)
             if ext not in ('.iso', '.gcm'):
                 msg = 'File extension in output path should be either `.iso` or `.gcm`.'
-                raise mkdd_extender.MKDDExtenderError(
-                    msg,
-                )
+                raise mkdd_extender.MKDDExtenderError(msg)
 
             args = argparse.Namespace()
             args.input = input_path
