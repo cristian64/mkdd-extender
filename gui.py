@@ -4402,7 +4402,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 text = 'Custom courses processed successfully.'
                 detailed_text = ''
 
-            show_message(icon_name, title, text, detailed_text, self)
+            show_message(icon_name, title, text, detailed_text, dialog)
 
         generate_button = QtWidgets.QPushButton('Generate')
         generate_button.clicked.connect(on_generate_button_clicked)
@@ -4620,7 +4620,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 )
                 detailed_text = ''
 
-            show_message(icon_name, title, text, detailed_text, self)
+            show_message(icon_name, title, text, detailed_text, dialog)
 
         rip_courses_button = QtWidgets.QPushButton('Rip Courses')
         rip_courses_button.clicked.connect(on_rip_courses_button_clicked)
@@ -5152,7 +5152,7 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                 text = 'Audio file converted successfully.'
                 detailed_text = ''
 
-            show_message(icon_name, title, text, detailed_text, self)
+            show_message(icon_name, title, text, detailed_text, dialog)
 
         path = self._settings.value('ast_converter/input_path')
         if path:
