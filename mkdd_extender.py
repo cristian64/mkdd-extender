@@ -1017,7 +1017,9 @@ def rip_courses_from_iso(
                 if ext == '.bti':
                     convert_bti_to_png(filepath, f'{stem}.png')
                 elif ext == '.ast':
-                    ast_converter.convert_to_wav(filepath, f'{stem}.wav')
+                    metadata = ast_converter.get_ast_info(filepath)
+                    if metadata['audio_format'] == 'PCM':
+                        ast_converter.convert_to_wav(filepath, f'{stem}.wav')
 
     return page_count, len(os.listdir(dirpath))
 
@@ -1905,6 +1907,12 @@ def conform_audio_file(filepath: str, mix_to_mono: bool, downsample_sample_rate:
         return
 
     ast_info = ast_converter.get_ast_info(filepath)
+    if ast_info['audio_format'] != 'PCM':
+        log.warning(
+            f'Skipping audio conforming ("{filepath}"); audio format ({ast_info["audio_format"]}) '
+            'not supported',
+        )
+        return
 
     bit_depth = ast_info['bit_depth']
     channel_count = ast_info['channel_count']

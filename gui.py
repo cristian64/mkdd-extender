@@ -1151,6 +1151,10 @@ class ASTPlayer(QtWidgets.QWidget):
         wav_filepath = os.path.join(ASTPlayer._audio_tmp_dir, f'{hash(self._ast_filepath)}.wav')
 
         if not os.path.isfile(wav_filepath):
+            metadata = ast_converter.get_ast_info(self._ast_filepath)
+            if metadata['audio_format'] != 'PCM':
+                msg = f'Unsupported audio format: {metadata["audio_format"]}'
+                raise mkdd_extender.MKDDExtenderError(msg)
             ast_converter.convert_to_wav(self._ast_filepath, wav_filepath)
 
         self._wav_filepath = wav_filepath
@@ -1650,6 +1654,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
             if cache:
                 self._ast_metadata_cache[ast_filepath] = metadata
 
+        audio_format = metadata['audio_format']
         sample_count = metadata['sample_count']
         sample_rate = metadata['sample_rate']
         bit_depth = metadata['bit_depth']
@@ -1661,6 +1666,7 @@ class InfoViewWidget(QtWidgets.QScrollArea):
 
         return textwrap.dedent(f"""\
             <table>
+            <tr><td><b>Format: </b> </td><td>{audio_format}</td></tr>
             <tr><td><b>Duration: </b> </td><td>{human_readable_duration(sample_count, sample_rate)}</td></tr>
             <tr><td><b>Sample Rate: </b> </td><td>{sample_rate} Hz</td></tr>
             <tr><td><b>Bit Depth: </b> </td><td>{bit_depth}</td></tr>
@@ -5090,6 +5096,10 @@ class MKDDExtenderWindow(QtWidgets.QMainWindow):
                         raise mkdd_extender.MKDDExtenderError(msg)
 
                     def func() -> None:
+                        metadata = ast_converter.get_ast_info(input_path)
+                        if metadata['audio_format'] != 'PCM':
+                            msg = f'Unsupported audio format: {metadata["audio_format"]}'
+                            raise mkdd_extender.MKDDExtenderError(msg)
                         ast_converter.convert_to_wav(input_path, output_path)
 
                 else:

@@ -25,9 +25,11 @@ try:
 except ImportError:
     _NUMPY_AVAILABLE = False
 
+ADPCM_FORMAT = 0x0000
+PCM_FORMAT = 0x0001
+
 _MAGIC = struct.unpack('>L', b'STRM')[0]
 _HEADER_SIZE = 0x40
-_PCM_FORMAT = 0x0001
 _BLOCK_SIZE = 10080
 _BLOCK_MAGIC = struct.unpack('>L', b'BLCK')[0]
 _BLOCK_HEADER_SIZE = 0x20
@@ -77,7 +79,7 @@ def get_ast_info(filepath: str) -> dict[str, int]:
 
         assert magic_bytes == _MAGIC
         assert filesize == _HEADER_SIZE + block_data_size
-        assert audio_format == _PCM_FORMAT
+        assert audio_format in (ADPCM_FORMAT, PCM_FORMAT)
         assert bit_depth in (8, 16, 32)
         assert looped in (0x0000, 0xFFFF)
         assert loop_start < sample_count
@@ -97,14 +99,14 @@ def get_ast_info(filepath: str) -> dict[str, int]:
     (
         block_magic_bytes,
         last_block_size,
+        _unknown,  # Seen set in ADPCM files.
         padding0,
         padding1,
-        padding2,
     ) = struct.unpack('>LLQQQ', data)
 
     assert block_magic_bytes == _BLOCK_MAGIC
     assert last_block_size <= block_size
-    assert not (padding0 or padding1 or padding2)
+    assert not (padding0 or padding1)
 
     last_block_real_size = (filesize - last_block_offset - _BLOCK_HEADER_SIZE) // channel_count
 
@@ -114,6 +116,7 @@ def get_ast_info(filepath: str) -> dict[str, int]:
     assert last_block_real_size <= last_block_size
 
     return {
+        'audio_format': 'PCM' if audio_format == PCM_FORMAT else 'ADPCM',
         'block_data_size': block_data_size,
         'bit_depth': bit_depth,
         'channel_count': channel_count,
@@ -303,7 +306,7 @@ def convert_to_wav(src_filepath: str, dst_filepath: str) -> None:
 
     assert magic_bytes == _MAGIC
     assert filesize == _HEADER_SIZE + block_data_size
-    assert audio_format == _PCM_FORMAT
+    assert audio_format == PCM_FORMAT
     assert bit_depth in (8, 16, 32)
     assert looped in (0x0000, 0xFFFF)
     assert loop_start < sample_count
@@ -467,7 +470,7 @@ def convert_to_ast(
             '>LLHHHHLLLLLLbBHLQQ',
             _MAGIC,
             block_data_size,
-            _PCM_FORMAT,
+            PCM_FORMAT,
             bit_depth,
             channel_count,
             looped,
