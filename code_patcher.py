@@ -122,33 +122,6 @@ the `r2` register (+ the offset seen in the assembly), should tell which is the 
 "variable" that we are after.
 """
 
-SPAM_FLAG_ADDRESSES = {
-    'GM4E01': 0x802ED5F8,
-    'GM4P01': 0x802F90EC,
-    'GM4J01': 0x80309B6C,
-    'GM4E01dbg': 0x8032B158,
-}
-"""
-Memory address used to determine whether the button combination can be accepted. The intent is to
-force the player to release the D-pad before the page can be changed, avoiding potentially dangerous
-spam.
-
-This is the address to the first "This is padding" string (starting at "padding") that can be found
-in memory, to ensure that it can be overridden safely.
-"""
-
-CURRENT_PAGE_ADDRESSES = {k: v + 1 for k, v in SPAM_FLAG_ADDRESSES.items()}
-"""
-Memory address where the currently selected page index is stored. Defined as the next byte after
-the spam flag.
-"""
-
-GP_INITIAL_PAGE_ADDRESSES = {k: v + 1 for k, v in CURRENT_PAGE_ADDRESSES.items()}
-"""
-Memory address where the initial page in GP mode is stored. Defined as the next byte after the
-current page. Used in the Extender Cup.
-"""
-
 LAN_MENU_TITLE_INDEX_INSTRUCTION_ADDRESSES = {
     'GM4E01': 0x801E457C,
     'GM4P01': 0x801E4554,
@@ -167,25 +140,6 @@ another image would have to be introduced or repurposed.
 
 Instead, the index will be changed to the "SELECT COURSE" image (index `4`), which users have argue
 is a better text for the screen anyway.
-"""
-
-GP_GLOBAL_COURSE_INDEX_ADDRESSES = {k: v + 1 for k, v in GP_INITIAL_PAGE_ADDRESSES.items()}
-"""
-Memory address where the global course index in the Extender Cup code patch is stored. Defined as
-the next byte after the initial page.
-"""
-
-PLAYER_ITEM_ROLLS_ADDRESSES = {
-    'GM4E01': 0x802ED64F,
-    'GM4P01': 0x802F9D06,
-    'GM4J01': 0x8030A786,
-    'GM4E01dbg': 0x8032B1AF,
-}
-"""
-Memory address for the **Type-specific Item Boxes** code patch, where the players' item rolls will
-be temporarily stored. 8 bytes are used (one for each kart in the race).
-
-This is the address to the second "This is padding" string in the game.
 """
 
 SKIP_MOVIE_TRAILER_INSTRUCTIONS_ADDRESSES = {
@@ -1401,27 +1355,6 @@ retail ISO images when the instruction sequence (see `OSARENALO_INSTRUCTIONS_ADD
 executed.
 """
 
-KART_EXTENDED_TERRAIN_FLAG_ADDRESSES = {
-    'GM4E01': 0x802EDFC8,
-    'GM4P01': 0x80308588,
-    'GM4J01': 0x80319008,
-    'GM4E01dbg': 0x8032BB28,
-}
-"""
-Padding used to store a Char that functions as a flag for every Kart in the race.
-
-This is the address to the "This is padding to SCRNblo2" string.
-"""
-
-KART_BOUNCE_DEFAULT_READ_ADDRESSES = {
-    k: v + 8 for k, v in KART_EXTENDED_TERRAIN_FLAG_ADDRESSES.items()
-}
-"""
-Padding used by bounce logic to read movement vector data from if nothing was set up for the
-material in the .BCO file. Very useful for developing a CC with Bouncy if you don't know
-how much force you require. Loccation defined is KART_EXTENDED_TERRAIN_FLAG[game_id] + 0x8.
-"""
-
 DO_SPD_CTRL_CALL_HIJACK_ADDRESSES = {
     'GM4E01': 0x802AA8C8,
     'GM4P01': 0x802AA8A4,
@@ -2027,7 +1960,6 @@ def patch_dol_file(
                 '__COURSE_TO_STREAM_FILE_INDEX_ADDRESS__',
                 f'0x{COURSE_TO_STREAM_FILE_INDEX_ADDRESSES[game_id] + offset:08X}',
             ),
-            ('__CURRENT_PAGE_ADDRESS__', f'0x{CURRENT_PAGE_ADDRESSES[game_id]:08X}'),
             ('__EXTENDER_CUP__', str(int(extender_cup))),
             ('__GAMEAUDIO_MAIN_ADDRESS__', f'0x{GAMEAUDIO_MAIN_ADDRESSES[game_id]:08X}'),
             ('__GM4E01__', str(int(game_id == 'GM4E01'))),
@@ -2037,11 +1969,7 @@ def patch_dol_file(
             ('__GP_AWARDED_SCORES_ADDRESS__', f'0x{GP_AWARDED_SCORES_ADDRESSES[game_id]:08X}'),
             ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
             ('__GP_CUP_INDEX_ADDRESS__', f'0x{GP_CUP_INDEX_ADDRESSES[game_id]:08X}'),
-            (
-                '__GP_GLOBAL_COURSE_INDEX_ADDRESS__',
-                f'0x{GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id]:08X}',
-            ),
-            ('__GP_INITIAL_PAGE_ADDRESS__', f'0x{GP_INITIAL_PAGE_ADDRESSES[game_id]:08X}'),
+            ('__INITIAL_PAGE_INDEX__', f'{initial_page_index}'),
             ('__LAN_STRUCT_ADDRESS__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][0]:08X}'),
             ('__LAN_STRUCT_OFFSET1__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][1]:04X}'),
             ('__LAN_STRUCT_OFFSET2__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][2]:04X}'),
@@ -2049,12 +1977,10 @@ def patch_dol_file(
             ('__LAN_STRUCT_OFFSET4__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][4]:04X}'),
             ('__LAN_STRUCT_OFFSET5__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][5]:04X}'),
             ('__PAGE_COUNT__', f'{page_count}'),
-            ('__PLAYER_ITEM_ROLLS_ADDRESS__', f'0x{PLAYER_ITEM_ROLLS_ADDRESSES[game_id]:08X}'),
             (
                 '__REDRAW_COURSESELECT_SCREEN_ADDRESS__',
                 f'0x{REDRAW_COURSESELECT_SCREEN_ADDRESSES[game_id]:08X}',
             ),
-            ('__SPAM_FLAG_ADDRESS__', f'0x{SPAM_FLAG_ADDRESSES[game_id]:08X}'),
             ('__USE_ALT_BUTTONS__', str(int(use_alternative_buttons))),
             (
                 '__RESET_COURSE_PAGE_ON_LAN_INITIALIZATION__',
@@ -2074,14 +2000,6 @@ def patch_dol_file(
             ('__CUSTOMIZABLE_FALLING_STARS__', str(int(customizable_falling_stars))),
             ('__SECTIONED_COURSES__', str(int(sectioned_courses))),
             ('__BOUNCY_TERRAIN_TYPE__', str(int(bouncy_terrain_type))),
-            (
-                '__KART_EXTENDED_TERRAIN_FLAG_ADDRESS__',
-                f'0x{KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id]:04X}',
-            ),
-            (
-                '__KART_BOUNCE_DEFAULT_READ_ADDRESS__',
-                f'0x{KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id]:04X}',
-            ),
             (
                 '__LAN_CHOOSE_CHARACTER_AND_KART__',
                 str(int(bool(args.lan_choose_character_and_kart))),
@@ -2106,25 +2024,6 @@ def patch_dol_file(
                     dol_file.seek(OSARENALO_INSTRUCTIONS_ADDRESSES[game_id])
                     doltools.write_lis(dol_file, 3, unaligned_new_osarena_value >> 16, signed=False)
                     doltools.write_ori(dol_file, 3, 3, unaligned_new_osarena_value & 0xFFFF)
-
-                # Initialize static variables.
-                if page_count > 1:
-                    project.dol.seek(SPAM_FLAG_ADDRESSES[game_id])
-                    project.dol.write(b'\0')
-                    project.dol.seek(CURRENT_PAGE_ADDRESSES[game_id])
-                    project.dol.write(initial_page_index.to_bytes(1, 'big'))
-                if extender_cup:
-                    project.dol.seek(GP_GLOBAL_COURSE_INDEX_ADDRESSES[game_id])
-                    project.dol.write(b'\0')
-                if type_specific_item_boxes:
-                    project.dol.seek(PLAYER_ITEM_ROLLS_ADDRESSES[game_id])
-                    project.dol.write(b'\xff\xff\xff\xff\xff\xff\xff\xff')
-
-                if bouncy_terrain_type:
-                    project.dol.seek(KART_EXTENDED_TERRAIN_FLAG_ADDRESSES[game_id])
-                    project.dol.write(b'\x00\x00\x00\x00\x00\x00\x00\x00')
-                    project.dol.seek(KART_BOUNCE_DEFAULT_READ_ADDRESSES[game_id])
-                    project.dol.write(b'\x50\x00\x50\x00')
 
                 # Initialize the strings with the character of the first page ('0').
                 if page_count > 1:
@@ -2419,21 +2318,28 @@ def patch_dol_file(
 
                 # Further symbol post-processing once the map is available.
                 if pass_number == 0:
-                    if extender_cup or args.reset_course_page_on_title_screen:
-                        with open('project.map', encoding='ascii') as f:
-                            for line in f:
-                                if 'g_extender_cup_cup_filenames' in line:
-                                    extender_cup_cup_filenames_address = int(
-                                        line.split()[0],
-                                        base=16,
-                                    )
-                                elif 'g_extender_cup_preview_filenames' in line:
-                                    extender_cup_preview_filename_address = int(
-                                        line.split()[0],
-                                        base=16,
-                                    )
-                                elif 'scenetitle_init_ex' in line:
-                                    scenetitle_init_ex_address = int(line.split()[0], base=16)
+                    for line in project_map_lines:
+                        if extender_cup:
+                            if 'g_extender_cup_cup_filenames' in line:
+                                extender_cup_cup_filenames_address = int(
+                                    line.split()[0],
+                                    base=16,
+                                )
+                            elif 'g_extender_cup_preview_filenames' in line:
+                                extender_cup_preview_filename_address = int(
+                                    line.split()[0],
+                                    base=16,
+                                )
+                        if args.reset_course_page_on_title_screen:
+                            if 'scenetitle_init_ex' in line:
+                                scenetitle_init_ex_address = int(line.split()[0], base=16)
+                        if bouncy_terrain_type:
+                            if 'g_kart_bounce_default_properties' in line:
+                                address = int(line.split()[0], base=16)
+                                log.info(
+                                    'Bouncy Terrain Type: Default properties address: '
+                                    f'0x{address:08X}',
+                                )
                     if extender_cup:
                         assert extender_cup_cup_filenames_address is not None
                         assert extender_cup_preview_filename_address is not None

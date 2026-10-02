@@ -17,7 +17,6 @@
 #define BATTLE_STAGES __BATTLE_STAGES__
 #define BUTTONS_STATE_ADDRESS __BUTTONS_STATE_ADDRESS__
 #define COURSE_TO_STREAM_FILE_INDEX_ADDRESS __COURSE_TO_STREAM_FILE_INDEX_ADDRESS__
-#define CURRENT_PAGE_ADDRESS __CURRENT_PAGE_ADDRESS__
 #define EXTENDER_CUP __EXTENDER_CUP__
 #define RESET_COURSE_PAGE_ON_LAN_INITIALIZATION __RESET_COURSE_PAGE_ON_LAN_INITIALIZATION__
 #define RESET_COURSE_PAGE_ON_TITLE_SCREEN __RESET_COURSE_PAGE_ON_TITLE_SCREEN__
@@ -29,8 +28,7 @@
 #define GP_AWARDED_SCORES_ADDRESS __GP_AWARDED_SCORES_ADDRESS__
 #define GP_COURSE_INDEX_ADDRESS __GP_COURSE_INDEX_ADDRESS__
 #define GP_CUP_INDEX_ADDRESS __GP_CUP_INDEX_ADDRESS__
-#define GP_GLOBAL_COURSE_INDEX_ADDRESS __GP_GLOBAL_COURSE_INDEX_ADDRESS__
-#define GP_INITIAL_PAGE_ADDRESS __GP_INITIAL_PAGE_ADDRESS__
+#define INITIAL_PAGE_INDEX __INITIAL_PAGE_INDEX__
 #define LAN_STRUCT_ADDRESS __LAN_STRUCT_ADDRESS__
 #define LAN_STRUCT_OFFSET1 __LAN_STRUCT_OFFSET1__
 #define LAN_STRUCT_OFFSET2 __LAN_STRUCT_OFFSET2__
@@ -38,9 +36,7 @@
 #define LAN_STRUCT_OFFSET4 __LAN_STRUCT_OFFSET4__
 #define LAN_STRUCT_OFFSET5 __LAN_STRUCT_OFFSET5__
 #define PAGE_COUNT __PAGE_COUNT__
-#define PLAYER_ITEM_ROLLS_ADDRESS __PLAYER_ITEM_ROLLS_ADDRESS__
 #define REDRAW_COURSESELECT_SCREEN_ADDRESS __REDRAW_COURSESELECT_SCREEN_ADDRESS__
-#define SPAM_FLAG_ADDRESS __SPAM_FLAG_ADDRESS__
 #define USE_ALT_BUTTONS __USE_ALT_BUTTONS__
 #define COURSE_AND_AUTHOR_NAMES __COURSE_AND_AUTHOR_NAMES__
 #define IDLE_AUTOPILOT __IDLE_AUTOPILOT__
@@ -49,8 +45,6 @@
 #define CUSTOMIZABLE_FALLING_STARS __CUSTOMIZABLE_FALLING_STARS__
 #define SECTIONED_COURSES __SECTIONED_COURSES__
 #define BOUNCY_TERRAIN_TYPE __BOUNCY_TERRAIN_TYPE__
-#define KART_EXTENDED_TERRAIN_FLAG_ADDRESS __KART_EXTENDED_TERRAIN_FLAG_ADDRESS__
-#define KART_BOUNCE_DEFAULT_READ_ADDRESS __KART_BOUNCE_DEFAULT_READ_ADDRESS__
 #define LAN_CHOOSE_CHARACTER_AND_KART __LAN_CHOOSE_CHARACTER_AND_KART__
 #define APPMGR_MSGAMEAPP_ADDRESS __APPMGR_MSGAMEAPP_ADDRESS__
 
@@ -68,9 +62,11 @@
 void set_course_page(int page);
 #endif
 
+static char g_current_page = INITIAL_PAGE_INDEX;
+
 void change_course_page(const int delta)
 {
-    const int previous_page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
+    const int previous_page = (int)g_current_page;
     const int page = (previous_page + delta + PAGE_COUNT) % PAGE_COUNT;
 
 #if RESET_COURSE_PAGE_ON_TITLE_SCREEN >= 0 || RESET_COURSE_PAGE_ON_LAN_INITIALIZATION >= 0
@@ -80,7 +76,7 @@ void change_course_page(const int delta)
 void set_course_page(const int page)
 {
 #endif
-    *(char*)CURRENT_PAGE_ADDRESS = (char)page;
+    g_current_page = (char)page;
 
     const char suffix = '0' + page;
     // __STRING_DATA_PLACEHOLDER__
@@ -152,7 +148,7 @@ void refresh_mapselectmode()
 bool is_tilting_course(const int* const course)
 {
     const int course_id = *course;
-    const int page = (int)(*(char*)CURRENT_PAGE_ADDRESS);
+    const int page = (int)g_current_page;
 
     // __TILTING_DATA_PLACEHOLDER__
 
@@ -172,6 +168,8 @@ struct NetGameMgr
     char unknown2[0x12E8 - 0xC59];
     char network_console_count;
 };
+
+static char g_spam_flag = 0;
 
 void process_course_page_change(const int mode)
 {
@@ -212,7 +210,7 @@ void process_course_page_change(const int mode)
 #endif
     {
         // The spam flag is used to time how soon the course page can be changed again.
-        const char spam_flag = *(char*)SPAM_FLAG_ADDRESS;
+        const char spam_flag = g_spam_flag;
         if (spam_flag <= 1)
         {
             next_spam_flag = spam_flag ? 10 : 30;
@@ -245,7 +243,7 @@ void process_course_page_change(const int mode)
         next_redraw_courseselect_screen = 13.0f;
     }
 
-    *(char*)SPAM_FLAG_ADDRESS = next_spam_flag;
+    g_spam_flag = next_spam_flag;
 
     if (mode == RACE_MODE)
     {
@@ -345,7 +343,7 @@ static void draw_course_and_author_name()
 {
     do
     {
-        const int page_index = (int)(*(char*)CURRENT_PAGE_ADDRESS);
+        const int page_index = (int)g_current_page;
         if (page_index == 0)
             break;
         const int page_effective_index = page_index - 1;
@@ -488,12 +486,15 @@ const int g_limited_awarded_scores[8] = {6, 5, 4, 3, 2, 1, 0, 0};
 #endif
 #endif
 
+static char g_gp_global_course_index = 0;
+static char g_gp_initial_page = 0;
+
 void on_gp_about_to_start()
 {
     asm("stw 0, 0x0094(3)");  // Hijacked instruction.
 
-    *(char*)GP_GLOBAL_COURSE_INDEX_ADDRESS = 0;
-    *(char*)GP_INITIAL_PAGE_ADDRESS = *(const char*)CURRENT_PAGE_ADDRESS;
+    g_gp_global_course_index = 0;
+    g_gp_initial_page = g_current_page;
 
 #if PAGE_COUNT > 6
     const int* const awarded_scores = (*(const char*)GP_CUP_INDEX_ADDRESS != ALL_CUP_TOUR_INDEX)
@@ -514,7 +515,7 @@ int get_gp_course_index()
         return *(char*)GP_COURSE_INDEX_ADDRESS;
     }
 
-    return *(char*)GP_GLOBAL_COURSE_INDEX_ADDRESS;
+    return g_gp_global_course_index;
 }
 
 void sequenceinfo_setclrgpcourse_ex()
@@ -524,7 +525,7 @@ void sequenceinfo_setclrgpcourse_ex()
     if (*(const char*)GP_CUP_INDEX_ADDRESS != ALL_CUP_TOUR_INDEX)
         return;
 
-    const char global_course_index = ++*(char*)GP_GLOBAL_COURSE_INDEX_ADDRESS;
+    const char global_course_index = ++g_gp_global_course_index;
     char* const course_index = (char*)GP_COURSE_INDEX_ADDRESS;
 
     if (*course_index == 16)
@@ -534,9 +535,9 @@ void sequenceinfo_setclrgpcourse_ex()
             *course_index = 0;
         }
 
-        const char initial_page = *(const char*)GP_INITIAL_PAGE_ADDRESS;
+        const char initial_page = g_gp_initial_page;
         const char pages_played = global_course_index / 16;
-        *(char*)CURRENT_PAGE_ADDRESS = initial_page + pages_played - 1;
+        g_current_page = initial_page + pages_played - 1;
     }
 
     change_course_page(1);
@@ -590,6 +591,8 @@ struct ItemObj
 
 #if TYPE_SPECIFIC_ITEM_BOXES
 
+static signed char g_player_item_rolls[8] = {[0 ... 7] = 0xFF};
+
 int itemobjmgr_isavailablerollingslot_ex(const unsigned int* const itemobjmgr,
                                          const int player,
                                          const unsigned int val2)
@@ -604,8 +607,7 @@ int itemobjmgr_isavailablerollingslot_ex(const unsigned int* const itemobjmgr,
     if (is_available)
     {
         const struct SObject* const sobj = itembox->sobj;
-        signed char* const player_item_rolls = (signed char*)PLAYER_ITEM_ROLLS_ADDRESS;
-        player_item_rolls[player] = (signed char)(sobj->field_36 == 0 ? -1 : sobj->field_36 - 1);
+        g_player_item_rolls[player] = (signed char)(sobj->field_36 == 0 ? -1 : sobj->field_36 - 1);
     }
 
     return is_available;
@@ -618,8 +620,7 @@ int itemshufflemgr_calcslot_ex(const unsigned int* const itemshufflemgr,
                                const bool unk3)
 {
     const int player = *(kartrankdataset - 8 / 4);
-    const signed char* const player_item_rolls = (const signed char*)PLAYER_ITEM_ROLLS_ADDRESS;
-    const int player_item_type = (int)player_item_rolls[player];
+    const int player_item_type = (int)g_player_item_rolls[player];
 
     if (player_item_type == -1)
     {
@@ -1404,6 +1405,9 @@ int floor_xz_speed(int xz_speed)
     return xz_speed;
 }
 
+int g_kart_bounce_default_properties = 0x50005000;
+// Address to symbol will be reported in the build log for modders.
+
 // Called when game detects that the Kart is touching bounce flag material.
 void begin_bounce_liftoff(struct KartBody* const kart_body, const int kart_num)
 {
@@ -1411,7 +1415,7 @@ void begin_bounce_liftoff(struct KartBody* const kart_body, const int kart_num)
 
     if (ground_hash == 0)  // If no bounce settings, read from memory. Useful during CT development.
     {
-        ground_hash = *(int*)(KART_BOUNCE_DEFAULT_READ_ADDRESS);  // Location is 0x8000523C.
+        ground_hash = g_kart_bounce_default_properties;
     }
 
     const int ground_hash_upper = (ground_hash >> 16) & 0xffff;
@@ -1731,12 +1735,14 @@ bool has_kart_bounce_flag(const char* const flag)
     return has_kart_extended_terrain_flag(flag, EXTENDED_TERRAIN_BOUNCE_FLAG);
 }
 
+static char g_kart_extended_terrain_flag[8] = {[0 ... 7] = 0x00};
+
 // In case flags are set during times they shouldn't be, clear them.
 void clear_bounce_flags_if_errant(struct KartBody* const kart_body, const int kart_num)
 {
     if (is_touching_ground(kart_body) && !is_touching_ground_and_bouncy_type(kart_body))
     {
-        char* const flag = (char*)(KART_EXTENDED_TERRAIN_FLAG_ADDRESS + kart_num);
+        char* const flag = &g_kart_extended_terrain_flag[kart_num];
 
         set_kart_bounce_flag(flag, false);
         set_kart_bounce_liftoff_flag(flag, false);
@@ -1760,8 +1766,7 @@ void do_spd_ctrl_call_hijack()
 
     clear_bounce_flags_if_errant(kart_body, *kart_num);
 
-    char* const kart_extended_terrain_flag =
-        (char*)(KART_EXTENDED_TERRAIN_FLAG_ADDRESS + *kart_num);
+    char* const kart_extended_terrain_flag = &g_kart_extended_terrain_flag[*kart_num];
 
     bool kart_bounce_flag = has_kart_bounce_flag(kart_extended_terrain_flag);
     bool kart_bounce_liftoff_flag = has_kart_bounce_liftoff_flag(kart_extended_terrain_flag);
