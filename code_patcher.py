@@ -1863,17 +1863,6 @@ def patch_dol_file(
     unaligned_new_osarena_value = 0
     injected_code_size = 0
 
-    def patch_osarena(dol_file: dolreader.DolFile, dol_section_address_plus_size: int) -> None:
-        nonlocal unaligned_new_osarena_value
-        nonlocal injected_code_size
-        nonlocal injected_code_size
-        unaligned_new_osarena_value = dol_section_address_plus_size
-        injected_code_size = dol_section_address_plus_size - dol_section_address
-
-        dol_file.seek(OSARENALO_INSTRUCTIONS_ADDRESSES[game_id])
-        doltools.write_lis(dol_file, 3, unaligned_new_osarena_value >> 16, signed=False)
-        doltools.write_ori(dol_file, 3, 3, unaligned_new_osarena_value & 0xFFFF)
-
     # String data.
     string_data_code_lines = []
     char_addresses = []
@@ -2112,7 +2101,11 @@ def patch_dol_file(
         with tempfile.TemporaryDirectory(prefix=mkdd_extender.TEMP_DIR_PREFIX) as tmp_dir:  # noqa: SIM117
             with current_directory(tmp_dir):
                 project = devkit_tools.Project(dol_path, address=dol_section_address)
-                project.set_osarena_patcher(patch_osarena)
+                dol_file = project.dol
+                if pass_number == 1:
+                    dol_file.seek(OSARENALO_INSTRUCTIONS_ADDRESSES[game_id])
+                    doltools.write_lis(dol_file, 3, unaligned_new_osarena_value >> 16, signed=False)
+                    doltools.write_ori(dol_file, 3, 3, unaligned_new_osarena_value & 0xFFFF)
 
                 # Initialize static variables.
                 if page_count > 1:
@@ -2395,6 +2388,35 @@ def patch_dol_file(
 
                 project.build('main.dol' if pass_number == 0 else dol_path)
 
+                injected_code_size = os.path.getsize('project.bin')
+
+                with open('project.map', encoding='ascii') as f:
+                    project_map_lines = f.readlines()
+
+                # The end of the last recognizable section marks the new address for the OS Arena.
+                # NOTE: Empirical tests show that the `.iplt` section is always present, it's always
+                # empty, and it's always the last relevant section. Because "we don't know
+                # what we don't know", other relevant section names are listed too, but the
+                # expection right now is that the new OS Arena address will always match the address
+                # of the empty `.iplt` section.
+                last_section_end = 0
+                for line in project_map_lines:
+                    if line.startswith((
+                        '.text',
+                        '.rodata',
+                        '.eh_frame',
+                        '.sdata2',
+                        '.data',
+                        '.sdata',
+                        '.bss',
+                        '.sbss',
+                        '.iplt',
+                    )):
+                        _section_name, section_address, section_size, *_rest = line.split()
+                        section_end = int(section_address, base=16) + int(section_size, base=16)
+                        last_section_end = max(last_section_end, section_end)
+                unaligned_new_osarena_value = last_section_end
+
                 # Further symbol post-processing once the map is available.
                 if pass_number == 0:
                     if extender_cup or args.reset_course_page_on_title_screen:
@@ -2484,10 +2506,12 @@ def patch_dol_file(
             baa.pack_baa(tmp_dir, baa_filepath)
 
     if injected_code_size > 0:
+        log.info(f'Injected {injected_code_size} bytes of new code.')
+        previous_osarena_value = aligned(unaligned_previous_osarena_value)
+        new_osarena_value = aligned(unaligned_new_osarena_value)
         log.info(
-            f'Injected {injected_code_size} bytes of new code. '
-            f'OS Arena: 0x{aligned(unaligned_previous_osarena_value):08X} (previous) -> '
-            f'0x{aligned(unaligned_new_osarena_value):08X} (new).',
+            f'OS Arena: 0x{previous_osarena_value:08X} (previous) -> '
+            f'0x{new_osarena_value:08X} (new) (+{new_osarena_value - previous_osarena_value})',
         )
     else:
         log.info('No new code has been injected.')
