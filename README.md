@@ -35,7 +35,7 @@ command-line mode.
 Stand-alone precompiled bundles for Linux and Windows can be found in the
 [**Releases**](https://github.com/cristian64/mkdd-extender/releases) section.
 
-### Development Version
+### Running From Source
 
 Clone the Git repository along with its submodules:
 
