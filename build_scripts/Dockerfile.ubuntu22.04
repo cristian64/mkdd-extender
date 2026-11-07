@@ -8,9 +8,9 @@ RUN apt update && apt install \
     curl \
     git \
     libxcb-cursor0 \
-    python3.14 \
-    python3.14-dev \
-    python3.14-venv \
+    python3.15 \
+    python3.15-dev \
+    python3.15-venv \
     python3-pip \
     ubuntu-gnome-desktop \
     -y
