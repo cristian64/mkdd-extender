@@ -1133,6 +1133,39 @@ that leaves in `r3` whether the course in the current slot and in the current pa
 course. The next instruction to this address will be replaced, too, to compare whether `r3` is `1`.
 """
 
+SCENECOURSESELECT__RNDROULETTE_CALL_ADDRESSES = {
+    'GM4E01': (0x8016AE4C, 0x8016AE88),
+    'GM4P01': (0x80169CF0, 0x80169D2C),
+    'GM4J01': (0x8016AE4C, 0x8016AE88),
+    'GM4E01dbg': (0x8018898C, 0x801889C8),
+}
+"""
+The addresses to the two `bl` instructions in `SceneCourseSelect::course()` from where
+`SceneCourseSelect::rndRoulette()` is invoked.
+"""
+
+SCENEMAPSELECT__RNDROULETTE_CALL_ADDRESS = {
+    'GM4E01': 0x8017431C,
+    'GM4P01': 0x801731C0,
+    'GM4J01': 0x8017431C,
+    'GM4E01dbg': 0x80193944,
+}
+"""
+The address to the `bl` instruction in `SceneMapSelect::map()` from where
+`SceneMapSelect::rndRoulette()` is invoked.
+"""
+
+LANPLAYINFO_GETCRSID_CALL_ADDRESS = {
+    'GM4E01': 0x801DA0C4,
+    'GM4P01': 0x801DA0A8,
+    'GM4J01': 0x801DA0EC,
+    'GM4E01dbg': 0x80209A20,
+}
+"""
+The address to the `bl` instruction in `NetGateApp::calc()` from where `LANPlayInfo::getCrsID()` is
+invoked.
+"""
+
 CUP_FILENAMES_ARRAY_INSTRUCTION_ADDRESSES = {
     'GM4E01': 0x8016BDC0,
     'GM4P01': 0x8016AC64,
@@ -1516,18 +1549,23 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         strlen_ = 0x80107058;
         OSReport = 0x800E8078;
+        OSGetTime = 0x800EC33C;
         JSystemM__JUTReport = 0x80019C4C;
         JUTDbPrint__flush = 0x800199CC;
         GameAudio_Main_startSystemSe = 0x80115E74;
         RaceMgr__drawRace = 0x8018922C;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
+        SceneCourseSelect__rndRoulette = 0x8016C678;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
         SceneMapSelect__reset = 0x8017398C;
+        SceneMapSelect__rndRoulette = 0x80174D20;
         SceneTitle__init = 0x8012D6C8;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801E428C;
         LANPlayInfo__init = 0x801E66E4;
+        LANPlayInfo__getCrsID = 0x801E67C0;
+        LANPlayInfo__getRandomMap = 0x801E6BAC;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B62C;
         ItemShuffleMgr__calcSlot = 0x8020CFEC;
@@ -1549,18 +1587,23 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         strlen_ = 0x80107088;
         OSReport = 0x800E803C;
+        OSGetTime = 0x800EC36C;
         JSystemM__JUTReport = 0x80019C4C;
         JUTDbPrint__flush = 0x800199CC;
         GameAudio_Main_startSystemSe = 0x80115EA4;
         RaceMgr__drawRace = 0x801880D0;
         SceneCourseSelect__calcAnm = 0x8016A584;
+        SceneCourseSelect__rndRoulette = 0x8016B51C;
         SceneMapSelect__calcAnm = 0x80173974;
         SceneMapSelect__map_init = 0x801730A0;
         SceneMapSelect__reset = 0x80172830;
+        SceneMapSelect__rndRoulette = 0x80173BC4;
         SceneTitle__init = 0x8012D6EC;
         KartChecker__setLapTime = 0x8018570C;
         LANSelectMode__calcAnm = 0x801E4264;
         LANPlayInfo__init = 0x801E66B4;
+        LANPlayInfo__getCrsID = 0x801E6790;
+        LANPlayInfo__getRandomMap = 0x801E6B7C;
         SequenceInfo__setClrGPCourse = 0x8013FD14;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B5FC;
         ItemShuffleMgr__calcSlot = 0x8020CFBC;
@@ -1582,18 +1625,23 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         strlen_ = 0x80107058;
         OSReport = 0x800E8078;
+        OSGetTime = 0x800EC33C;
         JSystemM__JUTReport = 0x80019C4C;
         JUTDbPrint__flush = 0x800199CC;
         GameAudio_Main_startSystemSe = 0x80115E74;
         RaceMgr__drawRace = 0x8018922C;
         SceneCourseSelect__calcAnm = 0x8016B6E0;
+        SceneCourseSelect__rndRoulette = 0x8016C678;
         SceneMapSelect__calcAnm = 0x80174AD0;
         SceneMapSelect__map_init = 0x801741FC;
         SceneMapSelect__reset = 0x8017398C;
+        SceneMapSelect__rndRoulette = 0x80174D20;
         SceneTitle__init = 0x8012D6C8;
         KartChecker__setLapTime = 0x80186868;
         LANSelectMode__calcAnm = 0x801E42B4;
         LANPlayInfo__init = 0x801E670C;
+        LANPlayInfo__getCrsID = 0x801E67E8;
+        LANPlayInfo__getRandomMap = 0x801E6BD4;
         SequenceInfo__setClrGPCourse = 0x8013FCE4;
         ItemObjMgr__IsAvailableRollingSlot = 0x8020B654;
         ItemShuffleMgr__calcSlot = 0x8020D014;
@@ -1615,20 +1663,25 @@ SYMBOLS_MAP = {
         memcpy = 0x80003540;
         strlen_ = 0x8010DA58;
         OSReport = 0x800EEA6C;
+        OSGetTime = 0x800F2D3C;
         JSystemM__JUTReport = 0x8006BBF8;
         JUTDbPrint__flush = 0x8006B97C;
         GameAudio_Main_startSystemSe = 0x8011E540;
         RaceMgr__drawRace = 0x801ADD84;
         SceneCourseSelect__calcAnm = 0x80189448;
+        SceneCourseSelect__rndRoulette = 0x8018A71C;
         SceneMapSelect__calcAnm = 0x801943D0;
         SceneMapSelect__map_init = 0x80193824;
         SceneMapSelect__reset = 0x80192D44;
+        SceneMapSelect__rndRoulette = 0x80194620;
         SceneTitle__init = 0x8013C9A8;
         KartChecker__setLapTime = 0x801AADD0;
         KartChecker__isGoal = 0x801AACD8;
         KartChecker__incLap = 0x801AACE0;
         LANSelectMode__calcAnm = 0x80216028;
         LANPlayInfo__init = 0x80218580;
+        LANPlayInfo__getCrsID = 0x8021865C;
+        LANPlayInfo__getRandomMap = 0x80218A48;
         SequenceInfo__setClrGPCourse = 0x801517D0;
         ItemObjMgr__IsAvailableRollingSlot = 0x80241360;
         ItemShuffleMgr__calcSlot = 0x80243508;
@@ -1970,6 +2023,7 @@ def patch_dol_file(
             ('__GP_COURSE_INDEX_ADDRESS__', f'0x{GP_COURSE_INDEX_ADDRESSES[game_id]:08X}'),
             ('__GP_CUP_INDEX_ADDRESS__', f'0x{GP_CUP_INDEX_ADDRESSES[game_id]:08X}'),
             ('__INITIAL_PAGE_INDEX__', f'{initial_page_index}'),
+            ('__ALSO_RANDOMIZE_COURSE_PAGE__', str(int(bool(args.also_randomize_course_page)))),
             ('__LAN_STRUCT_ADDRESS__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][0]:08X}'),
             ('__LAN_STRUCT_OFFSET1__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][1]:04X}'),
             ('__LAN_STRUCT_OFFSET2__', f'0x{LAN_STRUCT_ADDRESSES_AND_OFFSETS[game_id][2]:04X}'),
@@ -2122,6 +2176,17 @@ def patch_dol_file(
                         project.branchlink(
                             LANPLAYINFO_INIT_CALL_ADDRESSES[game_id],
                             'lanplayinfo_init_ex',
+                        )
+                    if args.also_randomize_course_page:
+                        for address in SCENECOURSESELECT__RNDROULETTE_CALL_ADDRESSES[game_id]:
+                            project.branchlink(address, 'scenecourseselect_rndroulette_ex')
+                        project.branchlink(
+                            SCENEMAPSELECT__RNDROULETTE_CALL_ADDRESS[game_id],
+                            'scenemapselect_rndroulette_ex',
+                        )
+                        project.branchlink(
+                            LANPLAYINFO_GETCRSID_CALL_ADDRESS[game_id],
+                            'lanplayinfo_getcrsid_ex',
                         )
                     if pass_number == 1:
                         if args.reset_course_page_on_title_screen:

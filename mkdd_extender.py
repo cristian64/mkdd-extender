@@ -4115,6 +4115,14 @@ OPTIONAL_ARGUMENTS = {
             'page containing the stock courses in the input ISO file.',
         ),
         (
+            'Also Randomize Course Page',
+            bool,
+            'If enabled, also the course page will be randomized when the player uses the in-game '
+            '`L+R` button combination in-game to select a race track or battle stage randomly.'
+            '\n\n'
+            'This also applies to the **RANDOM** course order in LAN mode.',
+        ),
+        (
             'Reset Course Page On Title Screen',
             bool,
             'If enabled, the course page will be reset to the initial page number when the title '

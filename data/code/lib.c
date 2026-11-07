@@ -29,6 +29,7 @@
 #define GP_COURSE_INDEX_ADDRESS __GP_COURSE_INDEX_ADDRESS__
 #define GP_CUP_INDEX_ADDRESS __GP_CUP_INDEX_ADDRESS__
 #define INITIAL_PAGE_INDEX __INITIAL_PAGE_INDEX__
+#define ALSO_RANDOMIZE_COURSE_PAGE __ALSO_RANDOMIZE_COURSE_PAGE__
 #define LAN_STRUCT_ADDRESS __LAN_STRUCT_ADDRESS__
 #define LAN_STRUCT_OFFSET1 __LAN_STRUCT_OFFSET1__
 #define LAN_STRUCT_OFFSET2 __LAN_STRUCT_OFFSET2__
@@ -256,6 +257,77 @@ void scenecourseselect_calcanm_ex()
     SceneCourseSelect__calcAnm();
     process_course_page_change(RACE_MODE);
 }
+
+struct SceneCourseSelect
+{
+};
+
+struct SceneMapSelect
+{
+};
+
+#if ALSO_RANDOMIZE_COURSE_PAGE
+
+static unsigned int g_seed = 0;
+
+void scenecourseselect_rndroulette_ex(struct SceneCourseSelect* this)
+{
+    if (g_seed == 0)
+    {
+        g_seed = OSGetTime();
+    }
+    g_seed = (g_seed * 2654435761) >> 32;
+    const int delta = (int)g_seed % (PAGE_COUNT - 1) + 1;
+    change_course_page(delta);
+    SceneCourseSelect__rndRoulette(this);
+}
+
+#if BATTLE_STAGES
+void scenemapselect_rndroulette_ex(struct SceneMapSelect* this)
+{
+    const int _600 = *(int *)((char*)this + 600);
+    if (_600 == (_600 / 5) * 5)  // Condition seen in SceneMapSelect::rndRoulette().
+    {
+        if (g_seed == 0)
+        {
+            g_seed = OSGetTime();
+        }
+        g_seed = (g_seed * 2654435761) >> 32;
+        const int delta = (int)g_seed % (PAGE_COUNT - 1) + 1;
+        change_course_page(delta);
+        refresh_mapselectmode();
+    }
+
+    SceneMapSelect__rndRoulette(this);
+}
+#endif  // BATTLE_STAGES
+
+struct LANPlayInfo
+{
+    bool mRaceMode;
+    bool _01;
+    bool mCrsOrder;
+    bool _03;
+    int _04;
+    int _08;
+    int _0c;
+    int _10;  // Some sort of seed (or used as a seed?)
+    int _14;  // Some sort of seed (or used as a seed?)
+};
+
+int lanplayinfo_getcrsid_ex(struct LANPlayInfo* this)
+{
+    if (this->mCrsOrder == 0)  // Random
+    {
+        const int seed = this->mRaceMode == 0 ? this->_14 : this->_10;
+        const int delta = LANPlayInfo__getRandomMap(this, PAGE_COUNT, seed);
+        change_course_page(delta);
+    }
+
+    return LANPlayInfo__getCrsID(this);
+}
+
+#endif  // ALSO_RANDOMIZE_COURSE_PAGE
 
 #if COURSE_AND_AUTHOR_NAMES
 
