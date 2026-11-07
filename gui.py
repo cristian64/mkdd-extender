@@ -2,6 +2,13 @@
 Graphical user interface for the MKDD Extender.
 """
 
+import sys
+
+if hasattr(sys, "set_lazy_imports_filter"):
+    # TODO(CA): ThreadExecutor, which imported lazily since Python 3.15, fails to import due to some
+    # friction with PySide. For now, lazy imports are disabled.
+    sys.set_lazy_imports_filter(lambda *_: False)
+
 import argparse
 import atexit
 import collections
@@ -20,7 +27,6 @@ import re
 import shutil
 import signal
 import subprocess
-import sys
 import tempfile
 import textwrap
 import threading
