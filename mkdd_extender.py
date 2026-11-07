@@ -4198,7 +4198,10 @@ OPTIONAL_ARGUMENTS = {
             'Extender Cup',
             bool,
             'If enabled, the All-Cup Tour will be replaced with the Extender Cup, which features '
-            'all the courses included in all the configured course pages.',
+            'all the courses included in all the configured course pages.'
+            '\n\n'
+            'In LAN mode, also the **ALL COURSES** / **ALL STAGES** course orders will cycle '
+            'through all the available course pages.',
         ),
         (
             'LAN Choose Character and Kart',

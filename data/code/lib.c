@@ -302,6 +302,10 @@ void scenemapselect_rndroulette_ex(struct SceneMapSelect* this)
 }
 #endif  // BATTLE_STAGES
 
+#endif // ALSO_RANDOMIZE_COURSE_PAGE
+
+#if ALSO_RANDOMIZE_COURSE_PAGE || EXTENDER_CUP
+
 struct LANPlayInfo
 {
     bool mRaceMode;
@@ -309,7 +313,10 @@ struct LANPlayInfo
     bool mCrsOrder;
     bool _03;
     int _04;
-    int _08;
+    char _08;
+    char mNextCrsIdx;
+    char _0a;
+    char _0b;
     int _0c;
     int _10;  // Some sort of seed (or used as a seed?)
     int _14;  // Some sort of seed (or used as a seed?)
@@ -317,12 +324,28 @@ struct LANPlayInfo
 
 int lanplayinfo_getcrsid_ex(struct LANPlayInfo* this)
 {
+#if ALSO_RANDOMIZE_COURSE_PAGE
     if (this->mCrsOrder == 0)  // Random
     {
         const int seed = this->mRaceMode == 0 ? this->_14 : this->_10;
         const int delta = LANPlayInfo__getRandomMap(this, PAGE_COUNT, seed);
         change_course_page(delta);
     }
+#endif
+
+#if EXTENDER_CUP
+    if (this->mCrsOrder == 2)  // All Courses
+    {
+        if ((this->mRaceMode == 0 && this->mNextCrsIdx == 16)
+#if BATTLE_STAGES
+            || (this->mRaceMode != 0 && this->mNextCrsIdx == 6)
+#endif
+        )
+        {
+            change_course_page(1);
+        }
+    }
+#endif
 
     return LANPlayInfo__getCrsID(this);
 }
